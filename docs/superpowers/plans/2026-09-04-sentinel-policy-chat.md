@@ -258,11 +258,11 @@ git commit -m "feat: orchestrate policy chat actions"
 - Create: `docs/agent-guidelines.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Document the policy parser boundary**
+- [x] **Step 1: Document the policy parser boundary**
 
 Explain action types, structured output, current-policy context, patch validation, one retry, deterministic confirmation, session lifetime, and why policy parsing is separate from risk analysis.
 
-- [ ] **Step 2: Run complete verification**
+- [x] **Step 2: Run complete verification**
 
 ```bash
 .venv/bin/python -m pytest -q
@@ -271,7 +271,7 @@ node --test tests/test_ui.js
 git diff --check
 ```
 
-- [ ] **Step 3: Verify dependency boundaries**
+- [x] **Step 3: Verify dependency boundaries**
 
 ```bash
 rg -n 'from (agents|fastapi|mcp)|import (agents|fastapi|mcp)' app/models app/services
@@ -279,7 +279,7 @@ rg -n 'from (agents|fastapi|mcp)|import (agents|fastapi|mcp)' app/models app/ser
 
 Expected: the only allowed match is the `RequestParser` protocol's own module name containing “parser”; there must be no framework import.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md docs/agent-guidelines.md docs/superpowers/plans/2026-09-04-sentinel-policy-chat.md

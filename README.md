@@ -2,12 +2,13 @@
 
 Sentinel is a Python AI Agent for policy-driven crypto portfolio risk analysis. It is intentionally structured so the boundary between the LLM, deterministic Python rules, and external tools is easy to see.
 
-The deterministic domain core now calculates portfolio allocations, detects policy violations, builds draft rebalance proposals, and evaluates risk without an LLM. The console still uses temporary mock tools until the read-only Binance MCP integration is completed. There is no real trading, FastAPI, database, Docker, LangChain, LangGraph, or CrewAI yet.
+The deterministic domain core now calculates portfolio allocations, detects policy violations, builds draft rebalance proposals, and evaluates risk without an LLM. A structured-output policy parser and in-memory policy conversation service are also implemented. The console still uses temporary mock tools until these components are composed with the read-only Binance MCP integration and FastAPI. There is no real trading, database, Docker, LangChain, LangGraph, or CrewAI.
 
 ## Development documentation
 
 - [Architecture](docs/architecture.md)
 - [Development guidelines](docs/development-guidelines.md)
+- [Agent guidelines](docs/agent-guidelines.md)
 - [Testing guidelines](docs/testing.md)
 - [Vietnamese SRD guide](docs/sentinel-srd-guide.html)
 
@@ -92,7 +93,11 @@ There is no hard-coded Python `if` statement that forces this sequence. The LLM 
 sentinel-agent/
 ├── app/
 │   ├── __init__.py
-│   ├── agent.py
+│   ├── agent/
+│   │   ├── __init__.py
+│   │   ├── policy_parser.py
+│   │   ├── prompts.py
+│   │   └── sentinel.py
 │   ├── config.py
 │   ├── models/
 │   │   ├── __init__.py
@@ -106,7 +111,10 @@ sentinel-agent/
 │   │   ├── policy_service.py
 │   │   ├── portfolio_service.py
 │   │   ├── rebalance_service.py
+│   │   ├── policy_conversation_service.py
+│   │   ├── policy_response_service.py
 │   │   └── risk_service.py
+│   ├── sessions.py
 │   └── tools/
 │       ├── __init__.py
 │       ├── market.py
