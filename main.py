@@ -3,6 +3,8 @@ import asyncio
 from agents import Runner
 
 from app.agent.sentinel import create_sentinel_agent
+from app.binance.gateway import BinanceCliGateway
+from app.binance.runner import BinanceCliRunner
 from app.config import load_settings
 
 
@@ -14,9 +16,11 @@ SAMPLE_PROMPT = (
 async def run_console() -> None:
     """Run Sentinel's interactive command-line loop."""
     settings = load_settings()
-    sentinel = create_sentinel_agent(settings)
+    runner = BinanceCliRunner(settings)
+    gateway = BinanceCliGateway(runner, settings.binance_environment)
+    sentinel = create_sentinel_agent(settings, gateway)
 
-    print("Sentinel is ready. Market and portfolio data are mocked in this MVP.")
+    print("Sentinel is ready. Portfolio and market data come from Binance Demo.")
     print(f"Try: {SAMPLE_PROMPT}")
     print("Type 'exit' to close the application.\n")
 
@@ -40,7 +44,8 @@ async def run_console() -> None:
         except Exception:
             print(
                 "\nSentinel could not complete the request. "
-                "Check your API key and network connection, then try again.\n"
+                "Required Binance Demo data could not be verified. "
+                "No portfolio recommendation was generated.\n"
             )
 
 

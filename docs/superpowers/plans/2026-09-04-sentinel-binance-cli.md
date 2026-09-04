@@ -216,7 +216,7 @@ Add the same `data_source` field to `MarketData`.
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_market_gateway.py -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/binance app/models/market.py tests/unit/test_binance_market_gateway.py
@@ -235,20 +235,20 @@ git commit -m "feat: map Binance Demo market data"
 - Modify: `tests/test_market.py`
 - Modify: `tests/test_agent.py`
 
-- [ ] **Step 1: Write failing Agent/tool tests**
+- [x] **Step 1: Write failing Agent/tool tests**
 
 Create a fake `PortfolioMarketGateway`. Assert tool factories retain the names
 `get_portfolio` and `get_market_data`, the Agent is built with those tools, mock
 constants no longer exist, and instructions require explicit Binance Demo labels
 and prohibit claims about real holdings or trades.
 
-- [ ] **Step 2: Run test to verify RED**
+- [x] **Step 2: Run test to verify RED**
 
 Run: `.venv/bin/python -m pytest tests/test_portfolio.py tests/test_market.py tests/test_agent.py -q`
 
 Expected: tool factories and gateway argument are missing.
 
-- [ ] **Step 3: Implement tool factories and runtime composition**
+- [x] **Step 3: Implement tool factories and runtime composition**
 
 Implement `create_portfolio_tool(gateway)` and `create_market_data_tool(gateway)`
 as closures. Change `create_sentinel_agent(settings, gateway)` and create the
@@ -256,7 +256,7 @@ runner/gateway in `main.py`. Update startup text to state Binance Demo. On a too
 failure, report that Binance data could not be verified and do not offer a risk
 recommendation.
 
-- [ ] **Step 4: Run test to verify GREEN**
+- [x] **Step 4: Run test to verify GREEN**
 
 Run: `.venv/bin/python -m pytest tests/test_portfolio.py tests/test_market.py tests/test_agent.py -q`
 

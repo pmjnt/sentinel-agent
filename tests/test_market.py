@@ -1,21 +1,43 @@
+import asyncio
 from decimal import Decimal
 
-from app.models.market import MarketData, MarketDataError, Volatility
-from app.tools.market import get_market_data
+from app.models.market import MarketData, MarketDataResult, Volatility
+from app.models.portfolio import Portfolio
+from app.models.source import DataSource
+from app.tools.market import create_market_data_tool, read_market_data
 
 
-def test_get_market_data_returns_btc_mock_data() -> None:
-    market_data = get_market_data("BTCUSDT")
+class FakeGateway:
+    def __init__(self) -> None:
+        self.requested_symbols: list[str] = []
+
+    async def get_portfolio(self) -> Portfolio:
+        raise AssertionError("Not used.")
+
+    async def get_market_data(self, symbol: str) -> MarketDataResult:
+        self.requested_symbols.append(symbol)
+        return MarketData(
+            symbol=symbol,
+            price=Decimal("110000"),
+            change_24h_percent=Decimal("-4.2"),
+            volatility=Volatility.HIGH,
+            estimated_slippage_percent=Decimal("0.05"),
+            data_source=DataSource.BINANCE_DEMO,
+        )
+
+
+def test_read_market_data_delegates_symbol_to_injected_gateway() -> None:
+    gateway = FakeGateway()
+
+    market_data = asyncio.run(read_market_data(gateway, "BTCUSDT"))
 
     assert isinstance(market_data, MarketData)
-    assert market_data.price == Decimal("110000")
-    assert market_data.change_24h_percent == Decimal("-4.2")
-    assert market_data.volatility is Volatility.HIGH
-    assert market_data.estimated_slippage_percent == Decimal("0.05")
+    assert market_data.data_source is DataSource.BINANCE_DEMO
+    assert gateway.requested_symbols == ["BTCUSDT"]
 
 
-def test_get_market_data_returns_error_for_unsupported_symbol() -> None:
-    market_data = get_market_data("SOLUSDT")
+def test_market_tool_keeps_stable_ai_visible_name() -> None:
+    tool = create_market_data_tool(FakeGateway())
 
-    assert isinstance(market_data, MarketDataError)
-    assert market_data.error == "Unsupported symbol: SOLUSDT"
+    assert tool.name == "get_market_data"
+    assert "Binance Demo" in tool.description

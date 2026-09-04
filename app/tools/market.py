@@ -1,56 +1,24 @@
-from agents import function_tool
+from agents import FunctionTool, function_tool
 
-from decimal import Decimal
-
-from app.models.market import (
-    MarketData,
-    MarketDataError,
-    MarketDataResult,
-    Volatility,
-)
+from app.gateways import PortfolioMarketGateway
+from app.models.market import MarketDataResult
 
 
-_MOCK_MARKET_DATA = {
-    "BTCUSDT": MarketData(
-        symbol="BTCUSDT",
-        price=Decimal("110000"),
-        change_24h_percent=Decimal("-4.2"),
-        volatility=Volatility.HIGH,
-        estimated_slippage_percent=Decimal("0.05"),
-    ),
-    "ETHUSDT": MarketData(
-        symbol="ETHUSDT",
-        price=Decimal("4300"),
-        change_24h_percent=Decimal("-2.1"),
-        volatility=Volatility.MEDIUM,
-        estimated_slippage_percent=Decimal("0.08"),
-    ),
-}
+async def read_market_data(
+    gateway: PortfolioMarketGateway,
+    symbol: str,
+) -> MarketDataResult:
+    """Application boundary kept separate from the Agents SDK wrapper."""
+    return await gateway.get_market_data(symbol)
 
 
-def get_market_data(symbol: str) -> MarketDataResult:
-    """Return mocked market data for a crypto trading pair.
+def create_market_data_tool(gateway: PortfolioMarketGateway) -> FunctionTool:
+    async def get_market_data(symbol: str) -> MarketDataResult:
+        """Read price, 24-hour change, volatility, and reference slippage from Binance Demo.
 
-    Use this tool when a request needs a mocked current price, 24-hour price
-    change, or volatility. Pass a pair such as BTCUSDT or ETHUSDT.
+        Use this tool when a request needs current simulated market context. Pass
+        a compact pair such as BTCUSDT. Never invent values when an error is returned.
+        """
+        return await read_market_data(gateway, symbol)
 
-    Args:
-        symbol: Crypto trading pair to look up.
-    """
-    normalized_symbol = symbol.strip().upper()
-    market_data = _MOCK_MARKET_DATA.get(normalized_symbol)
-
-    if market_data is None:
-        return MarketDataError(
-            symbol=normalized_symbol,
-            error=f"Unsupported symbol: {normalized_symbol}",
-        )
-
-    return market_data.model_copy()
-
-
-# The Agent receives this SDK wrapper; regular tests call get_market_data directly.
-get_market_data_tool = function_tool(
-    get_market_data,
-    name_override="get_market_data",
-)
+    return function_tool(get_market_data, name_override="get_market_data")
