@@ -318,7 +318,7 @@ git commit -m "feat: apply portfolio policies deterministically"
 - Create: `app/services/rebalance_service.py`
 - Create: `tests/unit/test_rebalance_service.py`
 
-- [ ] **Step 1: Write failing proposal tests**
+- [x] **Step 1: Write failing proposal tests**
 
 For BTC 55%, max 40%, total $10,000, and BTC price $110,000, assert one SELL proposal:
 
@@ -332,7 +332,7 @@ assert plan.status is PlanStatus.DRAFT
 
 Also assert that no action is created for only a stablecoin-shortfall violation when no overweight asset exists, and that missing BTC market data raises a typed `MissingMarketDataError` rather than fabricating a price.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_rebalance_service.py -q
@@ -340,7 +340,7 @@ Also assert that no action is created for only a stablecoin-shortfall violation 
 
 Expected: import fails because the rebalance service does not exist.
 
-- [ ] **Step 3: Implement proposal building**
+- [x] **Step 3: Implement proposal building**
 
 Create `build_rebalance_plan(portfolio: Portfolio, violations: list[PolicyViolation], market_data: dict[str, MarketData]) -> RebalancePlan`.
 
@@ -353,7 +353,7 @@ amount = excess USD / current market price
 
 Quantize USD to `0.01` and asset amount to `0.00000001` using `ROUND_HALF_UP`. A corresponding stablecoin-shortfall violation is explained by the same sell proceeds; it must not create a duplicate trade.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_rebalance_service.py -q
@@ -361,7 +361,7 @@ Quantize USD to `0.01` and asset amount to `0.00000001` using `ROUND_HALF_UP`. A
 
 Expected: all proposal tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/services/rebalance_service.py tests/unit/test_rebalance_service.py
