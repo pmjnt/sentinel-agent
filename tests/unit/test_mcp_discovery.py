@@ -1,0 +1,63 @@
+import asyncio
+import json
+from types import SimpleNamespace
+
+from mcp.types import Tool
+
+from app.mcp.binance import BinanceMcpDiscovery
+from app.mcp.discover import render_catalog_json
+from app.models.mcp import McpToolCatalogEntry
+
+
+class FakeMcpSession:
+    def __init__(self) -> None:
+        self.list_tools_calls = 0
+        self.call_tool_calls = 0
+
+    async def list_tools(self) -> SimpleNamespace:
+        self.list_tools_calls += 1
+        return SimpleNamespace(
+            tools=[
+                Tool(
+                    name="market_reader",
+                    description="Read market data.",
+                    inputSchema={"type": "object"},
+                )
+            ]
+        )
+
+    async def call_tool(self, *args: object, **kwargs: object) -> None:
+        self.call_tool_calls += 1
+        raise AssertionError("Discovery must never call an MCP tool.")
+
+
+def test_discovery_lists_tools_once_without_invoking_them() -> None:
+    session = FakeMcpSession()
+
+    entries = asyncio.run(
+        BinanceMcpDiscovery.discover_with_session(session)
+    )
+
+    assert [entry.name for entry in entries] == ["market_reader"]
+    assert session.list_tools_calls == 1
+    assert session.call_tool_calls == 0
+
+
+def test_catalog_json_contains_only_normalized_metadata() -> None:
+    output = render_catalog_json(
+        [
+            McpToolCatalogEntry(
+                name="market_reader",
+                description="Read market data.",
+                input_schema={"type": "object"},
+                read_only_hint=True,
+                destructive_hint=False,
+            )
+        ]
+    )
+    parsed = json.loads(output)
+
+    assert parsed[0]["name"] == "market_reader"
+    assert "access_token" not in output
+    assert "client_secret" not in output
+    assert "_meta" not in output

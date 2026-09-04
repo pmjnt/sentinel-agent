@@ -195,19 +195,19 @@ git commit -m "feat: normalize Binance MCP tool catalog"
 - Create: `app/mcp/discover.py`
 - Create: `tests/unit/test_mcp_discovery.py`
 
-- [ ] **Step 1: Write failing discovery boundary tests**
+- [x] **Step 1: Write failing discovery boundary tests**
 
 Test a fake MCP session whose `list_tools()` returns fixtures. Assert `BinanceMcpDiscovery.discover_with_session(session)` calls `list_tools()` exactly once, returns normalized entries, and never calls `call_tool()`.
 
 Test CLI JSON rendering from catalog entries separately; serialized output must not contain token-like fields.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_mcp_discovery.py -q
 ```
 
-- [ ] **Step 3: Implement network discovery**
+- [x] **Step 3: Implement network discovery**
 
 `BinanceMcpDiscovery.discover()` must:
 
@@ -222,7 +222,7 @@ Test CLI JSON rendering from catalog entries separately; serialized output must 
 
 `app/mcp/discover.py` runs this flow with `python -m app.mcp.discover`, opens the authorization URL, and prints formatted catalog JSON after success. It must not call any discovered tool.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_mcp_discovery.py -q
