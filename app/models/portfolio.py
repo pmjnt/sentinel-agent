@@ -2,6 +2,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.models.source import DataSource
+
 
 class PortfolioAsset(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -25,3 +27,4 @@ class Portfolio(BaseModel):
 
     assets: list[PortfolioAsset]
     total_usd_value: Decimal = Field(ge=0)
+    data_source: DataSource = DataSource.UNKNOWN

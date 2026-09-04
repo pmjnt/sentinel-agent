@@ -119,7 +119,7 @@ fixed error messages. Authenticated calls use `require_binance_credentials`.
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_cli_runner.py -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/binance tests/unit/test_binance_cli_runner.py
@@ -135,7 +135,7 @@ git commit -m "feat: run Binance CLI safely"
 - Modify: `app/models/portfolio.py`
 - Create: `tests/unit/test_binance_portfolio_gateway.py`
 
-- [ ] **Step 1: Write failing portfolio mapping tests**
+- [x] **Step 1: Write failing portfolio mapping tests**
 
 Use a fake `JsonCommandRunner` with account and ticker fixtures. Assert the gateway
 calls exactly:
@@ -151,13 +151,13 @@ total and weights. Assert zero balances are excluded and a missing price fails
 instead of silently dropping an asset. Assert the result is labelled
 `BINANCE_DEMO`.
 
-- [ ] **Step 2: Run test to verify RED**
+- [x] **Step 2: Run test to verify RED**
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_portfolio_gateway.py -q`
 
 Expected: gateway modules or data-source field are missing.
 
-- [ ] **Step 3: Implement schemas, port, and portfolio mapping**
+- [x] **Step 3: Implement schemas, port, and portfolio mapping**
 
 Define `PortfolioMarketGateway` in `app/gateways.py`. In `schemas.py`, define
 strict transport models for account balances and price ticker rows. In
@@ -165,7 +165,7 @@ strict transport models for account balances and price ticker rows. In
 fixed commands. Add a `data_source` field whose values are `BINANCE_DEMO` and
 `BINANCE_PROD` to the portfolio model.
 
-- [ ] **Step 4: Run test to verify GREEN**
+- [x] **Step 4: Run test to verify GREEN**
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_portfolio_gateway.py -q`
 

@@ -1,9 +1,13 @@
 from decimal import Decimal
 
 from app.models.portfolio import Portfolio, PortfolioAsset
+from app.models.source import DataSource
 
 
-def calculate_portfolio(assets: list[PortfolioAsset]) -> Portfolio:
+def calculate_portfolio(
+    assets: list[PortfolioAsset],
+    data_source: DataSource = DataSource.UNKNOWN,
+) -> Portfolio:
     """Calculate the authoritative portfolio total and asset weights."""
     total_usd_value = sum(
         (asset.usd_value for asset in assets),
@@ -19,4 +23,5 @@ def calculate_portfolio(assets: list[PortfolioAsset]) -> Portfolio:
     return Portfolio(
         assets=weighted_assets,
         total_usd_value=total_usd_value,
+        data_source=data_source,
     )
