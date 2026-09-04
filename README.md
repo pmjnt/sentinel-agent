@@ -1,8 +1,24 @@
 # Sentinel Agent
 
-Sentinel is a minimal Python AI Agent that analyzes the risk of a mocked crypto portfolio. It is intentionally small so the boundary between the LLM and its tools is easy to see.
+Sentinel is a Python AI Agent for policy-driven crypto portfolio risk analysis. It is intentionally structured so the boundary between the LLM, deterministic Python rules, and external tools is easy to see.
 
-This is Phase 1 only: there is no Binance connection, real trading, FastAPI, database, Docker, LangChain, LangGraph, or CrewAI. A static educational UI is included, but it is not connected to the Python Agent yet.
+The deterministic domain core now calculates portfolio allocations, detects policy violations, builds draft rebalance proposals, and evaluates risk without an LLM. The console still uses temporary mock tools until the read-only Binance MCP integration is completed. There is no real trading, FastAPI, database, Docker, LangChain, LangGraph, or CrewAI yet.
+
+## Development documentation
+
+- [Architecture](docs/architecture.md)
+- [Development guidelines](docs/development-guidelines.md)
+- [Testing guidelines](docs/testing.md)
+- [Vietnamese SRD guide](docs/sentinel-srd-guide.html)
+
+The core responsibility rule is:
+
+```text
+LLM understands and coordinates.
+Python calculates and validates.
+RiskEngine enforces safety rules.
+Binance MCP supplies live read-only data in the target runtime.
+```
 
 ## What is an AI Agent?
 
@@ -78,12 +94,25 @@ sentinel-agent/
 │   ├── __init__.py
 │   ├── agent.py
 │   ├── config.py
-│   ├── models.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── market.py
+│   │   ├── policy.py
+│   │   ├── portfolio.py
+│   │   ├── risk.py
+│   │   └── trade.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── policy_service.py
+│   │   ├── portfolio_service.py
+│   │   ├── rebalance_service.py
+│   │   └── risk_service.py
 │   └── tools/
 │       ├── __init__.py
 │       ├── market.py
 │       └── portfolio.py
 ├── tests/
+│   ├── unit/
 │   ├── test_agent.py
 │   ├── test_config.py
 │   ├── test_market.py

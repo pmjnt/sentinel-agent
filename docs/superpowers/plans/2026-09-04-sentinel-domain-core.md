@@ -425,7 +425,7 @@ git commit -m "feat: enforce deterministic portfolio risk rules"
 - Create: `docs/testing.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Document the implemented boundary**
+- [x] **Step 1: Document the implemented boundary**
 
 Document:
 
@@ -435,7 +435,7 @@ Document:
 - TDD commands and external-call prohibition in unit tests;
 - the fact that this checkpoint implements the deterministic core while the existing mock runtime remains temporary until the Binance MCP plan is completed.
 
-- [ ] **Step 2: Run complete verification**
+- [x] **Step 2: Run complete verification**
 
 ```bash
 .venv/bin/python -m pytest -q
@@ -446,7 +446,7 @@ git diff --check
 
 Expected: all Python and JavaScript tests pass, compilation succeeds, and no whitespace error is reported.
 
-- [ ] **Step 3: Verify dependency boundaries**
+- [x] **Step 3: Verify dependency boundaries**
 
 ```bash
 rg -n 'from (agents|fastapi|mcp)|import (agents|fastapi|mcp)' app/models app/services
@@ -454,7 +454,7 @@ rg -n 'from (agents|fastapi|mcp)|import (agents|fastapi|mcp)' app/models app/ser
 
 Expected: no matches.
 
-- [ ] **Step 4: Commit documentation**
+- [x] **Step 4: Commit documentation**
 
 ```bash
 git add README.md docs/architecture.md docs/development-guidelines.md docs/testing.md
