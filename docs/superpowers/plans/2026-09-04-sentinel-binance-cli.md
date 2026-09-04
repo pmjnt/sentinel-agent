@@ -260,7 +260,7 @@ recommendation.
 
 Run: `.venv/bin/python -m pytest tests/test_portfolio.py tests/test_market.py tests/test_agent.py -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/tools app/agent main.py tests/test_portfolio.py tests/test_market.py tests/test_agent.py
@@ -282,32 +282,32 @@ git commit -m "feat: use Binance Demo tools in Sentinel"
 - Modify: `README.md`
 - Modify: `docs/architecture.md`
 
-- [ ] **Step 1: Write/adjust a dependency-boundary test**
+- [x] **Step 1: Write/adjust a dependency-boundary test**
 
 Add an assertion to the runner/gateway tests that importing the normal application
 does not require `mcp` or `httpx2`. Search for runtime `app.mcp` imports and record
 the expected RED state before deletion.
 
-- [ ] **Step 2: Run boundary check to verify RED**
+- [x] **Step 2: Run boundary check to verify RED**
 
 Run: `rg -n "app\.mcp|from mcp|import mcp|httpx2" app requirements.txt`
 
 Expected: MCP implementation and dependencies are still present.
 
-- [ ] **Step 3: Remove MCP code and update documentation**
+- [x] **Step 3: Remove MCP code and update documentation**
 
 Delete the listed files with `apply_patch`, remove `mcp` and `httpx2` from
 requirements, and document the Skills Hub architecture, Demo key creation,
 read-only allowlist, installation, and run commands. Keep historical design/plan
 documents under `docs/superpowers/` as decision records.
 
-- [ ] **Step 4: Verify boundary is GREEN**
+- [x] **Step 4: Verify boundary is GREEN**
 
 Run: `rg -n "app\.mcp|from mcp|import mcp|httpx2" app requirements.txt`
 
 Expected: no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A app tests requirements.txt README.md docs web/oauth

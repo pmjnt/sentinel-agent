@@ -21,17 +21,17 @@ Unit test không được:
 
 - đọc `.env` thật;
 - gọi LLM;
-- kết nối Binance MCP;
+- gọi `binance-cli` thật hoặc kết nối mạng;
 - mở browser;
 - phụ thuộc thời gian chờ.
 
 ### Integration tests
 
-Khi FastAPI và MCP adapter được thêm, integration test kiểm tra:
+Khi FastAPI được thêm, integration test kiểm tra:
 
 - API contract bằng dependency override;
 - workflow bằng fake intent parser và fake gateway;
-- Binance payload mapping bằng fixture đã loại dữ liệu nhạy cảm;
+- Binance CLI payload mapping bằng fixture đã loại dữ liệu nhạy cảm;
 - read-only allow-list;
 - error path không fallback sang mock.
 
@@ -39,7 +39,7 @@ Fake chỉ mô phỏng boundary, không mô phỏng lại business logic.
 
 ### Real smoke test
 
-Smoke test Binance là lệnh opt-in và không nằm trong pytest mặc định. Nó yêu cầu OAuth tương tác, chỉ list tool metadata và gọi capability đọc đã được duyệt. Không chạy trong CI.
+Smoke test Binance là lệnh opt-in và không nằm trong pytest mặc định. Nó dùng Binance Demo credentials do người dùng cấu hình cục bộ và chỉ chạy các lệnh đọc nằm trong allow-list. Không chạy trong CI và không in khóa bí mật.
 
 ## TDD workflow
 

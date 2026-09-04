@@ -1,16 +1,27 @@
 # Kiến trúc Sentinel
 
-## Mục tiêu kiến trúc
-
-Sentinel tách ba loại trách nhiệm:
+## Trách nhiệm
 
 ```text
-LLM hiểu ngôn ngữ và điều phối việc đọc dữ liệu.
-Python tính toán và áp dụng policy.
-RiskEngine quyết định proposal bị chặn, cần duyệt hay an toàn để đề xuất.
+LLM
+├── hiểu ngôn ngữ
+├── chọn get_portfolio / get_market_data
+└── giải thích kết quả
+
+BinanceCliGateway
+├── chọn command đọc cố định
+├── validate JSON Binance
+└── chuyển thành domain model
+
+Python services
+├── tính USD value và weight
+├── phát hiện policy violation
+├── tạo rebalance proposal
+└── chạy RiskEngine
 ```
 
-Không thành phần nào trong phiên bản read-only có quyền thực hiện giao dịch.
+LLM không được thực hiện phép tính tài chính có tính quyết định và không được
+quyền tạo command Binance.
 
 ## Dependency direction
 
@@ -19,110 +30,82 @@ app.models
     ↑
 app.services
     ↑
-Agent / MCP adapter / FastAPI
+app.gateways (application port)
+    ↑
+app.binance (external adapter)
+    ↑
+app.tools / app.agent / main.py
 ```
 
-- `app.models`: dữ liệu nghiệp vụ và validation cấp field.
-- `app.services`: phép tính và business rule deterministic.
-- `app.agent`: hiểu ngôn ngữ, chọn application tool và giải thích kết quả.
-- `app.mcp`: kết nối Binance, discover tool và chuyển payload sang model nội bộ.
-- `app.api`: HTTP boundary; không chứa phép tính tài chính.
-- `web`: chỉ giao tiếp với FastAPI, không giữ secret.
+- `app.models`: Pydantic domain data.
+- `app.services`: business rules deterministic.
+- `app.gateways`: interface do ứng dụng sở hữu.
+- `app.binance`: adapter Binance Skills Hub và schema transport.
+- `app.tools`: capability nhỏ, ổn định được expose cho LLM.
+- `app.agent`: prompt và Agent construction.
+- `web`: UI tĩnh, không nhận secret.
 
-`models` và `services` không được import `agents`, `litellm`, `fastapi` hoặc `mcp`.
+`models` và `services` không import Agents SDK, LiteLLM hoặc Binance CLI.
 
-## Domain core hiện đã có
-
-### Models
-
-- `portfolio.py`: `PortfolioAsset`, `Portfolio`.
-- `market.py`: `MarketData`, `MarketDataError`, `Volatility`.
-- `policy.py`: policy hoàn chỉnh, patch và violation.
-- `trade.py`: action đề xuất và rebalance plan.
-- `risk.py`: risk status và reason code.
-
-### Services
-
-- `portfolio_service.py`: tính tổng portfolio và tỷ trọng.
-- `policy_service.py`: merge patch và phát hiện violation.
-- `rebalance_service.py`: tạo proposal, không execute.
-- `risk_service.py`: áp dụng rule theo thứ tự ưu tiên.
-
-## Luồng deterministic
-
-Với portfolio:
+## Data flow
 
 ```text
-BTC  $5,500
-ETH  $2,500
-USDT $2,000
-```
-
-`calculate_portfolio()` tự tính:
-
-```text
-BTC  55%
-ETH  25%
-USDT 20%
-```
-
-Với policy:
-
-```text
-USDT tối thiểu 30%
-Mỗi crypto asset tối đa 40%
-Chặn rebalance khi volatility HIGH
-Trên $1,000 cần approval
-```
-
-Các service tạo kết quả:
-
-```text
-PolicyService
-  ├── BTC vượt 40%
-  └── USDT dưới 30%
-
-RebalanceService
-  └── đề xuất SELL ~$1,500 BTC
-
-RiskService
-  └── BLOCKED nếu BTC volatility HIGH
-```
-
-LLM không tham gia vào các phép tính này.
-
-## Ranh giới dữ liệu ngoài
-
-Ở checkpoint Binance MCP, chỉ một port được thêm:
-
-```python
-class PortfolioMarketGateway(Protocol):
-    async def get_portfolio(self) -> Portfolio: ...
-    async def get_market_data(self, symbol: str) -> MarketData: ...
-```
-
-Hai Agents SDK function tools ổn định gọi port này. Production implementation sử dụng Binance MCP; integration test sử dụng fake gateway. Raw Binance MCP tools không được đưa trực tiếp cho LLM.
-
-## Trạng thái hiện tại và trạng thái đích
-
-Hiện tại console Agent vẫn sử dụng hai tool mock cũ để giữ ứng dụng chạy được trong quá trình chuyển đổi. Đây là trạng thái tạm thời, không phải fallback production.
-
-Trạng thái đích:
-
-```text
-Web UI
+LLM gọi get_portfolio()
   ↓
-FastAPI
+BinanceCliGateway
+  ├── spot get-account
+  └── spot ticker-price
   ↓
-Sentinel Agent
-  ├── get_portfolio() ─────┐
-  └── get_market_data() ───┤
-                            ↓
-                     Binance MCP gateway
-                            ↓
-Policy Engine → Planner → RiskEngine
-                            ↓
-                 Structured result + explanation
+Pydantic transport validation
+  ↓
+PortfolioAsset(amount, usd_value)
+  ↓
+calculate_portfolio()
+  ↓
+Portfolio(total, weights, BINANCE_DEMO)
 ```
 
-Nếu Binance không kết nối hoặc trả lỗi, workflow dừng và báo lỗi. Không sử dụng mock data thay thế.
+```text
+LLM gọi get_market_data("BTCUSDT")
+  ↓
+validate symbol
+  ↓
+BinanceCliGateway
+  ├── spot ticker24hr
+  └── spot depth
+  ↓
+MarketData(price, change, volatility, slippage, BINANCE_DEMO)
+```
+
+Volatility dùng rule deterministic dựa trên độ lớn biến động 24 giờ:
+
+```text
+< 2%       LOW
+2%..<4%    MEDIUM
+>= 4%      HIGH
+```
+
+Slippage được ước lượng từ bid depth cho một reference sale 1,000 USDT. Đây là
+con số tham chiếu phân tích, không phải một order.
+
+## Security boundary
+
+`BinanceCliRunner` dùng argument array và không mở shell. Public commands không
+nhận credentials. Account command nhận Binance credentials qua child environment
+nhưng không log chúng. LLM provider keys không được truyền sang CLI.
+
+Command allowlist không chứa trade, transfer, withdrawal, cancel hay generic
+request. Nếu CLI lỗi, schema sai, thiếu giá hoặc thiếu depth, workflow fail-closed
+và không thay bằng mock data.
+
+## Môi trường
+
+Mặc định là `BINANCE_API_ENV=demo`. Portfolio là số dư mô phỏng của Binance Demo,
+không phải tài sản thật. `prod` chỉ dành cho giai đoạn sau với key read-only và
+không thay đổi command allowlist.
+
+## Khả năng thay adapter
+
+Hai AI tools phụ thuộc vào `PortfolioMarketGateway`, không phụ thuộc trực tiếp
+vào CLI. Sau này có thể thay bằng MCP adapter được Binance hỗ trợ mà không đổi
+tên tool, Agent prompt hoặc domain services.

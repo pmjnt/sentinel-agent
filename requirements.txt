@@ -1,7 +1,5 @@
 openai-agents[litellm]
 litellm==1.83.0
-mcp>=2.1,<3
-httpx2>=2.12,<3
 pydantic
 python-dotenv
 pytest

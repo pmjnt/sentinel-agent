@@ -1,337 +1,207 @@
 # Sentinel Agent
 
-Sentinel is a Python AI Agent for policy-driven crypto portfolio risk analysis. It is intentionally structured so the boundary between the LLM, deterministic Python rules, and external tools is easy to see.
+Sentinel is a policy-driven AI Agent that analyzes portfolio risk using Binance
+Demo Trading data. It is a Track A project for the Binance Agent OS Mini
+Hackathon and uses the official Binance Skills Hub `binance-cli` integration.
 
-The deterministic domain core now calculates portfolio allocations, detects policy violations, builds draft rebalance proposals, and evaluates risk without an LLM. A structured-output policy parser and in-memory policy conversation service are also implemented. Binance MCP OAuth and safe tool discovery are implemented; the production data adapter will be written only after its real schema is reviewed. There is no real trading, database, Docker, LangChain, LangGraph, or CrewAI.
+Sentinel never places an order. Demo balances are simulated and every response
+must label them as Binance Demo data.
 
-## Development documentation
-
-- [Architecture](docs/architecture.md)
-- [Development guidelines](docs/development-guidelines.md)
-- [Agent guidelines](docs/agent-guidelines.md)
-- [Testing guidelines](docs/testing.md)
-- [Binance MCP discovery and security](docs/binance-mcp.md)
-- [Vietnamese SRD guide](docs/sentinel-srd-guide.html)
-
-The core responsibility rule is:
+## Responsibility boundaries
 
 ```text
-LLM understands and coordinates.
-Python calculates and validates.
-RiskEngine enforces safety rules.
-Binance MCP supplies live read-only data in the target runtime.
+LLM understands the request, chooses application tools, and explains results.
+Binance Skills Hub supplies Demo portfolio and market observations.
+Python calculates allocations, policy violations, proposals, and risk decisions.
+RiskEngine enforces deterministic safety rules.
 ```
 
-## What is an AI Agent?
+The LLM is not authoritative for arithmetic, thresholds, permissions, or trade
+execution.
 
-A normal chatbot receives text and returns text. An AI Agent can also choose and call tools while working toward the user's goal.
+## Agent loop
 
-In Sentinel, the user asks a risk question. The LLM decides whether it needs portfolio holdings, market data, or both. The OpenAI Agents SDK runs the selected Python tool, sends its structured result back to the LLM, and lets the LLM continue its analysis.
-
-Sentinel uses LiteLLM as a model-routing layer. OpenAI Agents SDK still owns the Agent and tool loop; LiteLLM only routes the model request to OpenAI or Gemini.
-
-```text
-Sentinel Agent -> LiteLLM -> OpenAI or Gemini
-```
-
-## The LLM and the tools
-
-The **LLM is the AI brain**. It lives behind the `Agent` configured in `app/agent.py`. It understands the user's request, reads Sentinel's instructions, decides which tools are relevant, and explains the risk.
-
-The **tools are ordinary Python capabilities exposed to the LLM**:
-
-- `get_portfolio()` returns the user's mocked holdings and total value.
-- `get_market_data(symbol)` returns mocked price, 24-hour change, and volatility.
-
-Each tool starts as a plain Python function, which makes it easy to unit test. `function_tool(...)` creates a separate SDK wrapper that describes the function to the LLM. The Agent receives the wrappers, while tests call the plain functions directly.
-
-```text
-Plain Python function --function_tool(...)--> AI-callable tool
-```
-
-## Architecture
-
-```text
-User
-  |
-  v
-Sentinel Agent / LLM
-  |
-  | chooses tools
-  |
-  +----> get_portfolio()
-  |
-  +----> get_market_data()
-  |
-  v
-LLM analyzes tool results
-  |
-  v
-Final response
-```
-
-## Sentinel's agent loop
-
-For this request:
+For:
 
 ```text
 Analyze my BTC exposure and tell me whether it currently looks risky.
 ```
 
-the loop is expected to work like this:
+the OpenAI Agents SDK lets the LLM choose this sequence:
 
-1. The LLM sees that exposure depends on the user's holdings and calls `get_portfolio()`.
-2. The tool returns BTC = $6,000, ETH = $2,500, USDT = $1,500, total = $10,000.
-3. The LLM sees that "currently risky" also needs market context and calls `get_market_data("BTCUSDT")`.
-4. The tool returns the mocked BTC price, 24-hour change, and volatility.
-5. The LLM receives both tool results, separates facts from interpretation, and explains concentration and market risk.
+```text
+User
+  ↓
+Sentinel Agent / LLM
+  ├── get_portfolio()
+  │         ↓
+  │   BinanceCliGateway
+  │         ↓
+  │   binance-cli spot get-account
+  │
+  └── get_market_data("BTCUSDT")
+            ↓
+      BinanceCliGateway
+            ↓
+      ticker24hr + depth
+  ↓
+LLM explains facts and interpretation separately
+```
 
-There is no hard-coded Python `if` statement that forces this sequence. The LLM chooses tools from the user's request, the Agent instructions, each tool's description, and its argument schema. `Runner.run(...)` manages the tool-call loop.
+Only the two application tools are visible to the LLM. It cannot select CLI
+subcommands, URLs, order commands, transfers, or withdrawals.
 
 ## Project structure
 
 ```text
 sentinel-agent/
 ├── app/
-│   ├── __init__.py
-│   ├── agent/
-│   │   ├── __init__.py
-│   │   ├── policy_parser.py
-│   │   ├── prompts.py
-│   │   └── sentinel.py
+│   ├── agent/             # LLM instructions and Agent construction
+│   ├── binance/           # Safe CLI runner, response schemas, gateway
+│   ├── models/            # Pydantic domain models
+│   ├── services/          # Deterministic policy/planning/risk logic
+│   ├── tools/             # Two AI-callable application tools
 │   ├── config.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── market.py
-│   │   ├── policy.py
-│   │   ├── portfolio.py
-│   │   ├── risk.py
-│   │   └── trade.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── policy_service.py
-│   │   ├── portfolio_service.py
-│   │   ├── rebalance_service.py
-│   │   ├── policy_conversation_service.py
-│   │   ├── policy_response_service.py
-│   │   └── risk_service.py
-│   ├── sessions.py
-│   └── tools/
-│       ├── __init__.py
-│       ├── market.py
-│       └── portfolio.py
-├── tests/
-│   ├── unit/
-│   ├── test_agent.py
-│   ├── test_config.py
-│   ├── test_market.py
-│   ├── test_portfolio.py
-│   └── test_ui.js
-├── web/
-│   ├── app.js
-│   ├── index.html
-│   └── styles.css
-├── .env.example
-├── .gitignore
+│   ├── gateways.py
+│   └── sessions.py
+├── tests/                 # Offline tests; no Binance or LLM calls
+├── web/                   # Static vintage UI prototype
+├── docs/
 ├── main.py
-├── README.md
 └── requirements.txt
 ```
+
+More detail:
+
+- [Architecture](docs/architecture.md)
+- [Development guidelines](docs/development-guidelines.md)
+- [Agent guidelines](docs/agent-guidelines.md)
+- [Testing guidelines](docs/testing.md)
+- [Binance Skills Hub setup](docs/binance-skills-hub.md)
+- [Vietnamese SRD guide](docs/sentinel-srd-guide.html)
 
 ## Requirements
 
 - Python 3.12
-- An OpenAI or Gemini API key
+- Official `binance-cli` 2.1.1 or a later compatible release
+- A Binance Demo Trading API key for portfolio reads
+- An OpenAI or Gemini API key for the LLM
 
-Confirm your Python version:
-
-```bash
-python3.12 --version
-```
-
-## Create a virtual environment
-
-From the project root:
+## Python setup
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-```
-
-On Windows PowerShell, activate it with:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-## Install dependencies
-
-```bash
 python -m pip install -r requirements.txt
 ```
 
-`litellm==1.83.0` is pinned because it is compatible with the OpenAI Python 3.x dependency used by the installed Agents SDK. Upgrade the Agents SDK and LiteLLM together after checking their dependency ranges.
+## Install the official Binance CLI
 
-## Configure the LLM provider and model
+For security, download and inspect the official installer instead of piping
+network output directly into a shell:
 
-Copy the example file:
+```bash
+curl --proto '=https' --tlsv1.2 -L \
+  https://github.com/binance/binance-cli/releases/latest/download/binance-cli-installer.sh \
+  -o /tmp/binance-cli-installer.sh
+less /tmp/binance-cli-installer.sh
+sh /tmp/binance-cli-installer.sh
+binance-cli --version
+```
+
+The source and releases belong to the official
+[binance/binance-cli](https://github.com/binance/binance-cli) repository.
+
+## Configure `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Then edit `.env`. The default example prioritizes Gemini's free tier:
+Gemini example:
 
 ```dotenv
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash-lite
+GEMINI_API_KEY=your_gemini_api_key
 
-OPENAI_API_KEY=
-GEMINI_API_KEY=your_gemini_api_key_here
+BINANCE_API_ENV=demo
+BINANCE_CLI_PATH=binance-cli
+BINANCE_API_KEY=your_demo_api_key
+BINANCE_SECRET_KEY=your_demo_secret_key
 ```
 
-Other general-purpose Gemini models currently shown in the UI are:
-
-```text
-gemini-3.1-flash-lite
-gemini-3.5-flash
-gemini-3-flash-preview
-```
-
-Google lists these models as free of charge within free-tier quotas. Free tier does not mean unlimited use, availability can vary by region/account, and Google may change its model catalog or quotas. Check the [official Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing) before relying on a model.
-
-To use OpenAI instead:
+OpenAI example:
 
 ```dotenv
 LLM_PROVIDER=openai
 LLM_MODEL=gpt-5.6-luna
-
-OPENAI_API_KEY=your_openai_api_key_here
-GEMINI_API_KEY=
+OPENAI_API_KEY=your_openai_api_key
 ```
 
-`LLM_MODEL` is editable. Enter only the provider's model ID; Sentinel adds the LiteLLM routing prefix itself. For example, enter `gpt-5.6-luna`, not `litellm/openai/gpt-5.6-luna`.
+`LLM_MODEL` contains the provider model ID. Sentinel constructs the LiteLLM
+route, for example:
 
-Only the API key for the selected provider is required. The provider validates whether the configured model exists and whether your key can access it when the first request is made.
+```text
+gemini + gemini-3.5-flash-lite
+→ litellm/gemini/gemini-3.5-flash-lite
+```
 
-Never commit `.env`. It is listed in `.gitignore`. OpenAI tracing is disabled in this MVP so a Gemini configuration does not also require an OpenAI key.
+Never commit `.env`. Never paste Binance credentials into chat or frontend
+code. Use keys created in Binance Demo Trading, not production credentials.
 
-## Run Sentinel
+## Read-only Binance commands
+
+Sentinel's gateway contains a fixed allowlist:
+
+```text
+spot get-account --omit-zero-balances true
+spot ticker-price
+spot ticker24hr --symbol <validated symbol>
+spot depth --symbol <validated symbol> --limit 100
+```
+
+There is no generic `binance-cli request`, order, cancel, trade, transfer, or
+withdrawal code path.
+
+## Run
 
 ```bash
 python main.py
 ```
 
-At the prompt, try:
+Try:
 
 ```text
 Sentinel > Analyze my BTC exposure and tell me whether it currently looks risky.
 ```
 
-Type `exit` to close the application.
+Type `exit` to close the console.
 
-## Discover the real Binance MCP schema
-
-Binance requires a public HTTPS OAuth Client ID Metadata Document. Configure its URL
-first:
-
-```dotenv
-BINANCE_MCP_CLIENT_METADATA_URL=https://your-domain.example/oauth/client-metadata.json
-```
-
-The discovery command then opens Binance OAuth and calls only MCP `list_tools()`:
+## Test
 
 ```bash
-python -m app.mcp.discover
+python -m pytest -q
+node --test tests/test_ui.js
+python -m compileall -q app main.py tests
 ```
 
-Select read-only Market Data/Account access when available; do not grant Trade or
-Transfer permissions. OAuth state is held only in memory. See the
-[Binance MCP guide](docs/binance-mcp.md) before running it.
+Tests use fake gateways and fake subprocesses. They never call Binance, OpenAI,
+Gemini, or a real CLI process.
 
-## Preview the vintage web interface
-
-The `web/` directory is a plain HTML/CSS/JavaScript prototype. It shows provider/model selection, the decisions Sentinel would make, tool inputs and outputs, and a report that separates factual tool data from AI interpretation.
-
-Start a local static server from the project root:
+## Static UI preview
 
 ```bash
 python -m http.server 8000 -d web
 ```
 
-Then open [http://localhost:8000](http://localhost:8000).
+Open [http://localhost:8000](http://localhost:8000). The current frontend is a
+static visual prototype: its progress animation and result cards are simulated.
+It never receives LLM or Binance API keys.
 
-The progress and result shown in this interface are deliberately **simulated with mocked data**. Changing the provider or model demonstrates the future configuration flow; it does not send a request to OpenAI or Gemini from the browser.
+## What gets replaced later?
 
-### What happens when a model is selected?
-
-In the current static UI, the selection only updates a route preview such as:
-
-```text
-litellm/gemini/gemini-3.5-flash-lite
-```
-
-The working console app uses the same idea through `.env`:
-
-```text
-LLM_PROVIDER + LLM_MODEL
-          |
-          v
-Settings.agents_model
-          |
-          v
-Agent(model="litellm/gemini/gemini-3.5-flash-lite")
-          |
-          v
-LiteLLM reads GEMINI_API_KEY and calls Gemini
-```
-
-`Runner.run(...)` then sends the user's prompt to that model. When the model chooses a Sentinel tool, the Agents SDK executes it and returns its structured result to the same model. A later backend will receive the UI selection, validate it against an allow-list, and construct `Settings`; the browser must never receive or store the API key.
-
-When a backend is added later, a FastAPI SSE or WebSocket endpoint can replace the JavaScript timers. The existing event renderer can remain and render real Agent/tool events as they arrive.
-
-## Run tests
-
-```bash
-python -m pytest -v
-node --test tests/test_ui.js
-```
-
-The tests cover the plain mock-data functions, provider configuration, Agent construction, and the static UI's pure domain logic. They do not call OpenAI or Gemini and do not need a real API key.
-
-## What LiteLLM does
-
-Sentinel passes model IDs such as these to OpenAI Agents SDK:
-
-```text
-litellm/openai/gpt-5.6-luna
-litellm/gemini/gemini-3.5-flash-lite
-```
-
-The SDK delegates those model requests to LiteLLM. LiteLLM selects the provider and reads its standard API-key environment variable. It does not decide when to call portfolio or market tools; that remains the responsibility of the Sentinel Agent and its LLM.
-
-This MVP does not use the LiteLLM Proxy Server, automatic fallback, load balancing, cost tracking, or multi-provider retries.
-
-For a basic syntax check:
-
-```bash
-python -m compileall app main.py tests
-```
-
-## What changes when Binance MCP is added?
-
-Phase 1 currently has this data path:
-
-```text
-LLM -> local tool -> hard-coded mock data
-```
-
-A later Binance MCP phase will use a path such as:
-
-```text
-LLM -> MCP tool -> Binance -> real data
-```
-
-The mock implementations in `app/tools/portfolio.py` and `app/tools/market.py` are the main code that will be replaced or adapted. The Pydantic models, Sentinel instructions, console loop, and the overall Agent/tool loop can mostly remain.
-
-Adding Binance MCP or trading is deliberately outside this phase.
+`BinanceCliGateway` is behind the application-owned
+`PortfolioMarketGateway` protocol. If Binance later supports Sentinel as a
+direct MCP client, a new MCP gateway can implement the same two methods without
+changing the domain models, deterministic services, or AI-visible tool names.
