@@ -2,12 +2,24 @@ import os
 from enum import Enum
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LLMProvider(str, Enum):
     OPENAI = "openai"
     GEMINI = "gemini"
+
+
+class BinanceEnvironment(str, Enum):
+    DEMO = "demo"
+    PROD = "prod"
+
+
+class BinanceCredentials(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    api_key: str = Field(repr=False)
+    secret_key: str = Field(repr=False)
 
 
 class Settings(BaseModel):
@@ -17,6 +29,10 @@ class Settings(BaseModel):
     llm_model: str
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
+    binance_environment: BinanceEnvironment = BinanceEnvironment.DEMO
+    binance_cli_path: str = "binance-cli"
+    binance_api_key: str | None = Field(default=None, repr=False)
+    binance_secret_key: str | None = Field(default=None, repr=False)
 
     @property
     def agents_model(self) -> str:
@@ -50,9 +66,39 @@ def load_settings() -> Settings:
     if key_value is None:
         raise ValueError(f"{key_name} is required when LLM_PROVIDER={provider.value}.")
 
+    binance_environment_value = os.getenv("BINANCE_API_ENV", "demo").strip().lower()
+    try:
+        binance_environment = BinanceEnvironment(binance_environment_value)
+    except ValueError as error:
+        raise ValueError("BINANCE_API_ENV must be demo or prod.") from error
+
+    binance_cli_path = os.getenv("BINANCE_CLI_PATH", "binance-cli").strip()
+    if not binance_cli_path:
+        raise ValueError("BINANCE_CLI_PATH must not be empty.")
+
     return Settings(
         llm_provider=provider,
         llm_model=model,
         openai_api_key=openai_api_key,
         gemini_api_key=gemini_api_key,
+        binance_environment=binance_environment,
+        binance_cli_path=binance_cli_path,
+        binance_api_key=os.getenv("BINANCE_API_KEY", "").strip() or None,
+        binance_secret_key=os.getenv("BINANCE_SECRET_KEY", "").strip() or None,
+    )
+
+
+def require_binance_credentials(settings: Settings) -> BinanceCredentials:
+    """Return configured credentials without ever including their values in errors."""
+    missing = []
+    if settings.binance_api_key is None:
+        missing.append("BINANCE_API_KEY")
+    if settings.binance_secret_key is None:
+        missing.append("BINANCE_SECRET_KEY")
+    if missing:
+        raise ValueError(f"Missing Binance credentials: {', '.join(missing)}.")
+
+    return BinanceCredentials(
+        api_key=settings.binance_api_key,
+        secret_key=settings.binance_secret_key,
     )

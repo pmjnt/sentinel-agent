@@ -17,20 +17,20 @@
 - Modify: `.env.example`
 - Modify: `tests/test_config.py`
 
-- [ ] **Step 1: Write failing configuration tests**
+- [x] **Step 1: Write failing configuration tests**
 
 Add tests asserting that `Settings` defaults to `BINANCE_API_ENV=demo` and
 `BINANCE_CLI_PATH=binance-cli`, accepts optional credentials, rejects unsupported
 environments, and raises a safe error naming missing variables without values when
 account credentials are requested.
 
-- [ ] **Step 2: Run test to verify RED**
+- [x] **Step 2: Run test to verify RED**
 
 Run: `.venv/bin/python -m pytest tests/test_config.py -q`
 
 Expected: imports or assertions for `BinanceEnvironment` and Binance settings fail.
 
-- [ ] **Step 3: Implement minimal configuration**
+- [x] **Step 3: Implement minimal configuration**
 
 Add:
 
@@ -52,7 +52,7 @@ Extend `Settings` and `load_settings()` with `binance_environment`,
 optional at application startup so public market commands remain usable. Add only
 empty/example Binance variables to `.env.example`.
 
-- [ ] **Step 4: Run test to verify GREEN**
+- [x] **Step 4: Run test to verify GREEN**
 
 Run: `.venv/bin/python -m pytest tests/test_config.py -q`
 
