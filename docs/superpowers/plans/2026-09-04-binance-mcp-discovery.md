@@ -62,17 +62,17 @@ git commit -m "build: add Binance MCP client dependencies"
 - Create: `app/mcp/oauth.py`
 - Create: `tests/unit/test_mcp_oauth.py`
 
-- [ ] **Step 1: Write failing storage tests**
+- [x] **Step 1: Write failing storage tests**
 
 Test that a new store has no tokens/client information, values round-trip through all four async `TokenStorage` methods, and `clear()` removes both values. Construct SDK values with `OAuthToken` and `OAuthClientInformationFull` so the test tracks the installed MCP API.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_mcp_oauth.py -q
 ```
 
-- [ ] **Step 3: Implement `InMemoryOAuthStorage`**
+- [x] **Step 3: Implement `InMemoryOAuthStorage`**
 
 Implement the MCP `TokenStorage` protocol methods:
 
@@ -86,13 +86,13 @@ clear() -> None
 
 The object has no file I/O and its representation must not reveal tokens.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_mcp_oauth.py -q
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/mcp/oauth.py tests/unit/test_mcp_oauth.py
