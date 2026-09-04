@@ -3,7 +3,7 @@
 ## Goal
 
 Replace mocked production data and the unsupported custom Binance MCP client with
-read-only Binance data obtained through the official Binance Skills Hub
+read-only Binance Demo Trading data obtained through the official Binance Skills Hub
 `binance-cli`, while preserving Sentinel's LLM-driven application tool loop and
 deterministic risk controls.
 
@@ -16,8 +16,8 @@ trade.
 
 This checkpoint supports:
 
-- Spot account balances through a read-only Binance API key.
-- Public Spot prices and 24-hour market data.
+- Spot Demo account balances through a Binance Demo API key.
+- Public Spot Demo prices and 24-hour market data.
 - Deterministic USD valuation, allocation, volatility classification, policy
   checks, proposal creation, and risk decisions.
 - LLM selection of the stable `get_portfolio()` and
@@ -34,7 +34,8 @@ commands, MCP OAuth, FastAPI, or persistent credentials.
    uses Agent OS less visibly.
 3. Binance Skills Hub `binance-cli`: selected because it is official, works for
    Track A, provides the required Spot account and market capabilities, and
-   keeps exchange-specific access behind a replaceable gateway.
+   keeps exchange-specific access behind a replaceable gateway. Demo Trading
+   removes financial risk while still returning Binance-managed simulated data.
 
 ## Architecture
 
@@ -117,13 +118,17 @@ and descriptions remain stable. No mock fallback remains in the runtime path.
 
 Create one `BinanceCliRunner`, one `BinanceCliGateway`, bind both tools, and pass
 them to the Agent. Startup validates LLM configuration, CLI path, and read-only
-Binance credentials before portfolio access. Public market calls remain usable
-without credentials, but the complete Sentinel analysis requires account data.
+Binance Demo credentials before portfolio access. `BINANCE_API_ENV` defaults to
+`demo`; `prod` remains an explicit later configuration for a read-only key. Public
+market calls remain usable without credentials, but the complete Sentinel analysis
+requires Demo account data. Tool results and final explanations label the source as
+Binance Demo and never describe simulated holdings as the user's real portfolio.
 
 ## Security rules
 
-- The user creates a Binance key with Reading enabled and every trading,
-  transfer, and withdrawal permission disabled.
+- The user creates a Binance Demo API key. Production credentials are not required
+  for this checkpoint. If `prod` is enabled later, its key must have Reading enabled
+  and every trading, transfer, and withdrawal permission disabled.
 - Secrets stay only in local environment variables and are never deployed,
   committed, logged, placed in exceptions, or sent to the LLM.
 - The process runner uses `create_subprocess_exec`/argument arrays and never
@@ -153,9 +158,9 @@ slippage, malformed responses, missing prices, and sanitized failures.
 Integration verification is manual and ordered:
 
 1. Install the official CLI and inspect its version/help.
-2. Call public `ticker24hr` with no credentials.
-3. Let the user configure a local read-only key without sharing it in chat.
-4. Call `get-account` and confirm only non-sensitive structured output is mapped.
+2. Call public Demo `ticker24hr` with no credentials.
+3. Let the user configure a local Demo key without sharing it in chat.
+4. Call Demo `get-account` and confirm only non-sensitive structured output is mapped.
 5. Run Sentinel and observe the LLM autonomously use both application tools.
 
 All existing Python and UI tests, Python compilation, and `git diff --check`
