@@ -160,7 +160,7 @@ git commit -m "feat: explain policy changes in natural language"
 - Create: `tests/unit/test_policy_parser.py`
 - Modify: `tests/test_agent.py`
 
-- [ ] **Step 1: Write failing construction and input tests**
+- [x] **Step 1: Write failing construction and input tests**
 
 Assert:
 
@@ -170,13 +170,13 @@ Assert:
 - `build_parser_input(message, policy)` includes the user message and current validated policy JSON;
 - blank messages are rejected before an LLM call.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_policy_parser.py -q
 ```
 
-- [ ] **Step 3: Implement parser construction**
+- [x] **Step 3: Implement parser construction**
 
 `create_policy_parser_agent(settings: Settings) -> Agent` creates a tool-free Agent with `output_type=ParsedRequest`. Instructions define all four actions, multi-action ordering, patch semantics, and clarification behavior. The parser never receives financial tools.
 
@@ -184,17 +184,17 @@ Assert:
 
 `AgentPolicyParser.parse(message, current_policy) -> ParsedRequest` calls `Runner.run` and returns `result.final_output`. Retry exactly once only for `ModelBehaviorError`; propagate provider/network failures without converting them into a guessed action.
 
-- [ ] **Step 4: Preserve the existing Sentinel import**
+- [x] **Step 4: Preserve the existing Sentinel import**
 
 Move the existing risk-analysis Agent implementation to `app/agent/sentinel.py`. Keep `app/agent/__init__.py` empty. Update `main.py` and tests to import from `app.agent.sentinel`. Delete the conflicting `app/agent.py` module.
 
-- [ ] **Step 5: Run and verify GREEN**
+- [x] **Step 5: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_policy_parser.py tests/test_agent.py -q
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/agent app/agent.py main.py tests/unit/test_policy_parser.py tests/test_agent.py

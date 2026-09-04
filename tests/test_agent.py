@@ -1,4 +1,4 @@
-from app.agent import create_sentinel_agent
+from app.agent.sentinel import create_sentinel_agent
 from app.config import LLMProvider, Settings
 
 
