@@ -1,6 +1,8 @@
 from agents import function_tool
 
-from app.models import Portfolio, PortfolioAsset
+from decimal import Decimal
+
+from app.models.portfolio import Portfolio, PortfolioAsset
 
 
 def get_portfolio() -> Portfolio:
@@ -11,11 +13,26 @@ def get_portfolio() -> Portfolio:
     """
     return Portfolio(
         assets=[
-            PortfolioAsset(symbol="BTC", value_usd=6000.0),
-            PortfolioAsset(symbol="ETH", value_usd=2500.0),
-            PortfolioAsset(symbol="USDT", value_usd=1500.0),
+            PortfolioAsset(
+                symbol="BTC",
+                amount=Decimal("0.05"),
+                usd_value=Decimal("5500"),
+                weight=Decimal("0.55"),
+            ),
+            PortfolioAsset(
+                symbol="ETH",
+                amount=Decimal("0.58139535"),
+                usd_value=Decimal("2500"),
+                weight=Decimal("0.25"),
+            ),
+            PortfolioAsset(
+                symbol="USDT",
+                amount=Decimal("2000"),
+                usd_value=Decimal("2000"),
+                weight=Decimal("0.20"),
+            ),
         ],
-        total_value_usd=10000.0,
+        total_usd_value=Decimal("10000"),
     )
 
 

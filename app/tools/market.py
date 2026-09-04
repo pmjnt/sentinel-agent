@@ -1,27 +1,34 @@
 from agents import function_tool
 
-from app.models import MarketData, Volatility
+from decimal import Decimal
+
+from app.models.market import (
+    MarketData,
+    MarketDataError,
+    MarketDataResult,
+    Volatility,
+)
 
 
 _MOCK_MARKET_DATA = {
     "BTCUSDT": MarketData(
         symbol="BTCUSDT",
-        supported=True,
-        price=110000.0,
-        change_24h_percent=-4.2,
+        price=Decimal("110000"),
+        change_24h_percent=Decimal("-4.2"),
         volatility=Volatility.HIGH,
+        estimated_slippage_percent=Decimal("0.05"),
     ),
     "ETHUSDT": MarketData(
         symbol="ETHUSDT",
-        supported=True,
-        price=4300.0,
-        change_24h_percent=-2.1,
+        price=Decimal("4300"),
+        change_24h_percent=Decimal("-2.1"),
         volatility=Volatility.MEDIUM,
+        estimated_slippage_percent=Decimal("0.08"),
     ),
 }
 
 
-def get_market_data(symbol: str) -> MarketData:
+def get_market_data(symbol: str) -> MarketDataResult:
     """Return mocked market data for a crypto trading pair.
 
     Use this tool when a request needs a mocked current price, 24-hour price
@@ -34,9 +41,8 @@ def get_market_data(symbol: str) -> MarketData:
     market_data = _MOCK_MARKET_DATA.get(normalized_symbol)
 
     if market_data is None:
-        return MarketData(
+        return MarketDataError(
             symbol=normalized_symbol,
-            supported=False,
             error=f"Unsupported symbol: {normalized_symbol}",
         )
 

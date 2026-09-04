@@ -1,9 +1,15 @@
+from decimal import Decimal
+
 from app.tools.portfolio import get_portfolio
 
 
 def test_get_portfolio_returns_expected_mock_allocation() -> None:
     portfolio = get_portfolio()
-    values = {asset.symbol: asset.value_usd for asset in portfolio.assets}
+    values = {asset.symbol: asset.usd_value for asset in portfolio.assets}
 
-    assert values == {"BTC": 6000.0, "ETH": 2500.0, "USDT": 1500.0}
-    assert portfolio.total_value_usd == 10000.0
+    assert values == {
+        "BTC": Decimal("5500"),
+        "ETH": Decimal("2500"),
+        "USDT": Decimal("2000"),
+    }
+    assert portfolio.total_usd_value == Decimal("10000")
