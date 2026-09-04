@@ -169,7 +169,7 @@ fixed commands. Add a `data_source` field whose values are `BINANCE_DEMO` and
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_portfolio_gateway.py -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/gateways.py app/binance app/models/portfolio.py tests/unit/test_binance_portfolio_gateway.py
@@ -184,7 +184,7 @@ git commit -m "feat: map Binance Demo portfolio data"
 - Modify: `app/models/market.py`
 - Create: `tests/unit/test_binance_market_gateway.py`
 
-- [ ] **Step 1: Write failing market mapping tests**
+- [x] **Step 1: Write failing market mapping tests**
 
 Use ticker and depth fixtures. Assert normalized `BTCUSDT` calls exactly:
 
@@ -198,13 +198,13 @@ absolute 24-hour moves of 2% and 4%, and deterministic slippage for a $1,000
 reference sale. Assert malformed symbols make zero CLI calls; unsupported symbol,
 invalid schema, and insufficient bid depth return `MarketDataError`.
 
-- [ ] **Step 2: Run test to verify RED**
+- [x] **Step 2: Run test to verify RED**
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_market_gateway.py -q`
 
 Expected: market methods or schemas are missing.
 
-- [ ] **Step 3: Implement market mapping**
+- [x] **Step 3: Implement market mapping**
 
 Validate symbols against `^[A-Z0-9]{5,20}$`. Add strict ticker/depth schemas,
 `classify_volatility(change_percent)`, and
@@ -212,7 +212,7 @@ Validate symbols against `^[A-Z0-9]{5,20}$`. Add strict ticker/depth schemas,
 known CLI/data failures to a clear `MarketDataError`; do not return guessed values.
 Add the same `data_source` field to `MarketData`.
 
-- [ ] **Step 4: Run test to verify GREEN**
+- [x] **Step 4: Run test to verify GREEN**
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_market_gateway.py -q`
 

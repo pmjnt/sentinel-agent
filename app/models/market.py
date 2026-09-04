@@ -3,6 +3,8 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.models.source import DataSource
+
 
 class Volatility(str, Enum):
     LOW = "LOW"
@@ -18,6 +20,7 @@ class MarketData(BaseModel):
     change_24h_percent: Decimal
     volatility: Volatility
     estimated_slippage_percent: Decimal = Field(ge=0)
+    data_source: DataSource = DataSource.UNKNOWN
 
     @field_validator("symbol")
     @classmethod
