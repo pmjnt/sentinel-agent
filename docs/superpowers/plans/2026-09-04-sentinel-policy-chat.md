@@ -63,7 +63,7 @@ git commit -m "feat: model validated policy chat actions"
 - Create: `app/sessions.py`
 - Create: `tests/unit/test_sessions.py`
 
-- [ ] **Step 1: Write failing store tests**
+- [x] **Step 1: Write failing store tests**
 
 Test:
 
@@ -73,7 +73,7 @@ Test:
 - blank session IDs are rejected;
 - clearing a session removes its policy.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_sessions.py -q
@@ -81,7 +81,7 @@ Test:
 
 Expected: import fails because `app.sessions` does not exist.
 
-- [ ] **Step 3: Implement `InMemoryPolicySessionStore`**
+- [x] **Step 3: Implement `InMemoryPolicySessionStore`**
 
 Public methods:
 
@@ -93,13 +93,13 @@ clear(session_id: str) -> None
 
 Normalize a session ID by trimming it and rejecting an empty value. Use `apply_policy_patch` rather than duplicating merge logic. Do not add a protocol or persistence layer in this checkpoint.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_sessions.py -q
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/sessions.py tests/unit/test_sessions.py
