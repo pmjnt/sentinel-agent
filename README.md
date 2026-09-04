@@ -2,7 +2,7 @@
 
 Sentinel is a Python AI Agent for policy-driven crypto portfolio risk analysis. It is intentionally structured so the boundary between the LLM, deterministic Python rules, and external tools is easy to see.
 
-The deterministic domain core now calculates portfolio allocations, detects policy violations, builds draft rebalance proposals, and evaluates risk without an LLM. A structured-output policy parser and in-memory policy conversation service are also implemented. The console still uses temporary mock tools until these components are composed with the read-only Binance MCP integration and FastAPI. There is no real trading, database, Docker, LangChain, LangGraph, or CrewAI.
+The deterministic domain core now calculates portfolio allocations, detects policy violations, builds draft rebalance proposals, and evaluates risk without an LLM. A structured-output policy parser and in-memory policy conversation service are also implemented. Binance MCP OAuth and safe tool discovery are implemented; the production data adapter will be written only after its real schema is reviewed. There is no real trading, database, Docker, LangChain, LangGraph, or CrewAI.
 
 ## Development documentation
 
@@ -10,6 +10,7 @@ The deterministic domain core now calculates portfolio allocations, detects poli
 - [Development guidelines](docs/development-guidelines.md)
 - [Agent guidelines](docs/agent-guidelines.md)
 - [Testing guidelines](docs/testing.md)
+- [Binance MCP discovery and security](docs/binance-mcp.md)
 - [Vietnamese SRD guide](docs/sentinel-srd-guide.html)
 
 The core responsibility rule is:
@@ -228,6 +229,25 @@ Sentinel > Analyze my BTC exposure and tell me whether it currently looks risky.
 ```
 
 Type `exit` to close the application.
+
+## Discover the real Binance MCP schema
+
+Binance requires a public HTTPS OAuth Client ID Metadata Document. Configure its URL
+first:
+
+```dotenv
+BINANCE_MCP_CLIENT_METADATA_URL=https://your-domain.example/oauth/client-metadata.json
+```
+
+The discovery command then opens Binance OAuth and calls only MCP `list_tools()`:
+
+```bash
+python -m app.mcp.discover
+```
+
+Select read-only Market Data/Account access when available; do not grant Trade or
+Transfer permissions. OAuth state is held only in memory. See the
+[Binance MCP guide](docs/binance-mcp.md) before running it.
 
 ## Preview the vintage web interface
 

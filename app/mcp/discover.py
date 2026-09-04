@@ -3,6 +3,8 @@
 import asyncio
 import json
 
+from dotenv import load_dotenv
+
 from app.mcp.binance import BinanceMcpDiscovery
 from app.models.mcp import McpToolCatalogEntry
 
@@ -19,6 +21,7 @@ async def discover_and_render() -> str:
 
 
 def main() -> None:
+    load_dotenv()
     print(asyncio.run(discover_and_render()))
 
 

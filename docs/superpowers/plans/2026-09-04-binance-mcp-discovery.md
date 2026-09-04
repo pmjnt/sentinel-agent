@@ -228,7 +228,7 @@ Test CLI JSON rendering from catalog entries separately; serialized output must 
 .venv/bin/python -m pytest tests/unit/test_mcp_discovery.py -q
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/mcp/binance.py app/mcp/discover.py tests/unit/test_mcp_discovery.py
@@ -241,11 +241,11 @@ git commit -m "feat: discover Binance MCP tools safely"
 - Create: `docs/binance-mcp.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Document discovery and security**
+- [x] **Step 1: Document discovery and security**
 
 Explain endpoint, OAuth browser requirement, Market Data/Account scope selection, in-memory token lifetime, discovery-only behavior, no tool invocation, no mock fallback, and the command to run.
 
-- [ ] **Step 2: Run all offline verification**
+- [x] **Step 2: Run all offline verification**
 
 ```bash
 .venv/bin/python -m pytest -q
@@ -261,6 +261,11 @@ git diff --check
 ```
 
 Expected: browser authorization completes and the command prints the real Binance MCP tool catalog. It must show no `tools/call` activity.
+
+Observed on the first run: Binance advertised Client ID Metadata Documents but no
+dynamic registration endpoint. The client now requires
+`BINANCE_MCP_CLIENT_METADATA_URL` and fails before connecting when it is absent.
+Real discovery remains pending until that public HTTPS document is hosted.
 
 - [ ] **Step 4: Review and record mapping inputs**
 

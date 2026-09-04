@@ -1,5 +1,7 @@
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
+import os
 from typing import Protocol
+from urllib.parse import urlparse
 
 import httpx2
 from mcp import ClientSession
@@ -20,6 +22,29 @@ from app.models.mcp import McpToolCatalogEntry
 BINANCE_MCP_ENDPOINT = "https://agent.binance.com/mcp/agentic"
 
 
+class BinanceMcpConfigurationError(ValueError):
+    """Raised when required public OAuth client metadata is not configured."""
+
+
+def read_client_metadata_url(
+    environment: Mapping[str, str] = os.environ,
+) -> str:
+    """Read and validate the public HTTPS Client ID Metadata Document URL."""
+    # The loose mapping boundary keeps this pure function easy to test.
+    raw_value = environment.get("BINANCE_MCP_CLIENT_METADATA_URL")
+    if not raw_value:
+        raise BinanceMcpConfigurationError(
+            "BINANCE_MCP_CLIENT_METADATA_URL is required for Binance OAuth."
+        )
+
+    parsed = urlparse(raw_value)
+    if parsed.scheme != "https" or not parsed.netloc or parsed.path in ("", "/"):
+        raise BinanceMcpConfigurationError(
+            "BINANCE_MCP_CLIENT_METADATA_URL must be a public HTTPS document URL."
+        )
+    return raw_value
+
+
 class ToolListingSession(Protocol):
     """Small session boundary needed by discovery."""
 
@@ -34,12 +59,17 @@ class BinanceMcpDiscovery:
         endpoint: str = BINANCE_MCP_ENDPOINT,
         callback_port: int = 8766,
         browser_opener: Callable[[str], bool] | None = None,
+        client_metadata_url: str | None = None,
     ) -> None:
         self._endpoint = endpoint
         self._callback_port = callback_port
         self._browser_opener = browser_opener
+        self._client_metadata_url = client_metadata_url
 
     async def discover(self) -> list[McpToolCatalogEntry]:
+        client_metadata_url = (
+            self._client_metadata_url or read_client_metadata_url()
+        )
         callback = LoopbackCallbackServer(port=self._callback_port)
 
         async def redirect_handler(url: str) -> None:
@@ -53,13 +83,14 @@ class BinanceMcpDiscovery:
             client_metadata=OAuthClientMetadata(
                 client_name="Sentinel",
                 redirect_uris=[AnyUrl(callback.redirect_uri)],
-                grant_types=["authorization_code", "refresh_token"],
+                grant_types=["authorization_code"],
                 response_types=["code"],
                 application_type="native",
             ),
             storage=InMemoryOAuthStorage(),
             redirect_handler=redirect_handler,
             callback_handler=callback.wait_for_callback,
+            client_metadata_url=client_metadata_url,
         )
 
         try:

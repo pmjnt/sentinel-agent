@@ -1,10 +1,16 @@
 import asyncio
 import json
+from collections.abc import Mapping
 from types import SimpleNamespace
 
+import pytest
 from mcp.types import Tool
 
-from app.mcp.binance import BinanceMcpDiscovery
+from app.mcp.binance import (
+    BinanceMcpConfigurationError,
+    BinanceMcpDiscovery,
+    read_client_metadata_url,
+)
 from app.mcp.discover import render_catalog_json
 from app.models.mcp import McpToolCatalogEntry
 
@@ -61,3 +67,26 @@ def test_catalog_json_contains_only_normalized_metadata() -> None:
     assert "access_token" not in output
     assert "client_secret" not in output
     assert "_meta" not in output
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {},
+        {"BINANCE_MCP_CLIENT_METADATA_URL": "http://example.com/client.json"},
+        {"BINANCE_MCP_CLIENT_METADATA_URL": "https://example.com/"},
+    ],
+)
+def test_client_metadata_url_must_be_public_https_document(
+    environment: Mapping[str, str],
+) -> None:
+    with pytest.raises(BinanceMcpConfigurationError):
+        read_client_metadata_url(environment)
+
+
+def test_reads_valid_client_metadata_url() -> None:
+    url = "https://sentinel.example/oauth/client-metadata.json"
+
+    assert read_client_metadata_url(
+        {"BINANCE_MCP_CLIENT_METADATA_URL": url}
+    ) == url
