@@ -56,7 +56,7 @@ empty/example Binance variables to `.env.example`.
 
 Run: `.venv/bin/python -m pytest tests/test_config.py -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/config.py .env.example tests/test_config.py
@@ -70,7 +70,7 @@ git commit -m "feat: configure Binance Demo access"
 - Create: `app/binance/runner.py`
 - Create: `tests/unit/test_binance_cli_runner.py`
 
-- [ ] **Step 1: Write failing runner tests**
+- [x] **Step 1: Write failing runner tests**
 
 Patch `asyncio.create_subprocess_exec` with a fake process and assert:
 
@@ -81,13 +81,13 @@ Patch `asyncio.create_subprocess_exec` with a fake process and assert:
 - timeout, non-zero exit, empty output, and invalid JSON raise
   `BinanceCliError` whose message contains no stdout, stderr, API key, or secret.
 
-- [ ] **Step 2: Run test to verify RED**
+- [x] **Step 2: Run test to verify RED**
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_cli_runner.py -q`
 
 Expected: `app.binance.runner` cannot be imported.
 
-- [ ] **Step 3: Implement the runner**
+- [x] **Step 3: Implement the runner**
 
 Implement:
 
@@ -115,7 +115,7 @@ class BinanceCliRunner:
 Use `asyncio.wait_for`, `json.loads`, a 15-second default timeout, and sanitized
 fixed error messages. Authenticated calls use `require_binance_credentials`.
 
-- [ ] **Step 4: Run test to verify GREEN**
+- [x] **Step 4: Run test to verify GREEN**
 
 Run: `.venv/bin/python -m pytest tests/unit/test_binance_cli_runner.py -q`
 
