@@ -105,7 +105,7 @@ git commit -m "feat: hold Binance OAuth state in memory"
 - Modify: `app/mcp/oauth.py`
 - Create: `tests/unit/test_mcp_callback.py`
 
-- [ ] **Step 1: Write failing callback parsing tests**
+- [x] **Step 1: Write failing callback parsing tests**
 
 Test a pure `parse_authorization_callback(url)` function:
 
@@ -115,25 +115,25 @@ Test a pure `parse_authorization_callback(url)` function:
 
 Also test that `open_authorization_url(url, opener=fake)` sends the exact URL to the injected browser opener.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_mcp_callback.py -q
 ```
 
-- [ ] **Step 3: Implement callback helpers**
+- [x] **Step 3: Implement callback helpers**
 
 Use `urllib.parse` and `webbrowser.open`. Create `LoopbackCallbackServer` backed by `HTTPServer` bound to `127.0.0.1` on a configured port before authorization begins. Its async `wait_for_callback()` uses `asyncio.to_thread`, returns the parsed SDK result, sends a minimal UTF-8 success/error HTML page, handles one request, and always supports explicit `close()`.
 
 Do not log the callback URL, code, state, issuer, or token.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_mcp_callback.py -q
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/mcp/oauth.py tests/unit/test_mcp_callback.py
