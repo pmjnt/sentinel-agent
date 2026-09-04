@@ -76,10 +76,9 @@ class BinanceCliGateway:
         environment: BinanceEnvironment,
     ) -> None:
         self._runner = runner
-        self._data_source = {
-            BinanceEnvironment.DEMO: DataSource.BINANCE_DEMO,
-            BinanceEnvironment.PROD: DataSource.BINANCE_PROD,
-        }[environment]
+        if environment is not BinanceEnvironment.DEMO:
+            raise ValueError("Sentinel currently supports Binance Demo only.")
+        self._data_source = DataSource.BINANCE_DEMO
 
     async def get_portfolio(self) -> Portfolio:
         try:

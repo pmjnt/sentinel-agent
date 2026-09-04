@@ -118,9 +118,9 @@ def test_load_settings_rejects_unsupported_binance_environment(
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
     monkeypatch.setenv("LLM_MODEL", "gemini-3.5-flash-lite")
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
-    monkeypatch.setenv("BINANCE_API_ENV", "testnet")
+    monkeypatch.setenv("BINANCE_API_ENV", "prod")
 
-    with pytest.raises(ValueError, match="demo or prod"):
+    with pytest.raises(ValueError, match="must be demo"):
         config.load_settings()
 
 

@@ -12,7 +12,6 @@ class LLMProvider(str, Enum):
 
 class BinanceEnvironment(str, Enum):
     DEMO = "demo"
-    PROD = "prod"
 
 
 class BinanceCredentials(BaseModel):
@@ -70,7 +69,7 @@ def load_settings() -> Settings:
     try:
         binance_environment = BinanceEnvironment(binance_environment_value)
     except ValueError as error:
-        raise ValueError("BINANCE_API_ENV must be demo or prod.") from error
+        raise ValueError("BINANCE_API_ENV must be demo for this version.") from error
 
     binance_cli_path = os.getenv("BINANCE_CLI_PATH", "binance-cli").strip()
     if not binance_cli_path:

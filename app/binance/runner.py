@@ -79,6 +79,11 @@ class BinanceCliRunner:
             "PATH": os.environ.get("PATH", ""),
             "BINANCE_API_ENV": self._settings.binance_environment.value,
         }
+        home = os.environ.get("HOME")
+        if home:
+            # binance-cli resolves its local configuration root even when profiles
+            # are unused, so HOME is required for the process to start.
+            environment["HOME"] = home
         if authenticated:
             credentials = require_binance_credentials(self._settings)
             environment["BINANCE_API_KEY"] = credentials.api_key

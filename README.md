@@ -83,7 +83,7 @@ More detail:
 ## Requirements
 
 - Python 3.12
-- Official `binance-cli` 2.1.1 or a later compatible release
+- Official `binance-cli` 2.1.1 (the version validated by this project)
 - A Binance Demo Trading API key for portfolio reads
 - An OpenAI or Gemini API key for the LLM
 
@@ -102,7 +102,7 @@ network output directly into a shell:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -L \
-  https://github.com/binance/binance-cli/releases/latest/download/binance-cli-installer.sh \
+  https://github.com/binance/binance-cli/releases/download/v2.1.1/binance-cli-installer.sh \
   -o /tmp/binance-cli-installer.sh
 less /tmp/binance-cli-installer.sh
 sh /tmp/binance-cli-installer.sh

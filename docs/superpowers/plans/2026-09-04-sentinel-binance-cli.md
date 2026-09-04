@@ -163,7 +163,8 @@ Define `PortfolioMarketGateway` in `app/gateways.py`. In `schemas.py`, define
 strict transport models for account balances and price ticker rows. In
 `gateway.py`, implement `BinanceCliGateway.get_portfolio()` using only the two
 fixed commands. Add a `data_source` field whose values are `BINANCE_DEMO` and
-`BINANCE_PROD` to the portfolio model.
+`BINANCE_PROD` to the portfolio model, while the current runtime accepts only
+`BINANCE_DEMO` so real holdings cannot be mislabeled as simulated data.
 
 - [x] **Step 4: Run test to verify GREEN**
 
@@ -319,13 +320,13 @@ git commit -m "refactor: replace Binance MCP with Skills Hub"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-09-04-sentinel-binance-cli.md`
 
-- [ ] **Step 1: Download the official installer for review**
+- [x] **Step 1: Download the official installer for review**
 
 Download the installer from the signed `binance/binance-cli` v2.1.1 GitHub release
 to a temporary file. Inspect it before execution; do not pipe network output
 directly into a shell.
 
-- [ ] **Step 2: Install and inspect CLI schema**
+- [x] **Step 2: Install and inspect CLI schema**
 
 Run the reviewed installer, then:
 
@@ -337,11 +338,11 @@ binance-cli spot ticker24hr --help
 binance-cli spot depth --help
 ```
 
-Expected version: `2.1.1` or a later compatible official release. If actual command
+Expected version: the pinned official `2.1.1` release. If actual command
 names or JSON differ from the official references, update fixtures and mappings
 through a new RED/GREEN cycle before continuing.
 
-- [ ] **Step 3: Verify public Demo market data**
+- [x] **Step 3: Verify public Demo market data**
 
 Run:
 
@@ -351,7 +352,7 @@ BINANCE_API_ENV=demo binance-cli spot ticker24hr --symbol BTCUSDT
 
 Do not display or pass credentials. Validate the returned JSON shape only.
 
-- [ ] **Step 4: Run all offline checks**
+- [x] **Step 4: Run all offline checks**
 
 ```bash
 .venv/bin/python -m pytest -q
@@ -381,20 +382,27 @@ answer label all portfolio data as Binance Demo. No command containing `order`,
 **Files:**
 - No local source changes beyond Task 6
 
-- [ ] **Step 1: Redeploy only `web/`**
+- [x] **Step 1: Redeploy only `web/`**
 
 Deploy the static web directory to the existing Vercel project after the local
 metadata file has been removed.
 
-- [ ] **Step 2: Verify removal and UI availability**
+- [x] **Step 2: Verify removal and UI availability**
 
 Assert the former `/oauth/client-metadata.json` URL returns 404 while `/` returns
 200. This removes the unused OAuth identity document without deleting the demo UI.
 
-- [ ] **Step 3: Record final status**
+- [x] **Step 3: Record final status**
 
 Show the final project tree, test counts, installed CLI version, public Demo command
 result shape, and the remaining user-only step for Demo credentials.
+
+Verified on 2026-09-05:
+
+- `https://sentinel-agent-mu.vercel.app/` returns HTTP 200.
+- `/oauth/client-metadata.json` returns HTTP 404.
+- Authenticated verification remains a user-only step after Binance Demo
+  read-only credentials are added locally.
 
 ## Completion boundary
 

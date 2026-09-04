@@ -68,6 +68,7 @@ def _install_fake_subprocess(
 def test_public_command_uses_argument_array_without_secrets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("HOME", "/safe/home")
     process = FakeProcess(stdout=json.dumps({"price": "100"}).encode())
     calls = _install_fake_subprocess(monkeypatch, process)
     runner = BinanceCliRunner(_settings())
@@ -88,6 +89,7 @@ def test_public_command_uses_argument_array_without_secrets(
     assert "shell" not in kwargs
     child_environment = kwargs["env"]
     assert isinstance(child_environment, dict)
+    assert child_environment["HOME"] == "/safe/home"
     assert child_environment["BINANCE_API_ENV"] == "demo"
     assert "BINANCE_API_KEY" not in child_environment
     assert "BINANCE_SECRET_KEY" not in child_environment
