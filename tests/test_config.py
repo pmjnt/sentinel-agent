@@ -34,13 +34,13 @@ def test_load_settings_builds_gemini_litellm_model(
 ) -> None:
     _clear_llm_environment(monkeypatch)
     monkeypatch.setenv("LLM_PROVIDER", "GEMINI")
-    monkeypatch.setenv("LLM_MODEL", "gemini-3.8-flash")
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.5-flash-lite")
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
 
     settings = config.load_settings()
 
     assert settings.llm_provider.value == "gemini"
-    assert settings.agents_model == "litellm/gemini/gemini-3.8-flash"
+    assert settings.agents_model == "litellm/gemini/gemini-3.5-flash-lite"
 
 
 def test_load_settings_rejects_unsupported_provider(
@@ -68,7 +68,7 @@ def test_load_settings_requires_active_provider_key(
 ) -> None:
     _clear_llm_environment(monkeypatch)
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
-    monkeypatch.setenv("LLM_MODEL", "gemini-3.8-flash")
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.5-flash-lite")
     monkeypatch.setenv("OPENAI_API_KEY", "inactive-openai-key")
 
     with pytest.raises(ValueError, match="GEMINI_API_KEY"):

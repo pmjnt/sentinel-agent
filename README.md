@@ -2,7 +2,7 @@
 
 Sentinel is a minimal Python AI Agent that analyzes the risk of a mocked crypto portfolio. It is intentionally small so the boundary between the LLM and its tools is easy to see.
 
-This is Phase 1 only: there is no Binance connection, real trading, FastAPI, frontend, database, Docker, LangChain, LangGraph, or CrewAI.
+This is Phase 1 only: there is no Binance connection, real trading, FastAPI, database, Docker, LangChain, LangGraph, or CrewAI. A static educational UI is included, but it is not connected to the Python Agent yet.
 
 ## What is an AI Agent?
 
@@ -87,7 +87,12 @@ sentinel-agent/
 │   ├── test_agent.py
 │   ├── test_config.py
 │   ├── test_market.py
-│   └── test_portfolio.py
+│   ├── test_portfolio.py
+│   └── test_ui.js
+├── web/
+│   ├── app.js
+│   ├── index.html
+│   └── styles.css
 ├── .env.example
 ├── .gitignore
 ├── main.py
@@ -137,7 +142,27 @@ Copy the example file:
 cp .env.example .env
 ```
 
-Then edit `.env`. For OpenAI:
+Then edit `.env`. The default example prioritizes Gemini's free tier:
+
+```dotenv
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-3.5-flash-lite
+
+OPENAI_API_KEY=
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+Other general-purpose Gemini models currently shown in the UI are:
+
+```text
+gemini-3.1-flash-lite
+gemini-3.5-flash
+gemini-3-flash-preview
+```
+
+Google lists these models as free of charge within free-tier quotas. Free tier does not mean unlimited use, availability can vary by region/account, and Google may change its model catalog or quotas. Check the [official Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing) before relying on a model.
+
+To use OpenAI instead:
 
 ```dotenv
 LLM_PROVIDER=openai
@@ -145,16 +170,6 @@ LLM_MODEL=gpt-5.6-luna
 
 OPENAI_API_KEY=your_openai_api_key_here
 GEMINI_API_KEY=
-```
-
-To switch to Gemini:
-
-```dotenv
-LLM_PROVIDER=gemini
-LLM_MODEL=gemini-3.8-flash
-
-OPENAI_API_KEY=
-GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 `LLM_MODEL` is editable. Enter only the provider's model ID; Sentinel adds the LiteLLM routing prefix itself. For example, enter `gpt-5.6-luna`, not `litellm/openai/gpt-5.6-luna`.
@@ -177,13 +192,55 @@ Sentinel > Analyze my BTC exposure and tell me whether it currently looks risky.
 
 Type `exit` to close the application.
 
+## Preview the vintage web interface
+
+The `web/` directory is a plain HTML/CSS/JavaScript prototype. It shows provider/model selection, the decisions Sentinel would make, tool inputs and outputs, and a report that separates factual tool data from AI interpretation.
+
+Start a local static server from the project root:
+
+```bash
+python -m http.server 8000 -d web
+```
+
+Then open [http://localhost:8000](http://localhost:8000).
+
+The progress and result shown in this interface are deliberately **simulated with mocked data**. Changing the provider or model demonstrates the future configuration flow; it does not send a request to OpenAI or Gemini from the browser.
+
+### What happens when a model is selected?
+
+In the current static UI, the selection only updates a route preview such as:
+
+```text
+litellm/gemini/gemini-3.5-flash-lite
+```
+
+The working console app uses the same idea through `.env`:
+
+```text
+LLM_PROVIDER + LLM_MODEL
+          |
+          v
+Settings.agents_model
+          |
+          v
+Agent(model="litellm/gemini/gemini-3.5-flash-lite")
+          |
+          v
+LiteLLM reads GEMINI_API_KEY and calls Gemini
+```
+
+`Runner.run(...)` then sends the user's prompt to that model. When the model chooses a Sentinel tool, the Agents SDK executes it and returns its structured result to the same model. A later backend will receive the UI selection, validate it against an allow-list, and construct `Settings`; the browser must never receive or store the API key.
+
+When a backend is added later, a FastAPI SSE or WebSocket endpoint can replace the JavaScript timers. The existing event renderer can remain and render real Agent/tool events as they arrive.
+
 ## Run tests
 
 ```bash
 python -m pytest -v
+node --test tests/test_ui.js
 ```
 
-The tests cover the plain mock-data functions, provider configuration, and Agent construction. They do not call OpenAI or Gemini and do not need a real API key.
+The tests cover the plain mock-data functions, provider configuration, Agent construction, and the static UI's pure domain logic. They do not call OpenAI or Gemini and do not need a real API key.
 
 ## What LiteLLM does
 
@@ -191,7 +248,7 @@ Sentinel passes model IDs such as these to OpenAI Agents SDK:
 
 ```text
 litellm/openai/gpt-5.6-luna
-litellm/gemini/gemini-3.8-flash
+litellm/gemini/gemini-3.5-flash-lite
 ```
 
 The SDK delegates those model requests to LiteLLM. LiteLLM selects the provider and reads its standard API-key environment variable. It does not decide when to call portfolio or market tools; that remains the responsibility of the Sentinel Agent and its LLM.
