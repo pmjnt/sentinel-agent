@@ -112,7 +112,7 @@ git commit -m "feat: keep portfolio policy by session"
 - Create: `app/services/policy_response_service.py`
 - Create: `tests/unit/test_policy_response_service.py`
 
-- [ ] **Step 1: Write failing response tests**
+- [x] **Step 1: Write failing response tests**
 
 Test Vietnamese responses for:
 
@@ -122,13 +122,13 @@ Test Vietnamese responses for:
 - setting the approval threshold;
 - viewing an empty policy and a configured policy.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_policy_response_service.py -q
 ```
 
-- [ ] **Step 3: Implement deterministic formatters**
+- [x] **Step 3: Implement deterministic formatters**
 
 Create:
 
@@ -137,13 +137,13 @@ Create:
 
 Format weights as percentages without float conversion and USD with comma separators. Mention only explicitly patched fields in an update response. Do not call an LLM.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_policy_response_service.py -q
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/services/policy_response_service.py tests/unit/test_policy_response_service.py
