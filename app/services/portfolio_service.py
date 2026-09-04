@@ -1,0 +1,22 @@
+from decimal import Decimal
+
+from app.models.portfolio import Portfolio, PortfolioAsset
+
+
+def calculate_portfolio(assets: list[PortfolioAsset]) -> Portfolio:
+    """Calculate the authoritative portfolio total and asset weights."""
+    total_usd_value = sum(
+        (asset.usd_value for asset in assets),
+        start=Decimal("0"),
+    )
+    if total_usd_value <= 0:
+        raise ValueError("Portfolio total must be greater than zero.")
+
+    weighted_assets = [
+        asset.model_copy(update={"weight": asset.usd_value / total_usd_value})
+        for asset in assets
+    ]
+    return Portfolio(
+        assets=weighted_assets,
+        total_usd_value=total_usd_value,
+    )

@@ -184,7 +184,7 @@ git commit -m "refactor: split Sentinel domain models"
 - Create: `app/services/portfolio_service.py`
 - Create: `tests/unit/test_portfolio_service.py`
 
-- [ ] **Step 1: Write failing calculation tests**
+- [x] **Step 1: Write failing calculation tests**
 
 Cover total value, weights, and invalid empty/zero portfolios:
 
@@ -216,7 +216,7 @@ def test_rejects_portfolio_with_zero_total() -> None:
         calculate_portfolio([])
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_portfolio_service.py -q
@@ -224,11 +224,11 @@ def test_rejects_portfolio_with_zero_total() -> None:
 
 Expected: import fails because the service does not exist.
 
-- [ ] **Step 3: Implement `calculate_portfolio`**
+- [x] **Step 3: Implement `calculate_portfolio`**
 
 Sum `usd_value` with `Decimal`, reject non-positive totals, and return copied immutable assets with deterministic weights. Do not use `float` or trust an externally supplied total.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_portfolio_service.py -q
@@ -236,7 +236,7 @@ Sum `usd_value` with `Decimal`, reject non-positive totals, and return copied im
 
 Expected: two tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/services tests/unit/test_portfolio_service.py
