@@ -147,7 +147,7 @@ git commit -m "feat: handle Binance OAuth loopback callback"
 - Modify: `app/mcp/binance.py`
 - Create: `tests/unit/test_mcp_catalog.py`
 
-- [ ] **Step 1: Write failing catalog tests**
+- [x] **Step 1: Write failing catalog tests**
 
 Build `mcp.types.Tool` fixtures and assert conversion preserves only:
 
@@ -163,25 +163,25 @@ destructive_hint
 
 Assert `_meta`, icons, and any other provider object are absent from serialized application metadata. Catalog order must match server order.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_mcp_catalog.py -q
 ```
 
-- [ ] **Step 3: Implement catalog conversion**
+- [x] **Step 3: Implement catalog conversion**
 
 Create frozen `McpToolCatalogEntry` in `app/models/mcp.py`. Implement `to_catalog_entries(tools: list[Tool]) -> list[McpToolCatalogEntry]` in `app/mcp/binance.py`.
 
 Annotations are untrusted hints. Missing hints remain `None`; the conversion must not infer read-only status from a name or description.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_mcp_catalog.py -q
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/models/mcp.py app/mcp/binance.py tests/unit/test_mcp_catalog.py
