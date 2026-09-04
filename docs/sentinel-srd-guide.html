@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Tài liệu giải thích hiện trạng và kiến trúc đích của Sentinel theo SRD.">
+    <title>Sentinel — Hướng dẫn đọc SRD và kiến trúc triển khai</title>
+    <style>
+      :root {
+        --ink: #17211c;
+        --muted: #5d6962;
+        --paper: #f4f2e9;
+        --paper-deep: #e9e5d8;
+        --panel: #fbfaf5;
+        --line: #c7c4b7;
+        --green: #1f6548;
+        --green-soft: #dceade;
+        --amber: #8a5a12;
+        --amber-soft: #f4e6c3;
+        --red: #943d34;
+        --red-soft: #f1d8d3;
+        --blue: #285d73;
+        --blue-soft: #dce8ed;
+        --shadow: 0 12px 30px rgba(23, 33, 28, 0.08);
+        --radius: 14px;
+        --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --serif: Georgia, "Times New Roman", serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          linear-gradient(rgba(23, 33, 28, 0.025) 1px, transparent 1px),
+          var(--paper);
+        background-size: 100% 28px;
+        font-family: var(--sans);
+        font-size: 17px;
+        line-height: 1.72;
+      }
+
+      a { color: var(--green); text-underline-offset: 3px; }
+      a:hover { color: var(--red); }
+      a:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+
+      code, pre { font-family: var(--mono); }
+      code {
+        padding: 0.12em 0.35em;
+        border-radius: 4px;
+        background: var(--paper-deep);
+        font-size: 0.9em;
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 1rem 0;
+        padding: 1.2rem;
+        border: 1px solid var(--line);
+        border-left: 5px solid var(--green);
+        border-radius: 8px;
+        background: #202923;
+        color: #ecf2e8;
+        font-size: 0.88rem;
+        line-height: 1.55;
+      }
+
+      .masthead {
+        border-bottom: 1px solid var(--line);
+        background: rgba(244, 242, 233, 0.94);
+      }
+
+      .masthead-inner {
+        width: min(1180px, calc(100% - 36px));
+        margin: 0 auto;
+        padding: 54px 0 42px;
+      }
+
+      .eyebrow {
+        margin: 0 0 12px;
+        color: var(--green);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      h1, h2, h3 { line-height: 1.18; }
+
+      h1 {
+        max-width: 880px;
+        margin: 0;
+        font-family: var(--serif);
+        font-size: clamp(2.5rem, 6vw, 5.5rem);
+        font-weight: 500;
+        letter-spacing: -0.04em;
+      }
+
+      .lede {
+        max-width: 780px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 1.15rem;
+      }
+
+      .status-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 28px;
+      }
+
+      .tag, .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .tag::before, .status::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        content: "";
+      }
+
+      .ok { color: var(--green); background: var(--green-soft); }
+      .partial { color: var(--amber); background: var(--amber-soft); }
+      .missing { color: var(--red); background: var(--red-soft); }
+      .target { color: var(--blue); background: var(--blue-soft); }
+
+      .page {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 860px);
+        gap: 48px;
+        width: min(1180px, calc(100% - 36px));
+        margin: 0 auto;
+        padding: 42px 0 90px;
+      }
+
+      nav {
+        position: sticky;
+        top: 24px;
+        align-self: start;
+        max-height: calc(100vh - 48px);
+        overflow: auto;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(251, 250, 245, 0.94);
+        box-shadow: var(--shadow);
+      }
+
+      nav strong {
+        display: block;
+        margin-bottom: 9px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      nav ol { margin: 0; padding: 0; list-style: none; }
+      nav li + li { border-top: 1px dotted var(--line); }
+      nav a {
+        display: block;
+        padding: 7px 2px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.35;
+        text-decoration: none;
+      }
+      nav a:hover { color: var(--green); }
+
+      main { min-width: 0; }
+
+      section {
+        scroll-margin-top: 24px;
+        padding: 42px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      section:first-child { padding-top: 0; }
+      section:last-child { border-bottom: 0; }
+
+      .section-kicker {
+        margin: 0 0 8px;
+        color: var(--red);
+        font-family: var(--mono);
+        font-size: 0.73rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin: 0 0 20px;
+        font-family: var(--serif);
+        font-size: clamp(1.9rem, 4vw, 3rem);
+        font-weight: 500;
+        letter-spacing: -0.025em;
+      }
+
+      h3 { margin: 1.7rem 0 0.65rem; font-size: 1.08rem; }
+      p { margin: 0.75rem 0; }
+      ul, ol { padding-left: 1.4rem; }
+      li + li { margin-top: 0.45rem; }
+
+      .callout {
+        margin: 22px 0;
+        padding: 20px 22px;
+        border: 1px solid var(--line);
+        border-left: 6px solid var(--green);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .callout strong:first-child { color: var(--green); }
+      .callout.warning { border-left-color: var(--amber); }
+      .callout.warning strong:first-child { color: var(--amber); }
+      .callout.danger { border-left-color: var(--red); }
+      .callout.danger strong:first-child { color: var(--red); }
+
+      .verdict {
+        padding: 26px;
+        border: 2px solid var(--ink);
+        border-radius: var(--radius);
+        background: var(--green-soft);
+        box-shadow: 8px 8px 0 var(--ink);
+      }
+
+      .verdict p { margin: 0; }
+      .verdict p + p { margin-top: 10px; }
+
+      .grid-2, .grid-3 {
+        display: grid;
+        gap: 16px;
+        margin: 20px 0;
+      }
+      .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+      .card {
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--panel);
+      }
+      .card h3 { margin-top: 0; }
+      .card p:last-child { margin-bottom: 0; }
+
+      .label {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        margin: 22px 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--panel);
+      }
+
+      table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+      th, td { padding: 13px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { background: var(--paper-deep); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; }
+      tr:last-child td { border-bottom: 0; }
+
+      .responsibility {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 20px;
+        padding: 23px 0;
+        border-top: 1px solid var(--line);
+      }
+      .responsibility:first-of-type { border-top: 0; }
+      .responsibility h3 { margin: 0; font-family: var(--serif); font-size: 1.35rem; }
+      .responsibility dl { margin: 0; }
+      .responsibility dt { margin-top: 13px; color: var(--green); font-family: var(--mono); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+      .responsibility dt:first-child { margin-top: 0; }
+      .responsibility dd { margin: 2px 0 0; }
+
+      .chat {
+        display: grid;
+        gap: 13px;
+        margin: 24px 0;
+      }
+      .message {
+        max-width: 88%;
+        padding: 14px 17px;
+        border: 1px solid var(--line);
+        border-radius: 14px 14px 14px 3px;
+        background: var(--panel);
+      }
+      .message.user {
+        justify-self: end;
+        border-radius: 14px 14px 3px 14px;
+        background: var(--blue-soft);
+      }
+      .message .who { display: block; margin-bottom: 4px; font-family: var(--mono); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
+      .message pre { margin-bottom: 0; font-size: 0.76rem; }
+
+      .flow {
+        display: grid;
+        gap: 0;
+        margin: 24px 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: flow;
+      }
+      .flow li {
+        position: relative;
+        margin: 0 0 0 20px;
+        padding: 0 0 24px 42px;
+        border-left: 2px solid var(--line);
+        counter-increment: flow;
+      }
+      .flow li:last-child { padding-bottom: 0; border-color: transparent; }
+      .flow li::before {
+        position: absolute;
+        top: -2px;
+        left: -17px;
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--paper);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        content: counter(flow);
+      }
+      .flow strong { display: block; }
+
+      .boundary {
+        display: grid;
+        grid-template-columns: 1fr 60px 1fr;
+        align-items: stretch;
+        margin: 26px 0;
+      }
+      .boundary-side { padding: 22px; border: 1px solid var(--line); background: var(--panel); }
+      .boundary-side:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+      .boundary-side:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+      .boundary-gate { display: grid; place-items: center; background: var(--ink); color: white; font-family: var(--mono); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-align: center; writing-mode: vertical-rl; text-transform: uppercase; }
+      .boundary h3 { margin-top: 0; }
+
+      .sources { font-size: 0.9rem; }
+      .sources li { overflow-wrap: anywhere; }
+
+      footer {
+        padding: 28px 18px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 0.74rem;
+      }
+
+      @media (max-width: 900px) {
+        .page { grid-template-columns: 1fr; gap: 20px; }
+        nav { position: static; max-height: none; }
+        nav ol { columns: 2; column-gap: 24px; }
+        nav li { break-inside: avoid; border-top: 0; }
+      }
+
+      @media (max-width: 620px) {
+        body { font-size: 16px; }
+        .masthead-inner, .page { width: min(100% - 24px, 1180px); }
+        .masthead-inner { padding: 36px 0 30px; }
+        .page { padding-top: 20px; }
+        nav ol { columns: 1; }
+        .grid-2, .grid-3, .boundary { grid-template-columns: 1fr; }
+        .responsibility { grid-template-columns: 1fr; gap: 8px; }
+        .boundary-gate { min-height: 44px; writing-mode: horizontal-tb; }
+        .boundary-side:first-child, .boundary-side:last-child { border-radius: var(--radius); }
+        .message { max-width: 100%; }
+        th, td { padding: 10px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+      }
+
+      @media print {
+        body { background: white; color: black; font-size: 11pt; }
+        .masthead-inner, .page { width: 100%; }
+        .masthead-inner { padding: 20px 0; }
+        .page { display: block; padding: 0; }
+        nav { display: none; }
+        section { break-inside: avoid; padding: 22px 0; }
+        .card, .callout, .verdict, .table-wrap { box-shadow: none; }
+        a { color: black; text-decoration: none; }
+        a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.75em; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-inner">
+        <p class="eyebrow">Sentinel · SRD 1.0 · Bản giải thích kiến trúc</p>
+        <h1>Từ agent phân tích mock đến hệ thống policy an toàn</h1>
+        <p class="lede">Tài liệu này trả lời ba câu hỏi: code hiện tại đã đúng SRD đến đâu, policy có thể chỉnh qua chat như thế nào, và Binance MCP cần được nối vào đâu mà không trao quyền giao dịch cho LLM.</p>
+        <div class="status-strip" aria-label="Chú giải trạng thái">
+          <span class="tag ok">Đã có</span>
+          <span class="tag partial">Một phần</span>
+          <span class="tag missing">Còn thiếu</span>
+          <span class="tag target">Kiến trúc đích</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="page">
+      <nav aria-label="Mục lục">
+        <strong>Mục lục</strong>
+        <ol>
+          <li><a href="#ket-luan">Kết luận nhanh</a></li>
+          <li><a href="#hien-trang">Hiện trạng code</a></li>
+          <li><a href="#acceptance-criteria">Đối chiếu AC</a></li>
+          <li><a href="#ranh-gioi-trach-nhiem">Ai chịu trách nhiệm?</a></li>
+          <li><a href="#policy-qua-chat">Policy qua chat</a></li>
+          <li><a href="#request-flow">Luồng request thật</a></li>
+          <li><a href="#binance-mcp">Binance MCP</a></li>
+          <li><a href="#kien-truc-dich">Kiến trúc đích</a></li>
+          <li><a href="#thay-doi-code">Code cần thay đổi</a></li>
+          <li><a href="#lo-trinh">Lộ trình triển khai</a></li>
+          <li><a href="#bao-mat">An toàn &amp; lỗi</a></li>
+          <li><a href="#checklist">Checklist hoàn thành</a></li>
+          <li><a href="#glossary">Từ điển nhanh</a></li>
+        </ol>
+      </nav>
+
+      <main>
+        <section id="ket-luan">
+          <p class="section-kicker">01 · Executive summary</p>
+          <h2>Kết luận nhanh</h2>
+          <div class="verdict">
+            <p><strong>Sentinel hiện tại đúng với MVP học cách Agent gọi tool, nhưng chưa đạt Phase 1 trong SRD mới.</strong></p>
+            <p>Điểm thiếu quan trọng không phải là “AI chưa đủ thông minh”, mà là chưa có các lớp Python quyết định chắc chắn: parse policy có schema, tính allocation, tìm violation, tạo kế hoạch và RiskEngine.</p>
+          </div>
+
+          <div class="grid-3">
+            <article class="card">
+              <span class="status ok">Đã có</span>
+              <h3>Agent + tool loop</h3>
+              <p>LLM có thể chọn <code>get_portfolio()</code> và <code>get_market_data()</code>, nhận kết quả rồi giải thích.</p>
+            </article>
+            <article class="card">
+              <span class="status partial">Một phần</span>
+              <h3>UI quan sát tiến trình</h3>
+              <p>Giao diện đã minh họa timeline, nhưng JavaScript đang tự diễn hoạt; chưa gọi backend hoặc LLM.</p>
+            </article>
+            <article class="card">
+              <span class="status missing">Còn thiếu</span>
+              <h3>Policy-driven safety</h3>
+              <p>Chưa có policy state, calculation service, planner, RiskEngine, approval và Binance MCP thật.</p>
+            </article>
+          </div>
+
+          <div class="callout warning">
+            <strong>Điểm cần phân biệt:</strong> “kết nối Binance MCP read-only” không có nghĩa là “đã hoàn thành toàn bộ SRD”. MCP chỉ thay nguồn dữ liệu. Logic policy và an toàn vẫn phải nằm trong Python.
+          </div>
+        </section>
+
+        <section id="hien-trang">
+          <p class="section-kicker">02 · Code đang chạy</p>
+          <h2>Hiện trạng Sentinel</h2>
+
+          <h3>Luồng Python hiện tại</h3>
+          <pre>User nhập câu hỏi trong terminal
+        ↓
+main.py gọi Runner.run(...)
+        ↓
+LLM đọc SENTINEL_INSTRUCTIONS
+        ↓ tự chọn tool
+get_portfolio() / get_market_data()
+        ↓ dữ liệu mock dạng Pydantic
+LLM viết câu trả lời cuối</pre>
+
+          <div class="grid-2">
+            <article class="card">
+              <span class="label">Dữ liệu hiện có</span>
+              <h3>Portfolio mock</h3>
+              <p>BTC $6,000 · ETH $2,500 · USDT $1,500 · Tổng $10,000.</p>
+              <p>Tương ứng <strong>60% / 25% / 15%</strong>. SRD demo mới dùng 55% / 25% / 20%, vì vậy fixture sẽ cần đổi khi triển khai.</p>
+            </article>
+            <article class="card">
+              <span class="label">Market mock</span>
+              <h3>BTCUSDT</h3>
+              <p>Giá $110,000 · thay đổi 24h −4.2% · volatility <strong>HIGH</strong>.</p>
+              <p>Chưa có <code>estimated_slippage_percent</code> theo domain model mới.</p>
+            </article>
+          </div>
+
+          <h3>LiteLLM đang nằm ở đâu?</h3>
+          <p><code>app/config.py</code> tạo route dạng <code>litellm/{provider}/{model}</code>. OpenAI Agents SDK gửi yêu cầu model qua LiteLLM; LiteLLM chọn provider dựa vào prefix và đọc đúng biến môi trường như <code>OPENAI_API_KEY</code> hoặc <code>GEMINI_API_KEY</code>.</p>
+          <p>LiteLLM chỉ là bộ chuyển đổi giao tiếp với nhiều nhà cung cấp LLM. Nó <strong>không</strong> thay thế Tool, Policy Engine, RiskEngine hay Binance MCP.</p>
+
+          <h3>UI hiện tại</h3>
+          <p><code>web/index.html</code> và <code>web/app.js</code> là prototype tĩnh. Model selector chỉ hiển thị route; nhấn Run chạy một timeline cố định trong browser. Nó chưa gửi request đến Python và không chứng minh agent thật đã gọi tool.</p>
+
+          <div class="grid-2">
+            <article class="card">
+              <span class="label">Mô phỏng hiện tại</span>
+              <h3>Browser tự dựng kết quả</h3>
+              <p>Dữ liệu và activity step nằm sẵn trong JavaScript, phù hợp để thử bố cục nhưng không phải bằng chứng của một agent run.</p>
+            </article>
+            <article class="card">
+              <span class="label">Kiến trúc đích</span>
+              <h3>Thực tế sau kết nối</h3>
+              <p>UI nhận event từ FastAPI; FastAPI chạy Agent, Binance MCP và deterministic services rồi trả dữ liệu có nguồn gốc rõ ràng.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="acceptance-criteria">
+          <p class="section-kicker">03 · SRD gap analysis</p>
+          <h2>Đối chiếu Acceptance Criteria Phase 1</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>AC</th><th>Yêu cầu</th><th>Hiện trạng</th><th>Cần bổ sung</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>AC-001</td><td>Natural language → PortfolioPolicy hợp lệ</td><td><span class="status missing">Thiếu</span></td><td>Structured output + Pydantic validation.</td></tr>
+                <tr><td>AC-002</td><td>Portfolio 55% BTC, 25% ETH, 20% USDT</td><td><span class="status partial">Khác fixture</span></td><td>Hiện là 60/25/15; mock sẽ bị thay bởi MCP.</td></tr>
+                <tr><td>AC-003</td><td>Phát hiện BTC &gt; 40%, USDT &lt; 30%</td><td><span class="status missing">Thiếu</span></td><td>Deterministic Policy Engine.</td></tr>
+                <tr><td>AC-004</td><td>Chọn BTC để kiểm tra market</td><td><span class="status partial">Một phần</span></td><td>Agent có thể gọi BTC tool, nhưng chưa dựa trên violation có cấu trúc.</td></tr>
+                <tr><td>AC-005</td><td>BTC volatility HIGH</td><td><span class="status ok">Đạt riêng lẻ</span></td><td>Mock hiện trả HIGH; về sau chuẩn hóa dữ liệu MCP.</td></tr>
+                <tr><td>AC-006</td><td>Tạo rebalance proposal</td><td><span class="status missing">Thiếu</span></td><td>Rebalance Planner deterministic.</td></tr>
+                <tr><td>AC-007</td><td>RiskEngine trả BLOCKED</td><td><span class="status missing">Thiếu</span></td><td>RiskEngine + thứ tự ưu tiên rule.</td></tr>
+                <tr><td>AC-008</td><td>Giải thích rõ vì sao không execution</td><td><span class="status partial">Một phần</span></td><td>Agent nói không trade, nhưng chưa giải thích từ RiskDecision thật.</td></tr>
+                <tr><td>AC-009</td><td>Unit test không gọi OpenAI</td><td><span class="status ok">Đạt</span></td><td>Giữ nguyên nguyên tắc này.</td></tr>
+                <tr><td>AC-010</td><td>Risk calculation có unit test</td><td><span class="status missing">Thiếu</span></td><td>Chưa có phép tính hoặc RiskEngine để test.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><strong>Đánh giá thực tế:</strong> code hiện tại là nền móng tốt cho “agent biết gọi tool”, nhưng core product trong SRD là “policy được hiểu bởi AI và được cưỡng chế bởi Python”. Phần sau chưa tồn tại.</p>
+        </section>
+
+        <section id="ranh-gioi-trach-nhiem">
+          <p class="section-kicker">04 · Core architecture rule</p>
+          <h2>Ai chịu trách nhiệm cho việc gì?</h2>
+
+          <article class="responsibility">
+            <h3>LLM</h3>
+            <dl>
+              <dt>Là gì?</dt><dd>“Bộ não ngôn ngữ”: hiểu câu chat, chọn tool phù hợp và diễn đạt kết quả.</dd>
+              <dt>Tại sao cần?</dt><dd>Người dùng không cần học cú pháp JSON cứng; họ có thể nói “đừng để BTC quá 40%”.</dd>
+              <dt>Trong Sentinel</dt><dd>LLM parse ý định thành dữ liệu có cấu trúc, xác định cần quan sát portfolio/market nào và giải thích kết quả. Nó không ra phán quyết tài chính cuối cùng.</dd>
+            </dl>
+          </article>
+
+          <article class="responsibility">
+            <h3>Python</h3>
+            <dl>
+              <dt>Là gì?</dt><dd>Code deterministic: cùng input luôn cho cùng output.</dd>
+              <dt>Tại sao cần?</dt><dd>Số học và business rule không được phụ thuộc vào cách LLM “suy nghĩ” ở lần chạy đó.</dd>
+              <dt>Trong Sentinel</dt><dd>Tính weight, so sánh threshold, tạo violation, lượng trade ước tính và kiểm tra schema.</dd>
+            </dl>
+          </article>
+
+          <article class="responsibility">
+            <h3>RiskEngine</h3>
+            <dl>
+              <dt>Là gì?</dt><dd>Cổng an toàn bằng Python, trả một trong ba trạng thái <code>BLOCKED</code>, <code>REQUIRES_APPROVAL</code>, <code>SAFE_TO_PROPOSE</code>.</dd>
+              <dt>Tại sao cần?</dt><dd>Prompt chỉ là hướng dẫn mềm. RiskEngine là luật cứng và có thể unit test.</dd>
+              <dt>Trong Sentinel</dt><dd>Kiểm tra điều kiện chặn trước, sau đó approval threshold, cuối cùng mới cho phép đề xuất.</dd>
+            </dl>
+          </article>
+
+          <article class="responsibility">
+            <h3>Con người</h3>
+            <dl>
+              <dt>Là gì?</dt><dd>Chủ tài khoản và nguồn phê duyệt rõ ràng.</dd>
+              <dt>Tại sao cần?</dt><dd>Một câu chat mơ hồ không thể được xem là đồng ý giao dịch.</dd>
+              <dt>Trong Sentinel</dt><dd>Ở giai đoạn execution sau này, người dùng bấm Approve hoặc Reject cho đúng plan ID.</dd>
+            </dl>
+          </article>
+
+          <article class="responsibility">
+            <h3>Binance MCP</h3>
+            <dl>
+              <dt>Là gì?</dt><dd>Cầu nối tiêu chuẩn để Agent khám phá và gọi capability do Binance cung cấp.</dd>
+              <dt>Tại sao cần?</dt><dd>Thay dữ liệu mock bằng dữ liệu portfolio/market thật mà không nhúng logic Binance vào prompt.</dd>
+              <dt>Trong Sentinel</dt><dd>Giai đoạn read-only chỉ mở các tool đọc đã kiểm duyệt; ứng dụng không có quyền đặt lệnh.</dd>
+            </dl>
+          </article>
+
+          <article class="responsibility">
+            <h3>FastAPI</h3>
+            <dl>
+              <dt>Là gì?</dt><dd>HTTP backend nối browser với agent workflow.</dd>
+              <dt>Tại sao cần?</dt><dd>UI không thể gọi trực tiếp Python Agent một cách an toàn và giữ session policy.</dd>
+              <dt>Trong Sentinel</dt><dd>Nhận message, tìm session, chạy orchestration, stream activity event và trả kết quả có cấu trúc.</dd>
+            </dl>
+          </article>
+
+          <div class="boundary" aria-label="Ranh giới giữa AI và deterministic safety">
+            <div class="boundary-side">
+              <h3>AI được quyền</h3>
+              <ul><li>Hiểu ngôn ngữ</li><li>Đề nghị gọi tool</li><li>Giải thích dữ liệu</li><li>Hỏi lại khi mơ hồ</li></ul>
+            </div>
+            <div class="boundary-gate">Schema + Risk</div>
+            <div class="boundary-side">
+              <h3>Python quyết định</h3>
+              <ul><li>Giá trị policy hợp lệ</li><li>Violation có tồn tại</li><li>Plan có bị chặn</li><li>Có cần approval</li></ul>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="callout danger"><strong>Sai:</strong> LLM nói “BTC 55%, nên tôi đã bán $1,500”. Không có phép tính được kiểm chứng, RiskEngine hoặc execution receipt.</div>
+            <div class="callout"><strong>Đúng:</strong> Python tính BTC = 55%, planner tạo draft, RiskEngine trả BLOCKED vì HIGH volatility; LLM chỉ giải thích phán quyết đó.</div>
+          </div>
+        </section>
+
+        <section id="policy-qua-chat">
+          <p class="section-kicker">05 · Conversational policy</p>
+          <h2>Policy có thể tùy chỉnh qua chat không?</h2>
+          <p><strong>Có.</strong> Chat là cách nhập và chỉnh policy; nhưng nguồn sự thật sau cùng phải là một <code>PortfolioPolicy</code> đã được Pydantic kiểm tra, không phải đoạn văn nằm trong lịch sử hội thoại.</p>
+
+          <div class="chat" aria-label="Ví dụ hội thoại chỉnh policy">
+            <div class="message user"><span class="who">Bạn · lượt 1</span>Giữ ít nhất 30% USDT, không asset nào quá 40%, chặn rebalance khi volatility cao, và hỏi tôi nếu trade trên $1,000.</div>
+            <div class="message"><span class="who">Sentinel</span>Đã tạo policy cho phiên này.
+              <pre>{
+  "min_stablecoin_weight": 0.30,
+  "max_asset_weight": 0.40,
+  "block_high_volatility": true,
+  "max_trade_usd_without_approval": 1000
+}</pre>
+            </div>
+            <div class="message user"><span class="who">Bạn · lượt 2</span>Đổi giới hạn mỗi asset thành 45%.</div>
+            <div class="message"><span class="who">Sentinel</span>Chỉ cập nhật field được nhắc đến: <code>max_asset_weight = 0.45</code>. Ba field còn lại được giữ nguyên.</div>
+            <div class="message user"><span class="who">Bạn · lượt 3</span>Bỏ giới hạn stablecoin.</div>
+            <div class="message"><span class="who">Sentinel</span>Đặt <code>min_stablecoin_weight = null</code>. “Bỏ” khác với việc thiếu field trong request cập nhật.</div>
+            <div class="message user"><span class="who">Bạn · lượt 4</span>Policy hiện tại của tôi là gì?</div>
+            <div class="message"><span class="who">Sentinel</span>
+              <pre>{
+  "min_stablecoin_weight": null,
+  "max_asset_weight": 0.45,
+  "block_high_volatility": true,
+  "max_trade_usd_without_approval": 1000
+}</pre>
+            </div>
+          </div>
+
+          <h3>Cách hoạt động an toàn</h3>
+          <ol>
+            <li>LLM nhận message cùng policy hiện tại và xuất ra một <strong>PolicyPatch</strong>, không tự sửa object tùy ý.</li>
+            <li>Pydantic kiểm tra kiểu và range, ví dụ weight phải từ 0 đến 1, threshold phải không âm.</li>
+            <li>Python merge patch vào policy hiện tại. Field không được nhắc tới thì giữ nguyên; thao tác remove phải rõ ràng.</li>
+            <li>Policy mới được lưu theo <code>session_id</code>. MVP có thể lưu RAM; production cần storage bền vững và audit log.</li>
+            <li>Sentinel hiển thị policy đã hiểu để người dùng kiểm tra trước khi phân tích.</li>
+          </ol>
+
+          <div class="callout warning">
+            <strong>Nếu mơ hồ thì hỏi đúng một điểm:</strong> “Giữ portfolio an toàn hơn” chưa đủ để tạo con số. Sentinel nên hỏi “Bạn muốn giới hạn tối đa mỗi asset là bao nhiêu?” thay vì tự chọn 40%.
+          </div>
+        </section>
+
+        <section id="request-flow">
+          <p class="section-kicker">06 · One real analysis request</p>
+          <h2>Một request thật sẽ đi như thế nào?</h2>
+          <ol class="flow">
+            <li><strong>Frontend gửi message + session ID</strong>Ví dụ: “Phân tích theo policy hiện tại”.</li>
+            <li><strong>FastAPI tải policy hiện tại</strong>Không đưa API key về browser.</li>
+            <li><strong>LLM phân loại ý định</strong>Đây là cập nhật policy, câu hỏi đọc policy hay yêu cầu phân tích?</li>
+            <li><strong>Pydantic validate structured output</strong>Nếu sai schema, retry một lần; vẫn sai thì dừng an toàn.</li>
+            <li><strong>Agent đọc portfolio qua Binance MCP</strong>Chỉ gọi tool read-only đã được allow-list.</li>
+            <li><strong>Python tính allocations và violations</strong>BTC weight = BTC USD value / total USD value.</li>
+            <li><strong>Agent lấy market data liên quan</strong>Chỉ lấy BTCUSDT nếu BTC là asset cần điều chỉnh; nhiều asset độc lập có thể fetch đồng thời.</li>
+            <li><strong>Planner tạo RebalancePlan dạng DRAFT</strong>Plan chứa violation, action ước tính, lý do và tác động dự kiến.</li>
+            <li><strong>RiskEngine ra quyết định</strong>HIGH volatility + policy chặn → <code>BLOCKED</code>; blocking luôn ưu tiên hơn approval.</li>
+            <li><strong>LLM giải thích structured result</strong>UI nhận cả dữ liệu máy đọc được và câu trả lời dễ hiểu. Không có trade nào được thực hiện.</li>
+          </ol>
+
+          <div class="callout">
+            <strong>Activity timeline không phải chain-of-thought.</strong> UI chỉ hiển thị event cấp cao như “Reading portfolio”, “Checking market”, “Risk Engine blocked”. Nó không hiển thị suy luận bí mật bên trong model.
+          </div>
+        </section>
+
+        <section id="binance-mcp">
+          <p class="section-kicker">07 · Real data boundary</p>
+          <h2>Binance MCP được apply ở đâu?</h2>
+          <p>Binance MCP nằm ở lớp <strong>tool/data source</strong>. Nó thay thế hoặc bọc hai mock tool hiện nay; nó không nằm trong LiteLLM và không thay RiskEngine.</p>
+
+          <pre>LiteLLM route ───────────────→ LLM provider (OpenAI/Gemini/...)
+                                  │
+                                  │ chooses read capability
+                                  ▼
+OpenAI Agents SDK MCP client ─→ https://agent.binance.com/mcp/agentic
+                                  │
+                                  ▼
+                         Binance market/account data
+
+Python Policy Engine + RiskEngine remain inside Sentinel.</pre>
+
+          <h3>Kết nối đề xuất</h3>
+          <ul>
+            <li>Dùng transport Streamable HTTP của OpenAI Agents SDK, ví dụ lớp <code>MCPServerStreamableHttp</code>.</li>
+            <li>Endpoint chính thức: <code>https://agent.binance.com/mcp/agentic</code>.</li>
+            <li>Authentication đi qua OAuth/browser theo Binance Agent OS; không tự nhét Binance secret vào prompt.</li>
+            <li>Sau khi kết nối, khám phá tên tool thật từ server. Không hard-code các tên đoán như <code>get_balances</code> nếu server chưa công bố tên đó.</li>
+          </ul>
+
+          <h3>Read-only phải được cưỡng chế bằng code</h3>
+          <p>Instruction “never trade” là cần nhưng chưa đủ. Sentinel phải dùng <code>tool_filter</code> hoặc allow-list cấp ứng dụng để chỉ expose capability đọc portfolio, balance và market. Tool đặt lệnh, hủy lệnh, transfer hoặc withdrawal không được đưa vào agent.</p>
+          <div class="callout danger">
+            <strong>Fail closed:</strong> nếu không phân loại chắc chắn một MCP tool là read-only, không expose tool đó. Ở phạm vi hiện tại, ứng dụng không có quyền đặt lệnh.
+          </div>
+
+          <h3>LiteLLM và MCP giải quyết hai việc khác nhau</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Thành phần</th><th>Kết nối tới</th><th>Để làm gì?</th><th>Credential</th></tr></thead>
+              <tbody>
+                <tr><td>LiteLLM</td><td>OpenAI, Gemini, DeepSeek…</td><td>Chạy “bộ não” LLM</td><td>Provider API key tương ứng</td></tr>
+                <tr><td>Binance MCP client</td><td>Binance Agent OS MCP</td><td>Lấy dữ liệu portfolio/market</td><td>OAuth và scope Binance</td></tr>
+                <tr><td>RiskEngine</td><td>Không gọi dịch vụ ngoài</td><td>Áp luật an toàn</td><td>Không cần key</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Nguồn chính thức</h3>
+          <ul class="sources">
+            <li><a href="https://developers.binance.com/en/docs/agent-native/mcp-server/agentic">Binance Agentic MCP Server documentation</a> — endpoint, transport, OAuth và phạm vi capability.</li>
+            <li><a href="https://openai.github.io/openai-agents-python/mcp/">OpenAI Agents SDK — MCP documentation</a> — cách gắn MCP server và lọc tool trong Agent.</li>
+          </ul>
+        </section>
+
+        <section id="kien-truc-dich">
+          <p class="section-kicker">08 · Target architecture</p>
+          <h2>Kiến trúc đích gọn nhưng đúng SRD</h2>
+          <pre>USER
+  │ chat policy / analyze
+  ▼
+VINTAGE WEB UI
+  │ HTTP + streamed activity events
+  ▼
+FASTAPI
+  │ session orchestration
+  ▼
+SENTINEL AGENT / LLM ──────────────┐
+  │ parse intent + choose reads     │
+  │                                 ▼
+  │                          BINANCE MCP
+  │                          read-only tools
+  ▼
+PYDANTIC SCHEMA VALIDATION
+  ▼
+POLICY ENGINE ─→ REBALANCE PLANNER
+                       │
+                       ▼
+                  RISK ENGINE
+                ┌──────┼───────────┐
+                ▼      ▼           ▼
+             BLOCKED  APPROVAL  SAFE_TO_PROPOSE
+                │      │           │
+                └──────┴───────────┘
+                       ▼
+                 EXPLANATION + UI
+
+Read-only scope: no execution branch is connected.</pre>
+
+          <p>Kiến trúc này vẫn đơn giản: một FastAPI app, một agent, một nhóm Pydantic model và ba module logic Python. Chưa cần database, queue, microservice hay service/repository/controller theo kiểu Spring Boot.</p>
+        </section>
+
+        <section id="thay-doi-code">
+          <p class="section-kicker">09 · Migration map</p>
+          <h2>Phần code nào giữ, thay và thêm?</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Hiện tại</th><th>Quyết định</th><th>Đích đến</th></tr></thead>
+              <tbody>
+                <tr><td><code>app/agent.py</code></td><td><span class="status partial">Mở rộng</span></td><td>Giữ Agent và instructions; thêm MCP server, structured workflow và output dựa trên RiskDecision.</td></tr>
+                <tr><td><code>app/config.py</code></td><td><span class="status ok">Giữ</span></td><td>Giữ LiteLLM provider/model; thêm cấu hình MCP và session an toàn.</td></tr>
+                <tr><td><code>app/models.py</code></td><td><span class="status partial">Tách vừa đủ</span></td><td>Thêm PortfolioPolicy, PolicyPatch, violation, trade, plan và risk models.</td></tr>
+                <tr><td><code>app/tools/portfolio.py</code></td><td><span class="status target">Thay adapter</span></td><td>Map kết quả Binance MCP sang model nội bộ Portfolio.</td></tr>
+                <tr><td><code>app/tools/market.py</code></td><td><span class="status target">Thay adapter</span></td><td>Map market MCP sang MarketData, gồm slippage nếu capability hỗ trợ.</td></tr>
+                <tr><td><code>main.py</code></td><td><span class="status partial">Giữ dev CLI</span></td><td>Không còn entrypoint chính của UI; FastAPI trở thành runtime web.</td></tr>
+                <tr><td><code>web/app.js</code></td><td><span class="status missing">Viết lại</span></td><td>Loại bỏ simulation; gọi API thật và render event thật.</td></tr>
+                <tr><td>Chưa có</td><td><span class="status target">Thêm</span></td><td><code>policy_service.py</code>, <code>portfolio_service.py</code>, <code>rebalance_service.py</code>, <code>risk_service.py</code>, <code>mcp/binance.py</code>, FastAPI routes.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Hai hàm mock là phần sẽ được thay khi nối Binance MCP. Tuy nhiên nên giữ model nội bộ ổn định để phần còn lại không phụ thuộc trực tiếp vào JSON thay đổi từ provider.</p>
+        </section>
+
+        <section id="lo-trinh">
+          <p class="section-kicker">10 · Implementation order</p>
+          <h2>Lộ trình không còn “demo giả”, nhưng vẫn kiểm soát rủi ro</h2>
+          <p>“Không dùng phase demo nữa” nên hiểu là UI phải gọi backend và dữ liệu bình thường lấy từ Binance MCP. Ta vẫn triển khai theo thứ tự kỹ thuật để mỗi lớp có test trước khi nối lớp tiếp theo.</p>
+          <ol class="flow">
+            <li><strong>Domain + Policy Engine</strong>Thêm model, parse/patch policy, allocation và violation tests.</li>
+            <li><strong>Planner + RiskEngine</strong>Đạt toàn bộ test priority: block thắng approval, rồi mới safe.</li>
+            <li><strong>Binance MCP read-only</strong>OAuth, tool discovery, allow-list và adapter về domain model nội bộ.</li>
+            <li><strong>Agent orchestration</strong>LLM chọn dữ liệu cần đọc; kết quả tính toán luôn đi qua service deterministic.</li>
+            <li><strong>FastAPI + session</strong>API phân tích, policy chat và activity streaming.</li>
+            <li><strong>Nối UI thật</strong>Xóa browser simulation; render structured response và trạng thái lỗi thật.</li>
+          </ol>
+          <div class="callout">
+            <strong>Phạm vi dừng:</strong> có thể dùng dữ liệu Binance thật và policy chat thật, nhưng không expose tool execution. Approve/Reject chỉ cần khi bước execution được thiết kế và kiểm thử ở giai đoạn sau.
+          </div>
+        </section>
+
+        <section id="bao-mat">
+          <p class="section-kicker">11 · Safety and failure</p>
+          <h2>An toàn và xử lý lỗi</h2>
+          <div class="grid-2">
+            <article class="card"><h3>Portfolio không đọc được</h3><p>Dừng phân tích và nói rõ không thể kiểm tra portfolio. Không dùng dữ liệu cache/mẫu để giả vờ là dữ liệu thật.</p></article>
+            <article class="card"><h3>Market không xác minh được</h3><p>Không được kết luận plan an toàn. Trả lỗi có cấu trúc và trạng thái không thể đánh giá.</p></article>
+            <article class="card"><h3>Policy không hợp lệ</h3><p>Chỉ hỏi lại field mơ hồ. Schema validation thất bại lần hai thì dừng xử lý policy.</p></article>
+            <article class="card"><h3>MCP lộ tool ghi</h3><p>Tool filter từ chối theo mặc định. Không dựa vào tên prompt hoặc lời hứa của model để ngăn trade.</p></article>
+          </div>
+          <ul>
+            <li>Không commit <code>.env</code>, access token hoặc credential.</li>
+            <li>Không gửi secret vào prompt/trace/log.</li>
+            <li>Log tool name, timestamp, input đã lọc, result status và rule code; không log dữ liệu nhạy cảm quá mức.</li>
+            <li>Không nói order thành công nếu không có execution confirmation. Trong read-only scope, không nói đã đặt order dưới bất kỳ hình thức nào.</li>
+          </ul>
+        </section>
+
+        <section id="checklist">
+          <p class="section-kicker">12 · Definition of done</p>
+          <h2>Checklist để Sentinel thực sự đạt SRD</h2>
+          <div class="grid-2">
+            <article class="card">
+              <h3>Policy &amp; calculation</h3>
+              <ul><li>Policy chat tạo/đổi/xóa field đúng</li><li>Pydantic reject value sai</li><li>Weights do Python tính</li><li>Hai violation được phát hiện</li></ul>
+            </article>
+            <article class="card">
+              <h3>Planning &amp; safety</h3>
+              <ul><li>Plan $1,500 BTC hợp lý</li><li>HIGH volatility → BLOCKED</li><li>Block ưu tiên hơn approval</li><li>Reason code đọc được bằng máy</li></ul>
+            </article>
+            <article class="card">
+              <h3>Binance MCP</h3>
+              <ul><li>OAuth kết nối thành công</li><li>Tool thật được discover</li><li>Chỉ read-only được expose</li><li>Failure không tạo dữ liệu giả</li></ul>
+            </article>
+            <article class="card">
+              <h3>API &amp; UI</h3>
+              <ul><li>Browser gọi FastAPI thật</li><li>Timeline đến từ backend event</li><li>Hiển thị policy/portfolio/plan/risk</li><li>Không còn nhãn browser simulation</li></ul>
+            </article>
+          </div>
+          <p>Khi các mục trên và 10 unit test bắt buộc trong SRD đều pass mà không gọi LLM thật, Sentinel mới đạt core Phase 1 theo định nghĩa sản phẩm — dù nguồn dữ liệu đã là Binance MCP thật.</p>
+        </section>
+
+        <section id="glossary">
+          <p class="section-kicker">13 · Java-to-agent glossary</p>
+          <h2>Từ điển nhanh cho Spring Boot developer</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Khái niệm</th><th>Hiểu đơn giản</th><th>Gần giống trong backend quen thuộc</th></tr></thead>
+              <tbody>
+                <tr><td>Agent</td><td>LLM có instruction, tool và vòng lặp hành động</td><td>Orchestrator động, nhưng quyết định bước tiếp theo bằng model</td></tr>
+                <tr><td>Tool</td><td>Hàm/capability LLM được phép yêu cầu gọi</td><td>Một typed application operation</td></tr>
+                <tr><td>MCP</td><td>Giao thức chuẩn để công bố tool và resource</td><td>Giống contract tích hợp, không hoàn toàn là REST</td></tr>
+                <tr><td>Pydantic</td><td>Parse và validate model Python</td><td>DTO + Bean Validation</td></tr>
+                <tr><td>Structured output</td><td>LLM trả object theo schema thay vì văn xuôi tự do</td><td>Request DTO được validate</td></tr>
+                <tr><td>LiteLLM</td><td>Adapter route tới nhiều LLM provider</td><td>Client abstraction cho nhiều vendor</td></tr>
+                <tr><td>RiskEngine</td><td>Luật an toàn deterministic</td><td>Domain service/rule engine có unit test</td></tr>
+                <tr><td>Tool filter</td><td>Danh sách capability agent thực sự nhìn thấy</td><td>Authorization allow-list</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout">
+            <strong>Câu nhớ ngắn:</strong> AI hiểu. Python tính. RiskEngine chặn. Con người duyệt. Binance cung cấp dữ liệu — và chỉ execution layer được thiết kế riêng mới có thể giao dịch.
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer>Sentinel SRD Guide · Self-contained HTML · Cập nhật 04/09/2026</footer>
+  </body>
+</html>
