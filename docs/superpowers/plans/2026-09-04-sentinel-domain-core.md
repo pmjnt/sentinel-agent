@@ -249,7 +249,7 @@ git commit -m "feat: calculate portfolio allocations deterministically"
 - Create: `app/services/policy_service.py`
 - Create: `tests/unit/test_policy_service.py`
 
-- [ ] **Step 1: Write failing patch tests**
+- [x] **Step 1: Write failing patch tests**
 
 Verify absent fields remain unchanged and explicit `None` removes an optional rule:
 
@@ -272,7 +272,7 @@ def test_explicit_null_removes_optional_rule() -> None:
     assert updated.min_stablecoin_weight is None
 ```
 
-- [ ] **Step 2: Write failing violation tests**
+- [x] **Step 2: Write failing violation tests**
 
 Using the 55/25/20 portfolio and 30/40 policy, assert exactly:
 
@@ -280,7 +280,7 @@ Using the 55/25/20 portfolio and 30/40 policy, assert exactly:
 - one `MIN_STABLECOIN_WEIGHT` violation for USDT at 0.20 versus 0.30;
 - no violation for a compliant 40/30/30 portfolio.
 
-- [ ] **Step 3: Run and verify RED**
+- [x] **Step 3: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_policy_service.py -q
@@ -288,7 +288,7 @@ Using the 55/25/20 portfolio and 30/40 policy, assert exactly:
 
 Expected: import fails because `policy_service.py` does not exist.
 
-- [ ] **Step 4: Implement patching and detection**
+- [x] **Step 4: Implement patching and detection**
 
 Create two public functions with these exact typed signatures:
 
@@ -297,7 +297,7 @@ Create two public functions with these exact typed signatures:
 
 Use `patch.model_fields_set` for merge semantics. Sum all configured stablecoin weights for the minimum rule. Exclude configured stablecoins from the maximum crypto-asset rule. Return violations in portfolio order, with the stablecoin minimum violation last.
 
-- [ ] **Step 5: Run and verify GREEN**
+- [x] **Step 5: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_policy_service.py -q
@@ -305,7 +305,7 @@ Use `patch.model_fields_set` for merge semantics. Sum all configured stablecoin 
 
 Expected: all patch and violation tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/services/policy_service.py tests/unit/test_policy_service.py
