@@ -207,7 +207,7 @@ git commit -m "feat: parse policy chat into structured actions"
 - Create: `app/services/policy_conversation_service.py`
 - Create: `tests/unit/test_policy_conversation_service.py`
 
-- [ ] **Step 1: Write failing orchestration tests**
+- [x] **Step 1: Write failing orchestration tests**
 
 Use a fake parser returning `ParsedRequest`. Test:
 
@@ -218,13 +218,13 @@ Use a fake parser returning `ParsedRequest`. Test:
 - analyze alone returns the existing policy and `analysis_requested=True`;
 - no test calls `Runner`, OpenAI, Gemini, or Binance.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_policy_conversation_service.py -q
 ```
 
-- [ ] **Step 3: Implement the conversation service**
+- [x] **Step 3: Implement the conversation service**
 
 Define a local `RequestParser` protocol with one async `parse(message, current_policy)` method because production and test have real alternative implementations.
 
@@ -239,13 +239,13 @@ focus_symbols: list[str]
 
 Execute actions in order. Stop immediately on clarification. Join multiple deterministic response messages with newlines. Never call portfolio or market tools in this service.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_policy_conversation_service.py -q
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/services/policy_conversation_service.py tests/unit/test_policy_conversation_service.py
