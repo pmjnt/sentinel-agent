@@ -20,6 +20,10 @@ function getAgentModelRoute(provider, model) {
   return `litellm/${provider}/${model}`;
 }
 
+function getTierLabel(provider) {
+  return provider === "gemini" ? "Free tier" : "";
+}
+
 function buildActivitySteps() {
   return [
     { id: "request", label: "Request received" },
@@ -38,13 +42,13 @@ function initializeApp() {
   const form = document.querySelector("#analysis-form");
   const providerSelect = document.querySelector("#provider");
   const modelSelect = document.querySelector("#model");
+  const tierMark = document.querySelector(".tier-mark");
   const promptInput = document.querySelector("#prompt");
   const promptError = document.querySelector("#prompt-error");
   const runButton = document.querySelector("#run-button");
   const runButtonLabel = document.querySelector("#run-button-label");
   const runId = document.querySelector("#run-id");
   const runRoute = document.querySelector("#run-route");
-  const agentModelRoute = document.querySelector("#agent-model-route");
   const activityLog = document.querySelector("#activity-log");
   const emptyActivity = document.querySelector("#empty-activity");
   const evidenceSection = document.querySelector("#evidence-section");
@@ -60,16 +64,17 @@ function initializeApp() {
     getModelsForProvider(providerSelect.value).forEach((model) => {
       const option = document.createElement("option");
       option.value = model;
-      option.textContent = providerSelect.value === "gemini" ? `${model} · free tier` : model;
+      option.textContent = model;
       modelSelect.append(option);
     });
+    tierMark.textContent = getTierLabel(providerSelect.value);
+    tierMark.hidden = tierMark.textContent === "";
     updateRoute();
   }
 
   function updateRoute() {
     const providerName = providerSelect.options[providerSelect.selectedIndex].text;
     runRoute.textContent = `${providerName} / ${modelSelect.value}`;
-    agentModelRoute.textContent = getAgentModelRoute(providerSelect.value, modelSelect.value);
   }
 
   function clearSimulation() {
@@ -185,6 +190,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildActivitySteps,
     getAgentModelRoute,
     getModelsForProvider,
+    getTierLabel,
     isValidPrompt,
   };
 }

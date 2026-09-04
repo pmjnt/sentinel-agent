@@ -35,21 +35,20 @@
           </div>
 
           <form id="analysis-form" novalidate>
-            <div class="selector-grid">
-              <div class="field">
+            <div class="model-toolbar" aria-label="Model configuration">
+              <div class="toolbar-field provider-choice">
                 <label for="provider">Provider</label>
                 <select id="provider" name="provider">
                   <option value="openai">OpenAI</option>
                   <option value="gemini" selected>Gemini</option>
                 </select>
               </div>
-              <div class="field">
+              <div class="toolbar-field model-choice">
                 <label for="model">Model</label>
                 <select id="model" name="model"></select>
               </div>
+              <span class="tier-mark">Free tier</span>
             </div>
-            <p class="route-preview">Agent model route: <code id="agent-model-route">litellm/gemini/gemini-3.5-flash-lite</code></p>
-            <p class="model-note">Free tier is quota-limited. In this static demo, selection only previews the route; the Python app reads the same provider and model from <code>.env</code>.</p>
 
             <div class="field prompt-field">
               <label for="prompt">Instruction to Sentinel</label>
