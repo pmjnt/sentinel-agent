@@ -374,7 +374,7 @@ git commit -m "feat: build deterministic rebalance proposals"
 - Create: `app/services/risk_service.py`
 - Create: `tests/unit/test_risk_service.py`
 
-- [ ] **Step 1: Write failing risk-priority tests**
+- [x] **Step 1: Write failing risk-priority tests**
 
 Cover the SRD-required cases:
 
@@ -388,7 +388,7 @@ $500 action + $1,000 threshold + non-HIGH market → SAFE_TO_PROPOSE
 
 Assert machine-readable reason codes as well as statuses.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_risk_service.py -q
@@ -396,13 +396,13 @@ Assert machine-readable reason codes as well as statuses.
 
 Expected: import fails because the risk service does not exist.
 
-- [ ] **Step 3: Implement risk evaluation**
+- [x] **Step 3: Implement risk evaluation**
 
 Create `evaluate_rebalance_risk(policy: PortfolioPolicy, plan: RebalancePlan, market_data: dict[str, MarketData]) -> RiskDecision`.
 
 Evaluate all applicable market records for proposed actions. Return immediately with `HIGH_VOLATILITY` if blocking conditions exist. Only then return `APPROVAL_THRESHOLD_EXCEEDED` when necessary. Otherwise return `SAFE_TO_PROPOSE` with `NO_RESTRICTION_TRIGGERED`. Do not mutate the input plan and do not use the LLM.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_risk_service.py -q
@@ -410,7 +410,7 @@ Evaluate all applicable market records for proposed actions. Return immediately 
 
 Expected: all five risk cases pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/services/risk_service.py tests/unit/test_risk_service.py
