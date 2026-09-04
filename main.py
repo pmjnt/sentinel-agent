@@ -13,8 +13,8 @@ SAMPLE_PROMPT = (
 
 async def run_console() -> None:
     """Run Sentinel's interactive command-line loop."""
-    load_settings()
-    sentinel = create_sentinel_agent()
+    settings = load_settings()
+    sentinel = create_sentinel_agent(settings)
 
     print("Sentinel is ready. Market and portfolio data are mocked in this MVP.")
     print(f"Try: {SAMPLE_PROMPT}")

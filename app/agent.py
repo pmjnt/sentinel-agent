@@ -1,5 +1,6 @@
-from agents import Agent
+from agents import Agent, set_tracing_disabled
 
+from app.config import Settings
 from app.tools.market import get_market_data_tool
 from app.tools.portfolio import get_portfolio_tool
 
@@ -20,10 +21,14 @@ Rules:
 """.strip()
 
 
-def create_sentinel_agent() -> Agent:
+def create_sentinel_agent(settings: Settings) -> Agent:
     """Create Sentinel with its available read-only analysis tools."""
+    # Keep this MVP independent from OpenAI tracing when Gemini is selected.
+    set_tracing_disabled(True)
+
     return Agent(
         name="Sentinel",
+        model=settings.agents_model,
         instructions=SENTINEL_INSTRUCTIONS,
         tools=[get_portfolio_tool, get_market_data_tool],
     )

@@ -10,6 +10,12 @@ A normal chatbot receives text and returns text. An AI Agent can also choose and
 
 In Sentinel, the user asks a risk question. The LLM decides whether it needs portfolio holdings, market data, or both. The OpenAI Agents SDK runs the selected Python tool, sends its structured result back to the LLM, and lets the LLM continue its analysis.
 
+Sentinel uses LiteLLM as a model-routing layer. OpenAI Agents SDK still owns the Agent and tool loop; LiteLLM only routes the model request to OpenAI or Gemini.
+
+```text
+Sentinel Agent -> LiteLLM -> OpenAI or Gemini
+```
+
 ## The LLM and the tools
 
 The **LLM is the AI brain**. It lives behind the `Agent` configured in `app/agent.py`. It understands the user's request, reads Sentinel's instructions, decides which tools are relevant, and explains the risk.
@@ -78,6 +84,7 @@ sentinel-agent/
 │       ├── market.py
 │       └── portfolio.py
 ├── tests/
+│   ├── test_agent.py
 │   ├── test_config.py
 │   ├── test_market.py
 │   └── test_portfolio.py
@@ -91,7 +98,7 @@ sentinel-agent/
 ## Requirements
 
 - Python 3.12
-- An OpenAI API key
+- An OpenAI or Gemini API key
 
 Confirm your Python version:
 
@@ -120,7 +127,9 @@ On Windows PowerShell, activate it with:
 python -m pip install -r requirements.txt
 ```
 
-## Configure the API key
+`litellm==1.83.0` is pinned because it is compatible with the OpenAI Python 3.x dependency used by the installed Agents SDK. Upgrade the Agents SDK and LiteLLM together after checking their dependency ranges.
+
+## Configure the LLM provider and model
 
 Copy the example file:
 
@@ -128,13 +137,31 @@ Copy the example file:
 cp .env.example .env
 ```
 
-Then edit `.env`:
+Then edit `.env`. For OpenAI:
 
 ```dotenv
-OPENAI_API_KEY=your_real_api_key_here
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-5.6-luna
+
+OPENAI_API_KEY=your_openai_api_key_here
+GEMINI_API_KEY=
 ```
 
-Never commit `.env`. It is listed in `.gitignore`.
+To switch to Gemini:
+
+```dotenv
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-3.8-flash
+
+OPENAI_API_KEY=
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+`LLM_MODEL` is editable. Enter only the provider's model ID; Sentinel adds the LiteLLM routing prefix itself. For example, enter `gpt-5.6-luna`, not `litellm/openai/gpt-5.6-luna`.
+
+Only the API key for the selected provider is required. The provider validates whether the configured model exists and whether your key can access it when the first request is made.
+
+Never commit `.env`. It is listed in `.gitignore`. OpenAI tracing is disabled in this MVP so a Gemini configuration does not also require an OpenAI key.
 
 ## Run Sentinel
 
@@ -156,7 +183,20 @@ Type `exit` to close the application.
 python -m pytest -v
 ```
 
-The tests call only the plain mock-data functions and configuration loader. They do not call the OpenAI API and do not need a real API key.
+The tests cover the plain mock-data functions, provider configuration, and Agent construction. They do not call OpenAI or Gemini and do not need a real API key.
+
+## What LiteLLM does
+
+Sentinel passes model IDs such as these to OpenAI Agents SDK:
+
+```text
+litellm/openai/gpt-5.6-luna
+litellm/gemini/gemini-3.8-flash
+```
+
+The SDK delegates those model requests to LiteLLM. LiteLLM selects the provider and reads its standard API-key environment variable. It does not decide when to call portfolio or market tools; that remains the responsibility of the Sentinel Agent and its LLM.
+
+This MVP does not use the LiteLLM Proxy Server, automatic fallback, load balancing, cost tracking, or multi-provider retries.
 
 For a basic syntax check:
 

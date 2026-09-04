@@ -1,4 +1,5 @@
-openai-agents
+openai-agents[litellm]
+litellm==1.83.0
 pydantic
 python-dotenv
 pytest
