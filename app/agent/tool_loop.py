@@ -1,12 +1,16 @@
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
 from agents import Agent, ModelBehaviorError, Runner, set_tracing_disabled
 
-from app.agent.controlled_tools import CONTROLLED_TOOLS
+from app.agent.controlled_tools import CONTROLLED_TOOLS, MAX_MARKET_OBSERVATIONS
 from app.agent.model_settings import build_agent_model_settings
-from app.agent.output_safety import validate_qualitative_output
+from app.agent.output_safety import (
+    validate_non_analysis_output,
+    validate_qualitative_output,
+)
 from app.agent.prompts import CONTROLLED_TOOL_LOOP_INSTRUCTIONS
 from app.agent.run_context import SentinelRunContext, SentinelRunEvent
 from app.config import Settings
@@ -16,6 +20,14 @@ from app.models.policy import PolicyPatch, PortfolioPolicy
 
 
 RunAgent = Callable[..., Awaitable[Any]]
+MAX_AGENT_TURNS = MAX_MARKET_OBSERVATIONS + 8
+_FINANCIAL_OBSERVATION_REQUEST = re.compile(
+    r"\b(?:analy[sz]e|analysis|risk|risky|exposure|holdings?|balances?|"
+    r"market\s+(?:data|price)|price|volatility)\b"
+    r"|phân tích|rủi ro|số dư|giá thị trường|biến động"
+    r"|xem.{0,20}danh mục|tỷ trọng.{0,20}(?:hiện tại|của tôi)",
+    flags=re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -72,7 +84,7 @@ class SentinelToolLoop:
             self._agent,
             build_tool_loop_input(message, policy),
             context=context,
-            max_turns=12,
+            max_turns=MAX_AGENT_TURNS,
         )
         output = result.final_output
         if not isinstance(output, str):
@@ -81,8 +93,23 @@ class SentinelToolLoop:
         final_text = output.strip()
         if context.analyses:
             final_text = validate_qualitative_output(final_text)
-        elif not final_text:
-            raise ModelBehaviorError("Sentinel Agent returned empty text output.")
+        else:
+            final_text = validate_non_analysis_output(final_text)
+            observed_financial_data = (
+                context.portfolio is not None or bool(context.market_by_symbol)
+            )
+            if observed_financial_data and not context.data_errors:
+                raise ModelBehaviorError(
+                    "Sentinel Agent stopped before deterministic evaluation."
+                )
+            if (
+                _FINANCIAL_OBSERVATION_REQUEST.search(message)
+                and not context.data_errors
+            ):
+                raise ModelBehaviorError(
+                    "Sentinel Agent answered a financial request "
+                    "without deterministic analysis."
+                )
 
         return ToolLoopResult(
             final_text=final_text,

@@ -20,7 +20,7 @@ The Agent receives these tools:
 ```text
 get_portfolio()
 get_market_data(symbol)
-update_policy(values, remove_fields)
+update_policy(changes=[{field, value_as_text}])
 view_policy()
 evaluate_portfolio_risk(focus_symbols)
 ```
@@ -58,8 +58,9 @@ result.
 
 ## Policy behavior
 
-`update_policy` accepts validated policy values and an explicit list of fields
-to remove. It updates only the run's working policy and records a patch. Later
+`update_policy` accepts field names and simple text values. Python parses each
+value as decimal, boolean, or `null`, then validates the resulting patch. It
+updates only the run's working policy and records a patch. Later
 tool calls in the same message see the working policy, so “update then analyze”
 uses the new rule.
 
@@ -70,7 +71,8 @@ event for the final response.
 
 ## User-facing output
 
-- With no tool call, the Agent's text is general chat or a clarification.
+- With no tool call, only general chat or clarification may complete. A request
+  for financial observations must produce deterministic analysis or fail closed.
 - Policy confirmations and policy views are rendered by deterministic Python.
 - Analysis facts, proposals, RiskDecision, and `NOT_EXECUTED` are rendered by
   deterministic Python.
@@ -98,6 +100,8 @@ and reassessing when verified volatility falls rather than acting now.
 Every Agent request sends an explicit output budget. The default is
 `LLM_MAX_TOKENS=4096`. Provider-specific reasoning options are omitted. Tool calls are sequential with
 `parallel_tool_calls=false` so observation and policy order are deterministic.
+One analysis is capped at 20 market observations, with a derived 28-turn Agent
+budget; larger scopes fail closed instead of exhausting the loop unpredictably.
 
 ## Migration
 

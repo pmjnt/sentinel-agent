@@ -41,14 +41,19 @@ Nếu evaluation trả `MISSING_OBSERVATIONS`, Agent phải gọi tool được 
 evaluation lại; không được đoán. Nếu tool trả `ERROR`, Agent phải nói dữ liệu
 không xác minh được và không khuyến nghị hành động.
 
+Một analysis tối đa 20 market observations. Vượt giới hạn sẽ fail-closed. Nếu
+Agent đọc dữ liệu hoặc nhận yêu cầu tài chính nhưng dừng trước
+`evaluate_portfolio_risk`, runtime từ chối final text.
+
 OpenAI Agents SDK thực hiện loop: gửi prompt và tool schemas cho model, chạy tool
 mà model chọn, trả result vào conversation, rồi gọi model lại. Vì vậy LLM thật
 sự quan sát dữ liệu giữa các bước; nó không chỉ biến JSON thành văn bản.
 
 ## Policy qua chat
 
-`update_policy` nhận danh sách `PolicyChange` đã có field enum và value được
-Pydantic validate:
+`update_policy` nhận danh sách `PolicyToolChange`: field là enum và value là
+text đơn giản (`"0.30"`, `"true"`, `"false"`, `"null"`). Python parse text
+thành `PolicyChange` typed rồi Pydantic validate:
 
 - Field không được gọi: giữ nguyên.
 - Value `null`: xóa optional rule.

@@ -118,6 +118,26 @@ def test_failed_agent_run_does_not_commit_policy() -> None:
     assert store.get("user-1") == PortfolioPolicy()
 
 
+def test_inconsistent_loop_policy_is_rejected_before_store_mutation() -> None:
+    store = InMemoryPolicySessionStore()
+    patch = PolicyPatch(max_asset_weight=Decimal("0.40"))
+    application = SentinelApplication(
+        FakeToolLoop(
+            _result(
+                final_text="Invalid result.",
+                policy=PortfolioPolicy(max_asset_weight=Decimal("0.50")),
+                patches=(patch,),
+            )
+        ),
+        store,
+    )
+
+    with pytest.raises(RuntimeError, match="did not match"):
+        asyncio.run(application.handle("user-1", "Set 40%."))
+
+    assert store.get("user-1") == PortfolioPolicy()
+
+
 def test_analysis_renders_authoritative_facts_before_agent_judgment() -> None:
     policy = PortfolioPolicy()
     analysis = _analysis(policy)

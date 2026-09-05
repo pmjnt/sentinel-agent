@@ -889,7 +889,7 @@
                 <li><strong>User chat</strong><span>“Giữ ít nhất 30% USDT và phân tích ngay.”</span></li>
                 <li><strong>Sentinel Agent</strong><span>Hiểu intent và gọi <code>update_policy</code> trước các tool phân tích khi user yêu cầu cả hai.</span></li>
                 <li><strong>Pydantic validation</strong><span>Chặn field lạ, threshold sai, duplicate change và giá trị không hợp lệ.</span></li>
-                <li><strong>Staged commit</strong><span>Policy chỉ vào session sau khi toàn bộ Agent run thành công; user vẫn nhận tiếng Việt tự nhiên.</span></li>
+                <li><strong>Staged commit</strong><span>Policy chỉ vào session sau khi toàn bộ Agent run thành công; expected-policy check chặn stale concurrent write.</span></li>
               </ol>
             </article>
             <article class="flow-panel">
@@ -919,7 +919,7 @@ RiskEngine validates deterministically
 LLM explains in natural language</pre>
 
           <div class="note">
-            <strong>Điểm an toàn:</strong> <code>evaluate_portfolio_risk</code> là cửa duy nhất tạo analysis và luôn gọi policy checks, planner rồi RiskEngine. <code>SentinelApplication</code> render event đúng thứ tự và chỉ commit staged policy sau khi Agent thành công.
+            <strong>Điểm an toàn:</strong> <code>evaluate_portfolio_risk</code> là cửa duy nhất tạo analysis và luôn gọi policy checks, planner rồi RiskEngine. Runtime từ chối kết luận tài chính nếu Agent dừng trước evaluation, giới hạn 20 market observations/28 turns, và chỉ commit staged policy sau khi Agent thành công.
           </div>
         </section>
 
@@ -1013,7 +1013,7 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/controlled_tools.py">app/agent/controlled_tools.py</a></h4>
-                <p>Định nghĩa năm tool đọc portfolio/market, update/view policy và deterministic risk evaluation. Không có execution tool.</p>
+                <p>Định nghĩa năm tool đọc portfolio/market, update/view policy và deterministic risk evaluation. Policy wire value là text đơn giản rồi Python parse; không có execution tool.</p>
                 <p class="relation"><strong>Ủy quyền:</strong> gateway cho I/O, services cho tính toán. <strong>Không được:</strong> nhận CLI command tùy ý.</p>
               </article>
               <article class="file">

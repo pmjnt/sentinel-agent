@@ -22,10 +22,16 @@ class InMemoryPolicySessionStore:
         self,
         session_id: str,
         patches: tuple[PolicyPatch, ...],
+        *,
+        expected_policy: PortfolioPolicy,
     ) -> PortfolioPolicy:
         """Atomically apply ordered validated patches after a successful Agent run."""
         normalized_id = self._normalize_session_id(session_id)
-        updated = self.get(normalized_id)
+        current = self.get(normalized_id)
+        if current != expected_policy:
+            raise RuntimeError("Policy changed during Agent run.")
+
+        updated = current
         for patch in patches:
             updated = apply_policy_patch(updated, patch)
         if patches:

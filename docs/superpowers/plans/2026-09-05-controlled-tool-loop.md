@@ -170,10 +170,11 @@ view_policy
 evaluate_portfolio_risk
 ```
 
-`update_policy` accepts `changes: list[PolicyChange]`, where every change has a
-known policy field and a string/boolean/null value. Null explicitly removes a
-rule. Duplicate fields are rejected. The SDK wrappers delegate to independently
-testable handler functions.
+`update_policy` accepts `changes: list[PolicyToolChange]`, where every change has
+a known policy field and a text value (`decimal`, `true`, `false`, or `null`).
+Python parses this simple wire schema into typed `PolicyChange` values. Null
+explicitly removes a rule. Duplicate fields are rejected. The SDK wrappers
+delegate to independently testable handler functions.
 
 `evaluate_portfolio_risk` reads portfolio and market objects only from context.
 When observations are missing it returns a structured requirement result rather
@@ -237,6 +238,10 @@ Run the Agent with a fresh `SentinelRunContext` and `max_turns` sufficient for
 portfolio, market, evaluation, and final response. Return an immutable result
 containing final text, ordered events, staged patches, final policy, analyses,
 and data errors. Do not commit session state in this layer.
+
+Cap each request at 20 market observations and derive the Agent budget as 28
+turns. Larger scopes fail closed. Reject final financial prose when the Agent
+stops before deterministic evaluation.
 
 - [x] **Step 5: Verify GREEN**
 

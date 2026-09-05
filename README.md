@@ -60,6 +60,9 @@ session only after the run succeeds. The earlier `request_interpreter.py`,
 `app/tools/` paths remain as tested legacy/educational code; `tool_loop.py` and
 `controlled_tools.py` are the active console runtime.
 
+To keep sequential tool use bounded, one request may inspect at most 20 market
+symbols. Larger scopes fail closed and should be split into smaller requests.
+
 ## Project structure
 
 ```text

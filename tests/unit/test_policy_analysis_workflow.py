@@ -8,7 +8,7 @@ from app.agent.controlled_tools import (
     read_portfolio,
     stage_policy_update,
 )
-from app.agent.tool_loop import SentinelToolLoop
+from app.agent.tool_loop import MAX_AGENT_TURNS, SentinelToolLoop
 from app.application import SentinelApplication
 from app.config import LLMProvider, Settings
 from app.models.market import MarketData, Volatility
@@ -53,7 +53,7 @@ class SrdScenarioGateway:
 
 
 async def run_srd_agent(agent, agent_input, *, context, max_turns):
-    assert max_turns == 12
+    assert max_turns == MAX_AGENT_TURNS
     assert "Giữ ít nhất 30% USDT" in agent_input
     stage_policy_update(
         context,

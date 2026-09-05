@@ -68,12 +68,17 @@ Python render facts/status trước, rồi mới nối AI interpretation
 
 Khi người dùng đổi policy, `update_policy` chỉ cập nhật `working_policy` trong
 `SentinelRunContext`. `SentinelApplication` commit các patch theo đúng thứ tự sau
-khi toàn bộ lượt Agent kết thúc thành công. Lỗi provider không làm policy dở dang
+khi toàn bộ lượt Agent kết thúc thành công. Store kiểm tra expected policy để
+không ghi đè một concurrent run mới hơn. Lỗi provider không làm policy dở dang
 lọt vào session.
 
 Nếu thiếu observation, `evaluate_portfolio_risk` trả danh sách tool còn thiếu;
 LLM phải đọc dữ liệu rồi thử lại. Nếu Binance lỗi, hệ thống ghi data error và
 fail-closed, không thay bằng dữ liệu giả.
+
+Một request tối đa 20 market observations và có 28 Agent turns. Runtime từ chối
+kết luận tài chính nếu Agent dừng sau tool đọc nhưng trước deterministic
+evaluation.
 
 ## Quy tắc deterministic
 

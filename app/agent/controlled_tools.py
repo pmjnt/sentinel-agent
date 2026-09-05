@@ -23,6 +23,9 @@ from app.services.portfolio_analysis_service import (
 )
 
 
+MAX_MARKET_OBSERVATIONS = 20
+
+
 class ToolDataError(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -159,7 +162,7 @@ def view_working_policy(context: SentinelRunContext) -> PortfolioPolicy:
 def evaluate_cached_portfolio(
     context: SentinelRunContext,
     focus_symbols: list[str],
-) -> PortfolioAnalysis | MissingObservations:
+) -> PortfolioAnalysis | MissingObservations | ToolDataError:
     if context.portfolio is None:
         return MissingObservations(required_tools=["get_portfolio"])
 
@@ -168,6 +171,12 @@ def evaluate_cached_portfolio(
         context.working_policy,
         focus_symbols,
     )
+    if len(required_symbols) > MAX_MARKET_OBSERVATIONS:
+        message = "Market analysis scope exceeds the safe limit."
+        if message not in context.data_errors:
+            context.data_errors.append(message)
+        return ToolDataError(code="MARKET_SCOPE_TOO_LARGE", message=message)
+
     missing_symbols = [
         symbol
         for symbol in required_symbols
@@ -236,7 +245,7 @@ async def view_policy(
 async def evaluate_portfolio_risk(
     ctx: RunContextWrapper[SentinelRunContext],
     focus_symbols: list[str],
-) -> PortfolioAnalysis | MissingObservations:
+) -> PortfolioAnalysis | MissingObservations | ToolDataError:
     """Run deterministic policy, planning, and risk checks on cached observations."""
     return evaluate_cached_portfolio(ctx.context, focus_symbols)
 

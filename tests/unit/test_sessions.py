@@ -53,7 +53,25 @@ def test_apply_many_commits_validated_patches_in_order() -> None:
             PolicyPatch(max_asset_weight=Decimal("0.50")),
             PolicyPatch(max_asset_weight=Decimal("0.40")),
         ),
+        expected_policy=PortfolioPolicy(),
     )
 
     assert result.max_asset_weight == Decimal("0.40")
     assert store.get("session-1") == result
+
+
+def test_apply_many_rejects_stale_policy_without_mutating_current_state() -> None:
+    store = InMemoryPolicySessionStore()
+    current = store.apply(
+        "session-1",
+        PolicyPatch(min_stablecoin_weight=Decimal("0.30")),
+    )
+
+    with pytest.raises(RuntimeError, match="changed during Agent run"):
+        store.apply_many(
+            "session-1",
+            (PolicyPatch(max_asset_weight=Decimal("0.40")),),
+            expected_policy=PortfolioPolicy(),
+        )
+
+    assert store.get("session-1") == current
