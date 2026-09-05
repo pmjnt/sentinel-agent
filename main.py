@@ -35,6 +35,30 @@ def configure_litellm_debug(
     )
 
 
+def read_console_input(reader: Callable[[], str] = input) -> str:
+    """Render the prompt ourselves to avoid terminal-specific input echo."""
+    print("Sentinel > ", end="", flush=True)
+    return reader().strip()
+
+
+def format_debug_error(error: Exception, settings: Settings) -> str | None:
+    """Return an opt-in diagnostic with configured credentials redacted."""
+    if not settings.litellm_debug:
+        return None
+
+    diagnostic = f"{type(error).__name__}: {error}"
+    secrets = (
+        settings.openai_api_key,
+        settings.gemini_api_key,
+        settings.binance_api_key,
+        settings.binance_secret_key,
+    )
+    for secret in secrets:
+        if secret:
+            diagnostic = diagnostic.replace(secret, "[REDACTED]")
+    return diagnostic
+
+
 def create_application(
     settings: Settings,
     gateway: PortfolioMarketGateway,
@@ -65,7 +89,7 @@ async def run_console() -> None:
 
     while True:
         try:
-            user_input = input("Sentinel > ").strip()
+            user_input = read_console_input()
         except (EOFError, KeyboardInterrupt):
             print("\nGoodbye.")
             return
@@ -80,11 +104,14 @@ async def run_console() -> None:
         try:
             result = await application.handle("console-user", user_input)
             print(f"\n{result.message}\n")
-        except Exception:
+        except Exception as error:
             print(
                 "\nSentinel could not complete the request. "
                 "No portfolio recommendation or financial action was generated.\n"
             )
+            diagnostic = format_debug_error(error, settings)
+            if diagnostic is not None:
+                print(f"Technical error: {diagnostic}\n")
 
 
 def main() -> None:

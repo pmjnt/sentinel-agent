@@ -3,7 +3,12 @@ from app.config import LLMProvider, Settings
 from app.models.market import MarketDataResult
 from app.models.portfolio import Portfolio
 from app.application import SentinelApplication
-from main import configure_litellm_debug, create_application
+from main import (
+    configure_litellm_debug,
+    create_application,
+    format_debug_error,
+    read_console_input,
+)
 
 
 class UnusedGateway:
@@ -82,3 +87,50 @@ def test_litellm_debug_opt_in_enables_logging_and_warns(capsys) -> None:
     assert calls == 1
     assert "request body" in warning
     assert "không chia sẻ log" in warning
+
+
+def test_console_prompt_is_printed_once_outside_input(capsys) -> None:
+    calls = 0
+
+    def fake_reader() -> str:
+        nonlocal calls
+        calls += 1
+        return "  xin chào  "
+
+    result = read_console_input(fake_reader)
+
+    assert result == "xin chào"
+    assert calls == 1
+    assert capsys.readouterr().out == "Sentinel > "
+
+
+def test_debug_error_redacts_all_configured_credentials() -> None:
+    settings = Settings(
+        llm_provider=LLMProvider.OPENAI,
+        llm_model="gpt-5.4-mini",
+        openai_api_key="openai-secret",
+        gemini_api_key="gemini-secret",
+        binance_api_key="binance-key",
+        binance_secret_key="binance-secret",
+        litellm_debug=True,
+    )
+    error = RuntimeError(
+        "failed with openai-secret gemini-secret binance-key binance-secret"
+    )
+
+    diagnostic = format_debug_error(error, settings)
+
+    assert diagnostic == (
+        "RuntimeError: failed with [REDACTED] [REDACTED] "
+        "[REDACTED] [REDACTED]"
+    )
+
+
+def test_debug_error_is_hidden_when_debug_is_disabled() -> None:
+    settings = Settings(
+        llm_provider=LLMProvider.OPENAI,
+        llm_model="gpt-5.4-mini",
+        openai_api_key="openai-secret",
+    )
+
+    assert format_debug_error(RuntimeError("provider failed"), settings) is None
