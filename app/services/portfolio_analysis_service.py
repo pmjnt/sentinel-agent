@@ -4,6 +4,7 @@ from app.gateways import PortfolioMarketGateway
 from app.models.analysis import PortfolioAnalysis
 from app.models.market import MarketData, MarketDataError
 from app.models.policy import PolicyViolation, PortfolioPolicy, ViolationType
+from app.models.portfolio import Portfolio
 from app.models.trade import PlanStatus
 from app.services.policy_service import find_policy_violations
 from app.services.rebalance_service import build_rebalance_plan
@@ -32,8 +33,7 @@ class PortfolioAnalysisService:
                 "Portfolio data could not be verified."
             ) from error
 
-        violations = find_policy_violations(portfolio, policy)
-        market_symbols = _required_market_symbols(focus_symbols, violations)
+        market_symbols = required_market_symbols(portfolio, policy, focus_symbols)
         market_results = await asyncio.gather(
             *(self._gateway.get_market_data(symbol) for symbol in market_symbols),
             return_exceptions=True,
@@ -51,24 +51,56 @@ class PortfolioAnalysisService:
                 "Required market data could not be verified."
             )
 
-        market_items = [
-            result for result in market_results if isinstance(result, MarketData)
-        ]
-        market_by_symbol = {item.symbol: item for item in market_items}
-        plan = build_rebalance_plan(portfolio, violations, market_by_symbol)
-        risk_decision = evaluate_rebalance_risk(policy, plan, market_by_symbol)
-        plan = plan.model_copy(
-            update={"status": PlanStatus(risk_decision.status.value)}
+        market_by_symbol = {
+            result.symbol: result
+            for result in market_results
+            if isinstance(result, MarketData)
+        }
+        return evaluate_portfolio_observations(
+            policy,
+            portfolio,
+            market_by_symbol,
         )
 
-        return PortfolioAnalysis(
-            policy=policy,
-            portfolio=portfolio,
-            violations=violations,
-            market_data=market_items,
-            plan=plan,
-            risk_decision=risk_decision,
-        )
+
+def required_market_symbols(
+    portfolio: Portfolio,
+    policy: PortfolioPolicy,
+    focus_symbols: list[str],
+) -> list[str]:
+    """Return normalized markets required by focus and policy violations."""
+    violations = find_policy_violations(portfolio, policy)
+    return _required_market_symbols(focus_symbols, violations)
+
+
+def evaluate_portfolio_observations(
+    policy: PortfolioPolicy,
+    portfolio: Portfolio,
+    market_by_symbol: dict[str, MarketData],
+) -> PortfolioAnalysis:
+    """Evaluate only trusted observations already retrieved from a gateway."""
+    normalized_market = {
+        symbol.strip().upper(): market
+        for symbol, market in market_by_symbol.items()
+    }
+    violations = find_policy_violations(portfolio, policy)
+    required_symbols = _required_market_symbols([], violations)
+    if any(symbol not in normalized_market for symbol in required_symbols):
+        raise AnalysisDataError("Required market data could not be verified.")
+
+    plan = build_rebalance_plan(portfolio, violations, normalized_market)
+    risk_decision = evaluate_rebalance_risk(policy, plan, normalized_market)
+    plan = plan.model_copy(
+        update={"status": PlanStatus(risk_decision.status.value)}
+    )
+    return PortfolioAnalysis(
+        policy=policy,
+        portfolio=portfolio,
+        violations=violations,
+        market_data=list(normalized_market.values()),
+        plan=plan,
+        risk_decision=risk_decision,
+    )
 
 
 def _required_market_symbols(

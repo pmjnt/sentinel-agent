@@ -65,7 +65,7 @@ Expected: all model-setting tests pass.
 - Modify: `app/services/portfolio_analysis_service.py`
 - Modify: `tests/unit/test_portfolio_analysis_service.py`
 
-- [ ] **Step 1: Write failing pure-evaluation tests**
+- [x] **Step 1: Write failing pure-evaluation tests**
 
 Add tests for public functions:
 
@@ -78,7 +78,7 @@ Assert that the SRD portfolio requires `BTCUSDT`, missing BTC market data is
 rejected, and verified HIGH-volatility data returns a BLOCKED
 `PortfolioAnalysis` without gateway access.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -88,7 +88,7 @@ Run:
 
 Expected: imports fail because the public observation functions do not exist.
 
-- [ ] **Step 3: Extract deterministic observation evaluation**
+- [x] **Step 3: Extract deterministic observation evaluation**
 
 Refactor `PortfolioAnalysisService.analyze()` to fetch through its gateway and
 then delegate to the two public functions. `evaluate_portfolio_observations()`
@@ -103,7 +103,7 @@ evaluate_rebalance_risk
 It must never accept LLM-calculated allocations, violations, plan status, or
 risk status.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run the portfolio-analysis tests again and expect all to pass.
 

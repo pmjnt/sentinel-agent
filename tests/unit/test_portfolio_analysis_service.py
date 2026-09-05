@@ -11,6 +11,8 @@ from app.models.trade import PlanStatus, TradeSide
 from app.services.portfolio_analysis_service import (
     AnalysisDataError,
     PortfolioAnalysisService,
+    evaluate_portfolio_observations,
+    required_market_symbols,
 )
 from app.services.portfolio_service import calculate_portfolio
 
@@ -60,6 +62,67 @@ def _market(
         volatility=volatility,
         estimated_slippage_percent=Decimal("0.05"),
     )
+
+
+def _portfolio():
+    return calculate_portfolio(
+        [
+            PortfolioAsset(
+                symbol="BTC",
+                amount=Decimal("0.05"),
+                usd_value=Decimal("5500"),
+            ),
+            PortfolioAsset(
+                symbol="ETH",
+                amount=Decimal("0.8"),
+                usd_value=Decimal("2500"),
+            ),
+            PortfolioAsset(
+                symbol="USDT",
+                amount=Decimal("2000"),
+                usd_value=Decimal("2000"),
+            ),
+        ]
+    )
+
+
+def test_required_market_symbols_uses_focus_and_policy_violations() -> None:
+    symbols = required_market_symbols(
+        _portfolio(),
+        PortfolioPolicy(max_asset_weight=Decimal("0.40")),
+        ["BTC", "ETH"],
+    )
+
+    assert symbols == ["BTCUSDT", "ETHUSDT"]
+
+
+def test_observation_evaluation_rejects_missing_required_market() -> None:
+    with pytest.raises(
+        AnalysisDataError,
+        match="Required market data could not be verified",
+    ):
+        evaluate_portfolio_observations(
+            PortfolioPolicy(max_asset_weight=Decimal("0.40")),
+            _portfolio(),
+            {},
+        )
+
+
+def test_observation_evaluation_reaches_blocked_without_gateway() -> None:
+    result = evaluate_portfolio_observations(
+        PortfolioPolicy(
+            min_stablecoin_weight=Decimal("0.30"),
+            max_asset_weight=Decimal("0.40"),
+            block_high_volatility=True,
+            max_trade_usd_without_approval=Decimal("1000"),
+        ),
+        _portfolio(),
+        {"BTCUSDT": _market()},
+    )
+
+    assert len(result.violations) == 2
+    assert result.plan.actions[0].estimated_usd_value == Decimal("1500.00")
+    assert result.risk_decision.status is RiskStatus.BLOCKED
 
 
 def test_builds_and_blocks_a_btc_rebalance_deterministically() -> None:
