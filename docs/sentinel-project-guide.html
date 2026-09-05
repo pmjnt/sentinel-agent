@@ -1,0 +1,1428 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Sentinel — Sổ tay kiến trúc &amp; mã nguồn</title>
+    <style>
+      :root {
+        --paper: #eee8d8;
+        --paper-deep: #e2d9c4;
+        --paper-light: #f8f4e9;
+        --ink: #25231f;
+        --muted: #686155;
+        --olive: #435744;
+        --olive-soft: #d5ddcf;
+        --rust: #9a4f36;
+        --rust-soft: #ead2c8;
+        --rule: #b8ad98;
+        --rule-dark: #776f62;
+        --future: #6b6276;
+        --future-soft: #ded8e4;
+        --shadow: 5px 6px 0 rgb(59 52 42 / 12%);
+        --serif: Georgia, "Times New Roman", Times, serif;
+        --sans: "Avenir Next", Avenir, "Segoe UI", Arial, sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 1.5rem;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background-color: var(--paper);
+        background-image:
+          repeating-linear-gradient(0deg, transparent 0 27px, rgb(67 87 68 / 4%) 27px 28px),
+          radial-gradient(circle at 12% 8%, rgb(255 255 255 / 45%), transparent 29rem);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.68;
+      }
+
+      a {
+        color: var(--olive);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 0.18em;
+      }
+
+      a:hover { color: var(--rust); }
+
+      :focus-visible {
+        outline: 3px solid var(--rust);
+        outline-offset: 3px;
+      }
+
+      code, pre, .path, .utility, .status, .eyebrow, .rail-index {
+        font-family: var(--mono);
+      }
+
+      code {
+        padding: 0.08em 0.3em;
+        background: rgb(255 255 255 / 45%);
+        border: 1px solid rgb(119 111 98 / 35%);
+        font-size: 0.91em;
+      }
+
+      pre {
+        margin: 1.1rem 0;
+        padding: 1.15rem;
+        overflow-x: auto;
+        color: #ece7da;
+        background: #302f2a;
+        border-left: 5px solid var(--olive);
+        line-height: 1.55;
+        white-space: pre;
+      }
+
+      .masthead {
+        border-bottom: 1px solid var(--rule-dark);
+        background: rgb(238 232 216 / 92%);
+      }
+
+      .masthead-inner {
+        width: min(1440px, calc(100% - 3rem));
+        margin: 0 auto;
+        padding: 3.7rem 0 3rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 400px);
+        gap: 3rem;
+        align-items: end;
+      }
+
+      .eyebrow {
+        margin: 0 0 0.6rem;
+        color: var(--rust);
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1, h2, h3, h4 {
+        font-family: var(--serif);
+        line-height: 1.12;
+        text-wrap: balance;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 840px;
+        font-size: clamp(3rem, 6vw, 6.6rem);
+        font-weight: 600;
+        letter-spacing: -0.055em;
+      }
+
+      .lede {
+        max-width: 760px;
+        margin: 1.3rem 0 0;
+        color: var(--muted);
+        font-family: var(--serif);
+        font-size: clamp(1.15rem, 2vw, 1.55rem);
+        line-height: 1.45;
+      }
+
+      .issue-card {
+        padding: 1.25rem;
+        border: 1px solid var(--rule-dark);
+        background: var(--paper-light);
+        box-shadow: var(--shadow);
+      }
+
+      .issue-card p { margin: 0.35rem 0; }
+
+      .issue-card .number {
+        display: block;
+        font-family: var(--serif);
+        font-size: 3rem;
+        line-height: 1;
+      }
+
+      .layout {
+        width: min(1440px, calc(100% - 3rem));
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 240px minmax(0, 1fr);
+        gap: clamp(2rem, 5vw, 5rem);
+      }
+
+      nav {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        max-height: 100vh;
+        overflow-y: auto;
+        padding: 2rem 0 2.5rem;
+        border-right: 1px solid var(--rule);
+      }
+
+      nav strong {
+        display: block;
+        margin-bottom: 0.8rem;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      nav ol {
+        margin: 0;
+        padding: 0 1.4rem 0 0;
+        list-style: none;
+        counter-reset: nav;
+      }
+
+      nav li { counter-increment: nav; }
+
+      nav a {
+        display: grid;
+        grid-template-columns: 2.2rem 1fr;
+        gap: 0.2rem;
+        padding: 0.46rem 0.35rem;
+        color: var(--muted);
+        text-decoration: none;
+        border-left: 3px solid transparent;
+        font-size: 0.84rem;
+        line-height: 1.3;
+      }
+
+      nav a::before {
+        content: counter(nav, decimal-leading-zero);
+        color: var(--rule-dark);
+        font-family: var(--mono);
+        font-size: 0.7rem;
+      }
+
+      nav a:hover, nav a[aria-current="true"] {
+        color: var(--ink);
+        background: rgb(255 255 255 / 38%);
+        border-left-color: var(--rust);
+      }
+
+      main {
+        min-width: 0;
+        padding: 0 0 6rem;
+      }
+
+      section {
+        padding: 4.5rem 0;
+        border-bottom: 1px solid var(--rule);
+      }
+
+      section:last-child { border-bottom: 0; }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(280px, 1.2fr);
+        gap: 2rem;
+        align-items: end;
+        margin-bottom: 2rem;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: clamp(2.2rem, 4vw, 4rem);
+        letter-spacing: -0.035em;
+      }
+
+      .section-head p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      h3 {
+        margin: 1.6rem 0 0.65rem;
+        font-size: 1.55rem;
+      }
+
+      h4 {
+        margin: 0 0 0.4rem;
+        font-size: 1.06rem;
+      }
+
+      p { margin: 0.65rem 0 1rem; }
+
+      ul, ol { padding-left: 1.35rem; }
+
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin: 1.4rem 0;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        padding: 0.28rem 0.55rem 0.22rem;
+        border: 1px solid currentColor;
+        font-size: 0.65rem;
+        font-weight: 800;
+        letter-spacing: 0.055em;
+        line-height: 1.2;
+      }
+
+      .status.live { color: var(--olive); background: var(--olive-soft); }
+      .status.partial { color: var(--rust); background: var(--rust-soft); }
+      .status.future { color: var(--future); background: var(--future-soft); }
+
+      .note, .warning {
+        margin: 1.5rem 0;
+        padding: 1.1rem 1.3rem;
+        border-left: 5px solid var(--olive);
+        background: rgb(255 255 255 / 38%);
+      }
+
+      .warning { border-left-color: var(--rust); }
+
+      .note strong, .warning strong { font-family: var(--serif); }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .card {
+        padding: 1.25rem;
+        border: 1px solid var(--rule);
+        background: rgb(248 244 233 / 72%);
+      }
+
+      .card h3 { margin-top: 0.65rem; }
+      .card p:last-child { margin-bottom: 0; }
+
+      .journey {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(145px, 1fr));
+        gap: 0;
+        padding: 0;
+        list-style: none;
+        border: 1px solid var(--rule-dark);
+        background: var(--paper-light);
+      }
+
+      .journey li {
+        min-height: 230px;
+        padding: 1.2rem;
+        border-right: 1px solid var(--rule);
+      }
+
+      .journey li:last-child { border-right: 0; }
+
+      .journey .phase {
+        color: var(--rust);
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+
+      .journey h3 { font-size: 1.25rem; }
+      .journey p { color: var(--muted); font-size: 0.88rem; }
+
+      .rail {
+        position: relative;
+        max-width: 880px;
+        margin: 2.2rem auto;
+        padding: 0;
+        list-style: none;
+      }
+
+      .rail::before {
+        content: "";
+        position: absolute;
+        top: 1rem;
+        bottom: 1rem;
+        left: 2.05rem;
+        width: 2px;
+        background: var(--olive);
+      }
+
+      .rail-item {
+        position: relative;
+        display: grid;
+        grid-template-columns: 4.2rem minmax(0, 1fr);
+        gap: 1.25rem;
+        margin: 0 0 0.85rem;
+      }
+
+      .rail-index {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        width: 4.1rem;
+        height: 4.1rem;
+        color: var(--paper-light);
+        background: var(--olive);
+        border: 6px solid var(--paper);
+        border-radius: 50%;
+        font-weight: 800;
+      }
+
+      .rail-body {
+        padding: 1rem 1.2rem;
+        border: 1px solid var(--rule);
+        background: var(--paper-light);
+        box-shadow: 3px 3px 0 rgb(59 52 42 / 8%);
+      }
+
+      .rail-body h3 { margin: 0; }
+      .rail-body p { margin: 0.35rem 0 0; color: var(--muted); }
+
+      .path {
+        display: inline-block;
+        margin-top: 0.55rem;
+        color: var(--olive);
+        font-size: 0.78rem;
+      }
+
+      .split-flow {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.2rem;
+      }
+
+      .flow-panel {
+        padding: 1.4rem;
+        border: 1px solid var(--rule-dark);
+        background: var(--paper-light);
+      }
+
+      .flow-panel h3 { margin-top: 0.7rem; }
+
+      .flow-list {
+        margin: 1rem 0 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: flow;
+      }
+
+      .flow-list li {
+        position: relative;
+        counter-increment: flow;
+        margin-left: 1rem;
+        padding: 0.7rem 0 0.7rem 2.8rem;
+        border-left: 1px solid var(--rule);
+      }
+
+      .flow-list li::before {
+        content: counter(flow, decimal-leading-zero);
+        position: absolute;
+        left: -1rem;
+        top: 0.65rem;
+        width: 2rem;
+        height: 2rem;
+        display: grid;
+        place-items: center;
+        color: var(--paper-light);
+        background: var(--olive);
+        font-family: var(--mono);
+        font-size: 0.68rem;
+      }
+
+      .flow-list strong { display: block; font-family: var(--serif); }
+      .flow-list span { color: var(--muted); font-size: 0.9rem; }
+
+      .table-wrap { overflow-x: auto; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: rgb(248 244 233 / 58%);
+      }
+
+      th, td {
+        padding: 0.85rem 0.9rem;
+        border: 1px solid var(--rule);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--paper-light);
+        background: var(--olive);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .tree {
+        padding: 1.3rem;
+        color: var(--ink);
+        background: var(--paper-light);
+        border: 1px solid var(--rule-dark);
+        border-left: 5px solid var(--rust);
+      }
+
+      .file-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin: 1rem 0 1.2rem;
+      }
+
+      button {
+        padding: 0.55rem 0.8rem;
+        color: var(--ink);
+        background: var(--paper-light);
+        border: 1px solid var(--rule-dark);
+        border-radius: 0;
+        font: 700 0.73rem/1 var(--mono);
+        letter-spacing: 0.04em;
+        cursor: pointer;
+      }
+
+      button:hover { color: var(--paper-light); background: var(--olive); }
+
+      details {
+        margin-bottom: 0.75rem;
+        border: 1px solid var(--rule);
+        background: rgb(248 244 233 / 65%);
+      }
+
+      summary {
+        padding: 0.9rem 1rem;
+        cursor: pointer;
+        font-family: var(--serif);
+        font-size: 1.2rem;
+        font-weight: 700;
+      }
+
+      details[open] summary { border-bottom: 1px solid var(--rule); }
+
+      .file-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0;
+      }
+
+      .file {
+        min-width: 0;
+        padding: 1rem;
+        border-right: 1px solid var(--rule);
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .file:nth-child(even) { border-right: 0; }
+      .file h4 a { overflow-wrap: anywhere; }
+      .file p { margin: 0.35rem 0; font-size: 0.88rem; }
+      .file .relation { color: var(--muted); }
+      .file .relation strong { color: var(--ink); }
+
+      .decision-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .decision {
+        padding: 1.1rem 1.2rem;
+        border-top: 4px solid var(--olive);
+        background: var(--paper-light);
+      }
+
+      .decision:nth-child(even) { border-top-color: var(--rust); }
+      .decision h3 { margin-top: 0; }
+
+      .checklist {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        padding: 0;
+        list-style: none;
+      }
+
+      .checklist li {
+        padding: 0.75rem 0.85rem 0.75rem 2.4rem;
+        position: relative;
+        background: rgb(248 244 233 / 65%);
+        border: 1px solid var(--rule);
+      }
+
+      .checklist li::before {
+        content: "✓";
+        position: absolute;
+        left: 0.8rem;
+        color: var(--olive);
+        font-weight: 900;
+      }
+
+      footer {
+        padding: 2rem 1.5rem;
+        color: var(--paper-light);
+        background: var(--ink);
+      }
+
+      .footer-inner {
+        width: min(1440px, 100%);
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        gap: 2rem;
+      }
+
+      footer p { margin: 0; font-size: 0.85rem; }
+
+      @media (max-width: 1060px) {
+        .masthead-inner { grid-template-columns: 1fr; gap: 1.5rem; }
+        .layout { grid-template-columns: 1fr; }
+        nav {
+          position: relative;
+          max-height: none;
+          padding: 1rem 0;
+          border-right: 0;
+          border-bottom: 1px solid var(--rule);
+        }
+        nav ol { display: flex; overflow-x: auto; padding: 0 0 0.6rem; }
+        nav li { flex: 0 0 auto; }
+        nav a { grid-template-columns: auto 1fr; min-width: max-content; }
+        .journey { grid-template-columns: 1fr 1fr; }
+        .journey li { min-height: auto; border-bottom: 1px solid var(--rule); }
+      }
+
+      @media (max-width: 760px) {
+        body { font-size: 15px; }
+        .masthead-inner, .layout { width: min(100% - 1.4rem, 1440px); }
+        .masthead-inner { padding: 2.3rem 0; }
+        .section-head, .cards, .split-flow, .decision-grid,
+        .file-list, .checklist { grid-template-columns: 1fr; }
+        section { padding: 3.2rem 0; }
+        .journey { grid-template-columns: 1fr; }
+        .journey li { border-right: 0; }
+        .file { border-right: 0; }
+        .rail-item { grid-template-columns: 3.3rem minmax(0, 1fr); gap: 0.7rem; }
+        .rail::before { left: 1.62rem; }
+        .rail-index { width: 3.25rem; height: 3.25rem; border-width: 4px; }
+        .footer-inner { flex-direction: column; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+      }
+
+      @media print {
+        body { background: white; color: black; font-size: 10.5pt; }
+        .masthead-inner, .layout, .footer-inner { width: 100%; }
+        .layout { display: block; }
+        nav, .file-toolbar { display: none; }
+        main { padding: 0; }
+        section { padding: 1.2rem 0; break-inside: avoid; }
+        details { break-inside: avoid; }
+        details:not([open]) > *:not(summary) { display: block; }
+        .card, .rail-body, .issue-card { box-shadow: none; }
+        footer { color: black; background: white; border-top: 1px solid black; }
+        a { color: black; text-decoration: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-inner">
+        <div>
+          <p class="eyebrow">Sentinel field manual · 05/09/2026</p>
+          <h1>Bản đồ của một AI Agent an toàn</h1>
+          <p class="lede">Từ câu chat của người dùng đến dữ liệu Binance Demo: mỗi tầng làm gì, vì sao tồn tại, và từng file kết nối với nhau như thế nào.</p>
+          <div class="status-row" aria-label="Trạng thái tài liệu">
+            <span class="status live">ĐÃ HOẠT ĐỘNG</span>
+            <span class="status partial">ĐÃ VIẾT — CHƯA NỐI END-TO-END</span>
+            <span class="status future">TƯƠNG LAI</span>
+          </div>
+        </div>
+        <aside class="issue-card" aria-label="Tóm tắt phiên bản">
+          <span class="number">v0.1</span>
+          <p><strong>Runtime hiện tại</strong></p>
+          <p>Console Agent + LiteLLM + hai AI tools + Binance CLI read-only.</p>
+          <p class="utility">Python 3.12 · OpenAI Agents SDK · Pydantic · pytest</p>
+        </aside>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav aria-label="Mục lục">
+        <strong>Tra cứu nhanh</strong>
+        <ol>
+          <li><a href="#hien-trang">Hiện trạng</a></li>
+          <li><a href="#hanh-trinh">Đã xây thế nào</a></li>
+          <li><a href="#ranh-gioi">Ranh giới trách nhiệm</a></li>
+          <li><a href="#runtime">Luồng đang chạy</a></li>
+          <li><a href="#policy">Luồng policy</a></li>
+          <li><a href="#file-map">Bản đồ file</a></li>
+          <li><a href="#config">Config &amp; model</a></li>
+          <li><a href="#binance">Binance Demo</a></li>
+          <li><a href="#bao-mat">Xem xét an toàn</a></li>
+          <li><a href="#java">Liên hệ Spring Boot</a></li>
+          <li><a href="#kiem-thu">Kiểm thử</a></li>
+          <li><a href="#tiep-theo">Chưa có &amp; tiếp theo</a></li>
+        </ol>
+      </nav>
+
+      <main>
+        <section id="hien-trang">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Đọc phần này trước</p>
+              <h2>Sentinel hiện đang ở đâu?</h2>
+            </div>
+            <p>Dự án có một runtime phân tích đơn giản đang hoạt động và một domain core policy đã được kiểm thử nhưng chưa được ghép vào cùng một orchestration end-to-end.</p>
+          </div>
+
+          <div class="cards">
+            <article class="card">
+              <span class="status live">ĐÃ HOẠT ĐỘNG</span>
+              <h3>Agent phân tích</h3>
+              <p><code>main.py</code> chạy Sentinel. LLM tự chọn đọc portfolio, đọc market hoặc cả hai rồi giải thích rủi ro.</p>
+            </article>
+            <article class="card">
+              <span class="status partial">ĐÃ VIẾT — CHƯA NỐI END-TO-END</span>
+              <h3>Policy core</h3>
+              <p>Parser, session, phép tính allocation, violation, rebalance và RiskEngine đã có test độc lập nhưng chưa nằm trong console loop.</p>
+            </article>
+            <article class="card">
+              <span class="status future">TƯƠNG LAI</span>
+              <h3>Ứng dụng hoàn chỉnh</h3>
+              <p>FastAPI, UI thật, activity stream, Approve/Reject, execution và verification chưa được triển khai.</p>
+            </article>
+          </div>
+
+          <div class="warning">
+            <strong>Bốn giới hạn cần nhớ.</strong>
+            <p>UI hiện tại là bản tĩnh; tiến trình phân tích trên web đang được mô phỏng.</p>
+            <p>Policy orchestration chưa được kết nối vào main.py.</p>
+            <p>Custom MCP hiện không hoạt động.</p>
+            <p>Sentinel hiện không có khả năng giao dịch.</p>
+          </div>
+        </section>
+
+        <section id="hanh-trinh">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Quá trình xây dựng</p>
+              <h2>Tại sao dự án có hình dạng này?</h2>
+            </div>
+            <p>Mỗi thay đổi giải quyết một câu hỏi kiến trúc cụ thể. Mục tiêu không phải nhiều lớp, mà là giữ LLM linh hoạt trong khi logic tài chính vẫn có thể kiểm thử.</p>
+          </div>
+
+          <ol class="journey">
+            <li>
+              <span class="phase">01 · HỌC AGENT</span>
+              <h3>Mock tools</h3>
+              <p>Bắt đầu với portfolio và market giả để nhìn rõ việc LLM quyết định khi nào cần gọi hàm.</p>
+            </li>
+            <li>
+              <span class="phase">02 · MODEL ROUTING</span>
+              <h3>LiteLLM</h3>
+              <p>Thêm một route chung để đổi Gemini/OpenAI bằng cấu hình mà không viết lại Agent.</p>
+            </li>
+            <li>
+              <span class="phase">03 · SAFETY CORE</span>
+              <h3>Policy + Risk</h3>
+              <p>Tách hiểu ngôn ngữ khỏi phép tính, threshold và quyết định an toàn bằng Python deterministic.</p>
+            </li>
+            <li>
+              <span class="phase">04 · DISCOVERY</span>
+              <h3>MCP không phù hợp</h3>
+              <p>Custom Agentic MCP OAuth bị Binance từ chối với lỗi Agent chưa được hỗ trợ, nên runtime MCP được gỡ bỏ.</p>
+            </li>
+            <li>
+              <span class="phase">05 · TRACK A</span>
+              <h3>Skills Hub CLI</h3>
+              <p>Chuyển sang <code>binance-cli</code> chính thức, chỉ expose hai tool ứng dụng ổn định và dùng Binance Demo.</p>
+            </li>
+          </ol>
+
+          <div class="note">
+            <strong>Quyết định quan trọng:</strong> Sentinel không cho LLM thấy toàn bộ Binance CLI. LLM chỉ thấy hai capability theo ngôn ngữ nghiệp vụ; gateway mới biết command kỹ thuật bên dưới.
+          </div>
+        </section>
+
+        <section id="ranh-gioi">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Architecture rule</p>
+              <h2>Ai chịu trách nhiệm việc gì?</h2>
+            </div>
+            <p>AI giỏi hiểu ngữ nghĩa nhưng không phải nơi đáng tin cho phép tính và quyền tài chính. Sentinel đặt mỗi loại quyết định vào đúng tầng.</p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tầng</th><th>Được làm</th><th>Không được làm</th><th>Code chính</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>LLM</strong></td>
+                  <td>Hiểu câu hỏi, nhận ra cần dữ liệu nào, chọn tool, diễn giải kết quả.</td>
+                  <td>Bịa dữ liệu, quyết định phép tính authoritative, chạy lệnh Binance.</td>
+                  <td><code>app/agent/</code></td>
+                </tr>
+                <tr>
+                  <td><strong>AI tools</strong></td>
+                  <td>Cung cấp hai capability nhỏ với tên và instruction rõ ràng.</td>
+                  <td>Chứa business rule hoặc nhận command tùy ý.</td>
+                  <td><code>app/tools/</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Gateway</strong></td>
+                  <td>Chọn command cố định, validate payload ngoài, map vào domain.</td>
+                  <td>Expose shell, URL hoặc generic request cho LLM.</td>
+                  <td><code>app/binance/</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Python services</strong></td>
+                  <td>Tính total, weight, violation, proposal và risk theo rule.</td>
+                  <td>Hiểu câu tự nhiên hoặc tự gọi API ngoài.</td>
+                  <td><code>app/services/</code></td>
+                </tr>
+                <tr>
+                  <td><strong>RiskEngine</strong></td>
+                  <td>BLOCKED ưu tiên hơn APPROVAL; trả reason code rõ ràng.</td>
+                  <td>Nhận kết luận an toàn từ LLM mà không tự kiểm tra.</td>
+                  <td><code>risk_service.py</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Người dùng</strong></td>
+                  <td>Giữ key local, định nghĩa policy, phê duyệt khi tương lai có execution.</td>
+                  <td>Gửi secret qua chat hoặc frontend.</td>
+                  <td><code>.env</code> local</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="runtime">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">System rail · runtime thật</p>
+              <h2>Một câu hỏi chạy qua hệ thống</h2>
+            </div>
+            <p>Ví dụ: “Analyze my BTC exposure and tell me whether it currently looks risky.” Đây là luồng có thể chạy ngay sau khi cấu hình LLM key và Binance Demo key.</p>
+          </div>
+
+          <ol class="rail">
+            <li class="rail-item">
+              <span class="rail-index">01</span>
+              <div class="rail-body">
+                <h3>User nhập câu hỏi</h3>
+                <p><code>main.py</code> đọc input trong console và chuyển nguyên câu cho Agents SDK.</p>
+                <a class="path" href="../main.py">main.py</a>
+              </div>
+            </li>
+            <li class="rail-item">
+              <span class="rail-index">02</span>
+              <div class="rail-body">
+                <h3>Sentinel LLM đọc instruction</h3>
+                <p>LLM suy ra “BTC exposure” cần cả holdings lẫn market context. Model được gọi qua LiteLLM route.</p>
+                <a class="path" href="../app/agent/sentinel.py">app/agent/sentinel.py</a>
+              </div>
+            </li>
+            <li class="rail-item">
+              <span class="rail-index">03</span>
+              <div class="rail-body">
+                <h3>LLM chọn application tools</h3>
+                <p>Agents SDK gửi tool call có cấu trúc tới <code>get_portfolio()</code>, sau đó <code>get_market_data("BTCUSDT")</code>.</p>
+                <span class="path">app/tools/portfolio.py · app/tools/market.py</span>
+              </div>
+            </li>
+            <li class="rail-item">
+              <span class="rail-index">04</span>
+              <div class="rail-body">
+                <h3>Gateway dịch nghiệp vụ sang CLI</h3>
+                <p><code>BinanceCliGateway</code> chọn command đã hard-code, validate symbol và map JSON qua Pydantic.</p>
+                <a class="path" href="../app/binance/gateway.py">app/binance/gateway.py</a>
+              </div>
+            </li>
+            <li class="rail-item">
+              <span class="rail-index">05</span>
+              <div class="rail-body">
+                <h3>Runner tạo subprocess an toàn</h3>
+                <p><code>BinanceCliRunner</code> dùng argument array, không mở shell, đặt timeout và chỉ truyền credentials cho account command.</p>
+                <a class="path" href="../app/binance/runner.py">app/binance/runner.py</a>
+              </div>
+            </li>
+            <li class="rail-item">
+              <span class="rail-index">06</span>
+              <div class="rail-body">
+                <h3>binance-cli đọc Binance Demo</h3>
+                <p>CLI chính thức gọi API Demo. Public market không cần key; portfolio private cần Demo key read-only.</p>
+                <span class="path">binance-cli 2.1.1 · BINANCE_API_ENV=demo</span>
+              </div>
+            </li>
+            <li class="rail-item">
+              <span class="rail-index">07</span>
+              <div class="rail-body">
+                <h3>Structured result quay về LLM</h3>
+                <p>Pydantic model được Agents SDK chuyển thành tool result. LLM tách dữ kiện tool khỏi phần diễn giải rủi ro và ghi rõ “Binance Demo”.</p>
+                <span class="path">Portfolio · MarketData → final_output</span>
+              </div>
+            </li>
+          </ol>
+
+          <h3>Tại sao đây là Agent chứ không chỉ là chatbot?</h3>
+          <p>Chatbot thông thường chỉ tạo câu trả lời từ prompt. Ở đây LLM quan sát yêu cầu, tự quyết định hành động cần thiết, gọi tool, nhận observation có cấu trúc rồi tiếp tục suy luận để trả lời. Quyền hành động vẫn bị giới hạn bởi danh sách tool mà Python cấp cho nó.</p>
+        </section>
+
+        <section id="policy">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Domain core</p>
+              <h2>Policy qua chat hoạt động thế nào?</h2>
+            </div>
+            <p>Code nền đã hỗ trợ phân biệt cập nhật, xem và phân tích policy. Tuy nhiên orchestration này chưa được gọi từ console Agent hiện tại.</p>
+          </div>
+
+          <div class="split-flow">
+            <article class="flow-panel">
+              <span class="status partial">ĐÃ VIẾT — CHƯA NỐI END-TO-END</span>
+              <h3>Phần hiểu ngôn ngữ</h3>
+              <ol class="flow-list">
+                <li><strong>User chat</strong><span>“Giữ ít nhất 30% USDT và phân tích ngay.”</span></li>
+                <li><strong>Policy Parser LLM</strong><span>Trả về typed actions: UPDATE_POLICY rồi ANALYZE_PORTFOLIO.</span></li>
+                <li><strong>Pydantic validation</strong><span>Chặn field lạ, threshold sai và action không hợp lệ.</span></li>
+                <li><strong>Conversation service</strong><span>Apply action đúng thứ tự và trả tiếng Việt tự nhiên, không phơi JSON cho user.</span></li>
+              </ol>
+            </article>
+            <article class="flow-panel">
+              <span class="status partial">ĐÃ VIẾT — CHƯA NỐI END-TO-END</span>
+              <h3>Phần quyết định deterministic</h3>
+              <ol class="flow-list">
+                <li><strong>Portfolio service</strong><span>Tính total và weight bằng Decimal.</span></li>
+                <li><strong>Policy service</strong><span>So sánh allocation với giới hạn đã validate.</span></li>
+                <li><strong>Rebalance service</strong><span>Tạo draft action từ phần allocation vượt ngưỡng.</span></li>
+                <li><strong>Risk service</strong><span>Trả BLOCKED, REQUIRES_APPROVAL hoặc SAFE_TO_PROPOSE.</span></li>
+              </ol>
+            </article>
+          </div>
+
+          <pre aria-label="Luồng policy đích">USER INTENT
+    ↓
+LLM parses typed actions
+    ↓
+Pydantic validates schema
+    ↓
+Python observes portfolio + calculates violations
+    ↓
+Planner creates proposal
+    ↓
+RiskEngine validates deterministically
+    ↓
+LLM explains in natural language</pre>
+
+          <div class="warning">
+            <strong>Điểm chưa nối:</strong> <code>PolicyConversationService</code> có thể trả <code>analysis_requested=True</code>, nhưng chưa có orchestrator lấy cờ đó để gọi portfolio gateway, policy checks, planner và RiskEngine trong một request duy nhất.
+          </div>
+        </section>
+
+        <section id="file-map">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Source atlas</p>
+              <h2>Từng file liên kết ra sao?</h2>
+            </div>
+            <p>Dependency đi từ domain thuần ra ngoài adapter. Models không biết LLM hay Binance; nhờ vậy business rule có thể test mà không gọi mạng.</p>
+          </div>
+
+          <pre class="tree" aria-label="Cây thư mục chính">sentinel-agent/
+├── main.py                 # composition root + console loop
+├── app/
+│   ├── agent/              # LLM construction và prompts
+│   ├── tools/              # hai capability LLM nhìn thấy
+│   ├── gateways.py         # application-owned interface
+│   ├── binance/            # external adapter
+│   ├── models/             # Pydantic domain contracts
+│   ├── services/           # deterministic business rules
+│   ├── sessions.py         # policy state trong RAM
+│   └── config.py           # environment → validated Settings
+├── tests/                  # offline verification
+├── web/                    # static vintage UI prototype
+└── docs/                   # kiến trúc và hướng dẫn</pre>
+
+          <div class="file-toolbar" aria-label="Điều khiển danh sách file">
+            <button type="button" id="expand-all">Mở tất cả nhóm</button>
+            <button type="button" id="collapse-all">Đóng tất cả nhóm</button>
+          </div>
+
+          <details open>
+            <summary>Entry point &amp; cấu hình</summary>
+            <div class="file-list">
+              <article class="file">
+                <h4><a href="../main.py">main.py</a></h4>
+                <p>Composition root: load config, tạo runner → gateway → Agent, sau đó chạy console loop bằng <code>Runner.run()</code>.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> config, Binance adapter, Sentinel Agent. <strong>Được gọi bởi:</strong> người dùng qua <code>python main.py</code>.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/config.py">app/config.py</a></h4>
+                <p>Đọc `.env`, validate provider/model/key, khóa Binance ở Demo và tạo LiteLLM route.</p>
+                <p class="relation"><strong>Input:</strong> environment variables. <strong>Output:</strong> immutable <code>Settings</code>. <strong>Dùng bởi:</strong> main, Agent, CLI runner.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/gateways.py">app/gateways.py</a></h4>
+                <p>Protocol do application sở hữu, định nghĩa <code>get_portfolio()</code> và <code>get_market_data()</code>.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> domain models. <strong>Được implement bởi:</strong> BinanceCliGateway. <strong>Dùng bởi:</strong> AI tools.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/sessions.py">app/sessions.py</a></h4>
+                <p>Lưu <code>PortfolioPolicy</code> theo session ID trong RAM và apply patch đã validate.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> policy model/service. <strong>Dùng bởi:</strong> PolicyConversationService. Mất dữ liệu khi process dừng.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/__init__.py">app/__init__.py</a></h4>
+                <p>Đánh dấu <code>app</code> là Python package. File có thể rỗng vì vai trò chính là ranh giới package/import.</p>
+                <p class="relation"><strong>Tương tự:</strong> các <code>__init__.py</code> trong agent, binance, models, services, tools và tests/unit.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../.env.example">.env.example</a></h4>
+                <p>Template tên biến cấu hình, chỉ chứa placeholder. `.env` thật bị ignore và không bao giờ đi vào frontend.</p>
+                <p class="relation"><strong>Dùng bởi:</strong> developer khi setup. <strong>Không được import:</strong> đây không phải source code.</p>
+              </article>
+            </div>
+          </details>
+
+          <details open>
+            <summary>Agent &amp; AI tools</summary>
+            <div class="file-list">
+              <article class="file">
+                <h4><a href="../app/agent/sentinel.py">app/agent/sentinel.py</a></h4>
+                <p>Tạo Agent tên Sentinel, gắn model route, instructions và đúng hai tool gateway-backed.</p>
+                <p class="relation"><strong>Input:</strong> Settings + PortfolioMarketGateway. <strong>Output:</strong> Agents SDK <code>Agent</code>. <strong>Dùng bởi:</strong> main.py.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/agent/prompts.py">app/agent/prompts.py</a></h4>
+                <p>Giữ Sentinel instructions và Policy Parser instructions tách khỏi construction code.</p>
+                <p class="relation"><strong>Quy tắc:</strong> không bịa dữ liệu, không trade, tách fact/interpretation, parser chỉ tạo typed actions.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/agent/policy_parser.py">app/agent/policy_parser.py</a></h4>
+                <p>Tạo tool-free LLM Agent với <code>output_type=ParsedRequest</code>; retry một lần khi structured output sai schema.</p>
+                <p class="relation"><strong>Input:</strong> message + current policy. <strong>Output:</strong> typed actions. <strong>Dùng bởi:</strong> policy conversation flow, chưa nối main.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/tools/portfolio.py">app/tools/portfolio.py</a></h4>
+                <p>Bọc gateway thành AI-callable <code>get_portfolio()</code>. Docstring là instruction giúp LLM biết khi nào gọi.</p>
+                <p class="relation"><strong>Input:</strong> không có argument. <strong>Output:</strong> Portfolio. <strong>Ủy quyền cho:</strong> gateway; không tự đọc Binance.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/tools/market.py">app/tools/market.py</a></h4>
+                <p>Bọc gateway thành AI-callable <code>get_market_data(symbol)</code>.</p>
+                <p class="relation"><strong>Input:</strong> pair như BTCUSDT. <strong>Output:</strong> MarketData hoặc MarketDataError. <strong>Không được:</strong> tự tạo giá.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/agent/__init__.py">app/agent/__init__.py và app/tools/__init__.py</a></h4>
+                <p>Đánh dấu package và cho phép API package rõ ràng về sau. Hiện để rỗng để tránh side effect khi import.</p>
+                <p class="relation"><strong>Không phải:</strong> nơi bắt buộc đặt business logic hoặc tự động khởi tạo Agent.</p>
+              </article>
+            </div>
+          </details>
+
+          <details open>
+            <summary>Binance adapter</summary>
+            <div class="file-list">
+              <article class="file">
+                <h4><a href="../app/binance/runner.py">app/binance/runner.py</a></h4>
+                <p>Chạy executable bằng <code>asyncio.create_subprocess_exec</code>, argument array, timeout và JSON parsing.</p>
+                <p class="relation"><strong>Input:</strong> danh sách argument cố định từ gateway. <strong>Output:</strong> parsed JSON. <strong>Bảo mật:</strong> sanitize mọi lỗi.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/binance/gateway.py">app/binance/gateway.py</a></h4>
+                <p>Adapter chính: chọn bốn command read-only, validate symbol, map payload và tính volatility/slippage.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> runner, transport schemas, portfolio service. <strong>Implement:</strong> PortfolioMarketGateway.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/binance/schemas.py">app/binance/schemas.py</a></h4>
+                <p>Pydantic transport models phản ánh JSON ngoài từ account, ticker, 24h stats và depth.</p>
+                <p class="relation"><strong>Ranh giới:</strong> payload Binance phải qua schema này trước khi thành domain model.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/binance/__init__.py">app/binance/__init__.py</a></h4>
+                <p>Đánh dấu external adapter package; giữ rỗng để import package không tự gọi subprocess hoặc mạng.</p>
+                <p class="relation"><strong>Nguyên tắc:</strong> import không có side effect.</p>
+              </article>
+            </div>
+          </details>
+
+          <details>
+            <summary>Domain models</summary>
+            <div class="file-list">
+              <article class="file">
+                <h4><a href="../app/models/portfolio.py">app/models/portfolio.py</a></h4>
+                <p><code>PortfolioAsset</code> và <code>Portfolio</code>: amount, USD value, weight, total và source.</p>
+                <p class="relation"><strong>Tạo bởi:</strong> gateway/portfolio service. <strong>Dùng bởi:</strong> tools, policy, planner.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/models/market.py">app/models/market.py</a></h4>
+                <p><code>MarketData</code>, volatility enum và error result cho failure không crash Agent.</p>
+                <p class="relation"><strong>Tạo bởi:</strong> Binance gateway. <strong>Dùng bởi:</strong> market tool, planner, RiskEngine.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/models/policy.py">app/models/policy.py</a></h4>
+                <p>Validated policy, partial patch và policy violations với Decimal threshold từ 0 đến 1.</p>
+                <p class="relation"><strong>Dùng bởi:</strong> parser actions, sessions, policy service và risk service.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/models/chat.py">app/models/chat.py</a></h4>
+                <p>Discriminated union cho UPDATE_POLICY, VIEW_POLICY, ANALYZE_PORTFOLIO và NEEDS_CLARIFICATION.</p>
+                <p class="relation"><strong>Output schema của:</strong> Policy Parser LLM. <strong>Input của:</strong> conversation service.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/models/trade.py">app/models/trade.py</a></h4>
+                <p>TradeAction và RebalancePlan là proposal data; model tồn tại không đồng nghĩa có execution.</p>
+                <p class="relation"><strong>Tạo bởi:</strong> rebalance service. <strong>Đọc bởi:</strong> risk service.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/models/risk.py">app/models/risk.py</a></h4>
+                <p>RiskStatus, reason codes và RiskDecision machine-readable.</p>
+                <p class="relation"><strong>Tạo bởi:</strong> risk service. <strong>Mục đích:</strong> không dùng câu văn LLM làm quyền thực thi.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/models/source.py">app/models/source.py</a></h4>
+                <p>DataSource gắn provenance cho kết quả. Runtime hiện luôn trả BINANCE_DEMO.</p>
+                <p class="relation"><strong>Dùng bởi:</strong> Portfolio và MarketData để tránh gọi số dư mô phỏng là tiền thật.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/models/__init__.py">app/models/__init__.py</a></h4>
+                <p>Package marker cho domain model; không re-export hàng loạt để dependency vẫn dễ truy vết.</p>
+                <p class="relation"><strong>Được import theo file cụ thể:</strong> ví dụ <code>app.models.policy</code>.</p>
+              </article>
+            </div>
+          </details>
+
+          <details>
+            <summary>Deterministic services</summary>
+            <div class="file-list">
+              <article class="file">
+                <h4><a href="../app/services/portfolio_service.py">app/services/portfolio_service.py</a></h4>
+                <p>Tính tổng USD và từng weight bằng Decimal; validate portfolio không rỗng và total hợp lệ.</p>
+                <p class="relation"><strong>Input:</strong> assets đã định giá. <strong>Output:</strong> Portfolio. <strong>Dùng bởi:</strong> Binance gateway.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/policy_service.py">app/services/policy_service.py</a></h4>
+                <p>Apply patch theo field được gửi và tìm concentration/stablecoin violations.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> policy + portfolio models. <strong>Không phụ thuộc:</strong> LLM/Binance.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/policy_conversation_service.py">app/services/policy_conversation_service.py</a></h4>
+                <p>Điều phối typed actions đúng thứ tự và báo có cần phân tích portfolio hay không.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> RequestParser protocol, session store, response formatter. <strong>Chưa dùng bởi:</strong> main.py.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/policy_response_service.py">app/services/policy_response_service.py</a></h4>
+                <p>Chuyển policy update/current policy thành câu tiếng Việt dễ đọc.</p>
+                <p class="relation"><strong>Input:</strong> validated policy/patch. <strong>Output:</strong> natural-language text, không trả JSON thô cho user.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/rebalance_service.py">app/services/rebalance_service.py</a></h4>
+                <p>Tính lượng exposure vượt max, draft SELL value và amount từ market price.</p>
+                <p class="relation"><strong>Output chỉ là proposal.</strong> File này không có API hoặc lệnh đặt order.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/risk_service.py">app/services/risk_service.py</a></h4>
+                <p>Áp priority: high volatility BLOCKED trước, trade threshold REQUIRES_APPROVAL sau, còn lại SAFE_TO_PROPOSE.</p>
+                <p class="relation"><strong>Input:</strong> policy + plan + market. <strong>Output:</strong> RiskDecision deterministic.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/__init__.py">app/services/__init__.py</a></h4>
+                <p>Package marker cho pure business services, không chạy khởi tạo hoặc I/O khi import.</p>
+                <p class="relation"><strong>Giữ layer sạch:</strong> services không import Agents SDK, LiteLLM hay binance-cli.</p>
+              </article>
+            </div>
+          </details>
+
+          <details>
+            <summary>Tests, web &amp; tài liệu</summary>
+            <div class="file-list">
+              <article class="file">
+                <h4><a href="../tests/">tests/</a></h4>
+                <p>Unit tests cho config, runner, Binance mapping, domain models, sessions, policy, planner, RiskEngine và Agent wiring.</p>
+                <p class="relation"><strong>Nguyên tắc:</strong> fake boundary, không gọi LLM/Binance thật, không đọc `.env` thật.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../tests/test_ui.js">tests/test_ui.js</a></h4>
+                <p>Kiểm tra model selector, LiteLLM route preview, prompt validation và thứ tự activity mô phỏng của UI.</p>
+                <p class="relation"><strong>Chạy bằng:</strong> Node built-in test runner; không cần browser.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../web/index.html">web/index.html</a></h4>
+                <p>Vintage static UI shell cho demo giao diện.</p>
+                <p class="relation"><strong>Liên kết:</strong> styles.css + app.js. <strong>Hiện chưa liên kết:</strong> Python Agent hoặc Binance.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../web/app.js">web/app.js và web/styles.css</a></h4>
+                <p>Model selector và simulated activity/result presentation; CSS giữ visual language vintage.</p>
+                <p class="relation"><strong>Không chứa:</strong> LLM key, Binance key hoặc backend API call.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../README.md">README.md</a></h4>
+                <p>Quick start: kiến trúc tóm tắt, setup Python/CLI/.env, chạy console, test và preview UI.</p>
+                <p class="relation"><strong>Dẫn tới:</strong> các tài liệu chi tiết trong thư mục docs.</p>
+              </article>
+              <article class="file">
+                <h4><a href="architecture.md">docs/architecture.md và docs/binance-skills-hub.md</a></h4>
+                <p>Ghi ranh giới dependency, data flow, security boundary và hướng dẫn Demo credentials.</p>
+                <p class="relation"><strong>Tài liệu này:</strong> tổng hợp chúng với source code thành một bản đồ học tập.</p>
+              </article>
+            </div>
+          </details>
+        </section>
+
+        <section id="config">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Provider routing</p>
+              <h2>LiteLLM được apply ở đâu?</h2>
+            </div>
+            <p>LiteLLM là adapter giữa Agents SDK và nhiều LLM provider. Nó không đọc Binance, không phải tool và không thay RiskEngine.</p>
+          </div>
+
+          <pre aria-label="Ví dụ cấu hình không có secret">LLM_PROVIDER=gemini
+LLM_MODEL=gemini-3.5-flash-lite
+GEMINI_API_KEY=your_gemini_api_key
+
+BINANCE_API_ENV=demo
+BINANCE_CLI_PATH=binance-cli
+BINANCE_API_KEY=your_demo_api_key
+BINANCE_SECRET_KEY=your_demo_secret_key</pre>
+
+          <div class="split-flow">
+            <article class="flow-panel">
+              <h3>Gemini</h3>
+              <pre>gemini
++ gemini-3.5-flash-lite
+↓
+litellm/gemini/
+gemini-3.5-flash-lite</pre>
+              <p>LiteLLM biết dùng <code>GEMINI_API_KEY</code> nhờ prefix provider <code>gemini</code>.</p>
+            </article>
+            <article class="flow-panel">
+              <h3>OpenAI</h3>
+              <pre>openai
++ gpt-5.6-luna
+↓
+litellm/openai/
+gpt-5.6-luna</pre>
+              <p>Với provider <code>openai</code>, LiteLLM dùng <code>OPENAI_API_KEY</code>.</p>
+            </article>
+          </div>
+
+          <p><code>Settings.agents_model</code> tạo route; <code>create_sentinel_agent()</code> truyền route đó vào <code>Agent(model=...)</code>. Vì vậy thay model là thay cấu hình, không sửa source Agent.</p>
+        </section>
+
+        <section id="binance">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">External data</p>
+              <h2>Binance Skills Hub được dùng ra sao?</h2>
+            </div>
+            <p>Sentinel dùng binary <code>binance-cli</code> chính thức v2.1.1 như một adapter command-line cho Binance Demo API. Đây là hướng Track A, không phải custom Agentic MCP.</p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Application need</th><th>Command cố định</th><th>Credential</th><th>Kết quả nội bộ</th></tr></thead>
+              <tbody>
+                <tr><td>Account balances</td><td><code>spot get-account --omit-zero-balances true</code></td><td>Demo key + secret</td><td>SpotAccountPayload</td></tr>
+                <tr><td>Định giá holdings</td><td><code>spot ticker-price</code></td><td>Không</td><td>PriceTickerPayload[]</td></tr>
+                <tr><td>Biến động 24h</td><td><code>spot ticker24hr --symbol BTCUSDT</code></td><td>Không</td><td>Ticker24hPayload</td></tr>
+                <tr><td>Slippage tham chiếu</td><td><code>spot depth --symbol BTCUSDT --limit 100</code></td><td>Không</td><td>DepthPayload</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Mapping portfolio</h3>
+          <pre>free + locked = amount
+amount × ASSETUSDT price = usd_value
+sum(usd_value) = total_usd_value
+usd_value ÷ total = weight</pre>
+          <p>USDT được định giá bằng 1 trong adapter Demo. Nếu một asset không có cặp ASSETUSDT, Sentinel dừng thay vì tự đoán conversion path.</p>
+
+          <h3>Market interpretation deterministic</h3>
+          <pre>|change_24h| &lt; 2%       → LOW
+2% ≤ |change_24h| &lt; 4%  → MEDIUM
+|change_24h| ≥ 4%       → HIGH</pre>
+          <p>Slippage được ước lượng bằng cách walk bid depth cho reference sale 1.000 USDT. Nó là dữ liệu phân tích, không phải order.</p>
+        </section>
+
+        <section id="bao-mat">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Threat boundaries</p>
+              <h2>Những xem xét an toàn</h2>
+            </div>
+            <p>Rủi ro chính không chỉ là lộ key. Một prompt độc hại cũng không được phép biến thành shell command hoặc hành động tài chính.</p>
+          </div>
+
+          <div class="decision-grid">
+            <article class="decision">
+              <h3>Không shell</h3>
+              <p>Dùng <code>create_subprocess_exec(executable, *arguments)</code>, không dùng <code>shell=True</code>. Symbol còn phải match regex trước khi thành argument.</p>
+            </article>
+            <article class="decision">
+              <h3>Credential tối thiểu</h3>
+              <p>Public market commands không nhận key. Chỉ account command authenticated nhận Binance credentials qua child environment; LLM keys không đi theo.</p>
+            </article>
+            <article class="decision">
+              <h3>Không expose CLI</h3>
+              <p>LLM không được truyền command hoặc URL. Không có generic <code>request</code>, order, cancel, transfer hay withdraw trong application path.</p>
+            </article>
+            <article class="decision">
+              <h3>Fail closed</h3>
+              <p>Timeout, exit code khác 0, JSON sai, schema sai, thiếu price/depth đều trả lỗi an toàn. Không fallback về mock khiến user tưởng dữ liệu cũ là thật.</p>
+            </article>
+            <article class="decision">
+              <h3>Demo only</h3>
+              <p>Config từ chối <code>prod</code>; gateway kiểm tra lại Demo. Hai tầng guard ngăn việc holdings thật bị LLM gắn nhãn mô phỏng.</p>
+            </article>
+            <article class="decision">
+              <h3>Structured provenance</h3>
+              <p><code>data_source=BINANCE_DEMO</code> nằm trong Portfolio/MarketData, không chỉ nằm trong câu prompt dễ bị quên.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="java">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Mental model</p>
+              <h2>Nếu nhìn bằng Spring Boot</h2>
+            </div>
+            <p>Đây chỉ là phép liên hệ để định hướng, không phải lý do tạo thêm controller/service/repository không cần thiết.</p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Sentinel Python</th><th>Gần giống trong Java</th><th>Điểm khác quan trọng</th></tr></thead>
+              <tbody>
+                <tr><td><code>main.py</code></td><td>Application bootstrap + manual bean wiring</td><td>Không có DI container; dependency được truyền trực tiếp.</td></tr>
+                <tr><td><code>Settings</code></td><td><code>@ConfigurationProperties</code></td><td>Pydantic validate khi load.</td></tr>
+                <tr><td><code>PortfolioMarketGateway</code></td><td>Port/interface</td><td>Python Protocol dùng structural typing.</td></tr>
+                <tr><td><code>BinanceCliGateway</code></td><td>Outbound adapter/client</td><td>Gọi subprocess CLI thay vì WebClient.</td></tr>
+                <tr><td>Pydantic models</td><td>Records/DTO/domain value objects</td><td>Runtime schema validation tích hợp.</td></tr>
+                <tr><td>Pure services</td><td>Stateless domain services</td><td>Chủ yếu là hàm, không cần class/annotation.</td></tr>
+                <tr><td><code>function_tool</code></td><td>Function registry callable by orchestration engine</td><td>LLM tự chọn function dựa trên name/schema/docstring.</td></tr>
+                <tr><td>Agents SDK Runner</td><td>Workflow/orchestration runtime</td><td>Agent loop do SDK tiếp tục sau mỗi tool result.</td></tr>
+                <tr><td><code>__init__.py</code></td><td>Gần với package boundary</td><td>Đánh dấu/import package; không tương đương class.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="kiem-thu">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Evidence</p>
+              <h2>Điều gì đang được test?</h2>
+            </div>
+            <p>Phần nguy hiểm và phần tính toán đều chạy offline. Test không gọi OpenAI, Gemini, Binance hoặc subprocess thật.</p>
+          </div>
+
+          <ul class="checklist">
+            <li>Config provider/model/key và Demo-only guard</li>
+            <li>CLI argument array, credential isolation, timeout, sanitized errors</li>
+            <li>Binance account/ticker/depth payload mapping</li>
+            <li>Portfolio total và allocation bằng Decimal</li>
+            <li>Policy patch, violations và session state</li>
+            <li>Rebalance arithmetic và missing-market failure</li>
+            <li>Risk priority: BLOCKED → APPROVAL → SAFE</li>
+            <li>Agent tool wiring và model route</li>
+            <li>Static UI behavior bằng Node test runner</li>
+            <li>HTML guide semantic/content contract</li>
+          </ul>
+
+          <pre>python -m pytest -q
+node --test tests/test_ui.js
+python -m compileall -q app main.py tests
+git diff --check</pre>
+
+          <p>Smoke test ngoài pytest đã xác nhận <code>BinanceCliRunner → BinanceCliGateway → BTCUSDT Demo</code> hoạt động với CLI v2.1.1. Portfolio authenticated vẫn cần người dùng tự tạo và điền Demo key local.</p>
+        </section>
+
+        <section id="tiep-theo">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Road ahead</p>
+              <h2>Chưa có gì, nên làm gì tiếp?</h2>
+            </div>
+            <p>Thứ tự dưới đây hoàn thiện core product trước khi nghĩ tới execution. Không bước nào được hiểu là đã có trong runtime hiện tại.</p>
+          </div>
+
+          <ol class="journey">
+            <li>
+              <span class="phase">NEXT 01</span>
+              <h3>Nối orchestrator</h3>
+              <p>Ghép policy chat, portfolio observation, violation, planner và RiskEngine thành một application flow.</p>
+            </li>
+            <li>
+              <span class="phase">NEXT 02</span>
+              <h3>FastAPI</h3>
+              <p>Expose structured analysis response và activity events; secrets chỉ ở backend.</p>
+            </li>
+            <li>
+              <span class="phase">NEXT 03</span>
+              <h3>UI thật</h3>
+              <p>Thay progress mô phỏng bằng event từ backend; render portfolio, policy, plan và risk result.</p>
+            </li>
+            <li>
+              <span class="phase">NEXT 04</span>
+              <h3>Approval state</h3>
+              <p>Approve/Reject rõ ràng, không suy approval từ câu chat mơ hồ.</p>
+            </li>
+            <li>
+              <span class="phase">LATER</span>
+              <h3>Execution</h3>
+              <p>Chỉ cân nhắc sau risk validation, authorization, idempotency, audit và post-execution verification.</p>
+            </li>
+          </ol>
+
+          <div class="note">
+            <strong>Phần có thể thay sau này:</strong> nếu Binance hỗ trợ Sentinel qua MCP chính thức, chỉ cần thêm một adapter implement <code>PortfolioMarketGateway</code>. AI-visible tool names, domain models và deterministic services có thể giữ nguyên.
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer>
+      <div class="footer-inner">
+        <p><strong>Sentinel Project Guide</strong> · tài liệu phản ánh repository ngày 05/09/2026.</p>
+        <p>Documentation only · Demo data · No trading · No active MCP</p>
+      </div>
+    </footer>
+
+    <script>
+      (() => {
+        const details = [...document.querySelectorAll("#file-map details")];
+        document.querySelector("#expand-all")?.addEventListener("click", () => {
+          details.forEach((item) => { item.open = true; });
+        });
+        document.querySelector("#collapse-all")?.addEventListener("click", () => {
+          details.forEach((item) => { item.open = false; });
+        });
+
+        if (!("IntersectionObserver" in window)) return;
+        const links = new Map(
+          [...document.querySelectorAll("nav a[href^='#']")].map((link) => [
+            link.getAttribute("href")?.slice(1),
+            link,
+          ]),
+        );
+        const observer = new IntersectionObserver((entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (!visible) return;
+          links.forEach((link) => link.removeAttribute("aria-current"));
+          links.get(visible.target.id)?.setAttribute("aria-current", "true");
+        }, { rootMargin: "-15% 0px -70%", threshold: [0, 0.2, 0.6] });
+        document.querySelectorAll("main > section[id]").forEach((section) => observer.observe(section));
+      })();
+    </script>
+  </body>
+</html>

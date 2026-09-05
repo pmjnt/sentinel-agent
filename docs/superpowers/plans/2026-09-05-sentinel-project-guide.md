@@ -67,7 +67,7 @@ git commit -m "test: define Sentinel project guide contract"
 - Create: `docs/sentinel-project-guide.html`
 - Test: `tests/test_project_guide.py`
 
-- [ ] **Step 1: Create the semantic page shell**
+- [x] **Step 1: Create the semantic page shell**
 
 Add:
 
@@ -81,7 +81,7 @@ Add:
 Use only relative repository links such as `../app/config.py` and
 `../main.py`; do not add external scripts, stylesheets, fonts, or analytics.
 
-- [ ] **Step 2: Add accurate project content**
+- [x] **Step 2: Add accurate project content**
 
 Describe the current repository with these boundaries:
 
@@ -103,7 +103,7 @@ dependencies, and consumers. Explain `__init__.py`, Pydantic transport/domain
 models, LiteLLM routing, the fixed read-only command list, credential boundary,
 schema validation, deterministic calculations, and fail-closed errors.
 
-- [ ] **Step 3: Apply the approved visual system**
+- [x] **Step 3: Apply the approved visual system**
 
 Use embedded CSS variables for the approved paper, ink, muted ink, olive, rust,
 and rule colors. Build the signature vertical system rail, status chips, file
@@ -111,7 +111,7 @@ relationship cards, responsive layout, print styles, visible focus states, and
 reduced-motion handling. Keep prose typography readable and file paths
 monospaced.
 
-- [ ] **Step 4: Add minimal progressive enhancement**
+- [x] **Step 4: Add minimal progressive enhancement**
 
 Use a short inline script only to:
 
@@ -121,7 +121,7 @@ Use a short inline script only to:
 
 The document must remain fully readable when JavaScript is disabled.
 
-- [ ] **Step 5: Run the guide test to verify GREEN**
+- [x] **Step 5: Run the guide test to verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/test_project_guide.py -q
@@ -129,7 +129,7 @@ The document must remain fully readable when JavaScript is disabled.
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the handbook**
+- [x] **Step 6: Commit the handbook**
 
 ```bash
 git add docs/sentinel-project-guide.html tests/test_project_guide.py
