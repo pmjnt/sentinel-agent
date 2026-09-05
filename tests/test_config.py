@@ -10,6 +10,7 @@ def _clear_llm_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "LLM_MODEL",
         "OPENAI_API_KEY",
         "GEMINI_API_KEY",
+        "LITELLM_DEBUG",
         "BINANCE_API_ENV",
         "BINANCE_CLI_PATH",
         "BINANCE_API_KEY",
@@ -31,6 +32,34 @@ def test_load_settings_builds_openai_litellm_model(
     assert settings.llm_provider.value == "openai"
     assert settings.llm_model == "gpt-5.6-luna"
     assert settings.agents_model == "litellm/openai/gpt-5.6-luna"
+    assert settings.litellm_debug is False
+
+
+def test_load_settings_enables_litellm_debug_explicitly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("LITELLM_DEBUG", "true")
+
+    settings = config.load_settings()
+
+    assert settings.litellm_debug is True
+
+
+def test_load_settings_rejects_invalid_litellm_debug_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("LITELLM_DEBUG", "sometimes")
+
+    with pytest.raises(ValueError, match="valid boolean"):
+        config.load_settings()
 
 
 def test_load_settings_builds_gemini_litellm_model(

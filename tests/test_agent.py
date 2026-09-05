@@ -3,7 +3,7 @@ from app.config import LLMProvider, Settings
 from app.models.market import MarketDataResult
 from app.models.portfolio import Portfolio
 from app.application import SentinelApplication
-from main import create_application
+from main import configure_litellm_debug, create_application
 
 
 class UnusedGateway:
@@ -43,3 +43,42 @@ def test_create_application_wires_policy_analysis_without_external_calls() -> No
     application = create_application(settings, UnusedGateway())
 
     assert isinstance(application, SentinelApplication)
+
+
+def test_litellm_debug_stays_off_by_default(capsys) -> None:
+    settings = Settings(
+        llm_provider=LLMProvider.OPENAI,
+        llm_model="gpt-5.4-mini",
+        openai_api_key="test-openai-key",
+    )
+    calls = 0
+
+    def fake_enable_debug() -> None:
+        nonlocal calls
+        calls += 1
+
+    configure_litellm_debug(settings, fake_enable_debug)
+
+    assert calls == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_litellm_debug_opt_in_enables_logging_and_warns(capsys) -> None:
+    settings = Settings(
+        llm_provider=LLMProvider.OPENAI,
+        llm_model="gpt-5.4-mini",
+        openai_api_key="test-openai-key",
+        litellm_debug=True,
+    )
+    calls = 0
+
+    def fake_enable_debug() -> None:
+        nonlocal calls
+        calls += 1
+
+    configure_litellm_debug(settings, fake_enable_debug)
+
+    warning = capsys.readouterr().out
+    assert calls == 1
+    assert "request body" in warning
+    assert "không chia sẻ log" in warning

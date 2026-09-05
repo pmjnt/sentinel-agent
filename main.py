@@ -1,4 +1,7 @@
 import asyncio
+from collections.abc import Callable
+
+import litellm
 
 from app.agent.analysis_reporter import AgentAnalysisReporter
 from app.agent.request_interpreter import AgentRequestInterpreter
@@ -15,6 +18,21 @@ from app.sessions import InMemoryPolicySessionStore
 SAMPLE_PROMPT = (
     "Analyze my BTC exposure and tell me whether it currently looks risky."
 )
+
+
+def configure_litellm_debug(
+    settings: Settings,
+    enable_debug: Callable[[], None] = litellm._turn_on_debug,
+) -> None:
+    """Enable verbose LiteLLM logs only after an explicit local opt-in."""
+    if not settings.litellm_debug:
+        return
+
+    enable_debug()
+    print(
+        "WARNING: LiteLLM debug is ON. Prompt, policy/portfolio context, and "
+        "request body may appear in this terminal; không chia sẻ log công khai."
+    )
 
 
 def create_application(
@@ -35,6 +53,7 @@ def create_application(
 async def run_console() -> None:
     """Run Sentinel's interactive command-line loop."""
     settings = load_settings()
+    configure_litellm_debug(settings)
     runner = BinanceCliRunner(settings)
     gateway = BinanceCliGateway(runner, settings.binance_environment)
     application = create_application(settings, gateway)

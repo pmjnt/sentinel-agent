@@ -28,6 +28,7 @@ class Settings(BaseModel):
     llm_model: str
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
+    litellm_debug: bool = False
     binance_environment: BinanceEnvironment = BinanceEnvironment.DEMO
     binance_cli_path: str = "binance-cli"
     binance_api_key: str | None = Field(default=None, repr=False)
@@ -80,6 +81,7 @@ def load_settings() -> Settings:
         llm_model=model,
         openai_api_key=openai_api_key,
         gemini_api_key=gemini_api_key,
+        litellm_debug=os.getenv("LITELLM_DEBUG", "false"),
         binance_environment=binance_environment,
         binance_cli_path=binance_cli_path,
         binance_api_key=os.getenv("BINANCE_API_KEY", "").strip() or None,

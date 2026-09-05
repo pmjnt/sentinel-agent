@@ -152,6 +152,17 @@ gemini + gemini-3.5-flash-lite
 → litellm/gemini/gemini-3.5-flash-lite
 ```
 
+For short-lived local troubleshooting only, enable verbose LiteLLM logs:
+
+```dotenv
+LITELLM_DEBUG=true
+```
+
+Restart `python main.py` after changing the flag. Debug output can include the
+prompt, current policy, portfolio context, and request body. Do not commit the
+flag as enabled and do not share debug logs publicly. Set it back to `false`
+after diagnosing the provider error.
+
 Never commit `.env`. Never paste Binance credentials into chat or frontend
 code. Use keys created in Binance Demo Trading, not production credentials.
 
