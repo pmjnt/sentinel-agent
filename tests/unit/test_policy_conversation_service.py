@@ -4,6 +4,7 @@ from decimal import Decimal
 from app.models.chat import (
     AnalyzePortfolioAction,
     ClarificationAction,
+    GeneralChatAction,
     ParsedRequest,
     UpdatePolicyAction,
     ViewPolicyAction,
@@ -12,6 +13,7 @@ from app.models.policy import PolicyPatch, PortfolioPolicy
 from app.services.policy_conversation_service import (
     PolicyConversationResult,
     PolicyConversationService,
+    PolicyMessageEvent,
 )
 from app.sessions import InMemoryPolicySessionStore
 
@@ -173,3 +175,23 @@ def test_clarification_anywhere_prevents_all_state_changes() -> None:
     assert result.analysis_requested is False
     assert result.policy == original_policy
     assert store.get("session-1") == original_policy
+
+
+def test_general_chat_returns_message_without_policy_or_analysis_work() -> None:
+    store = InMemoryPolicySessionStore()
+    original_policy = store.get("session-1")
+
+    result = _handle(
+        ParsedRequest(
+            actions=[GeneralChatAction(response="Xin chào! Mình là Sentinel.")]
+        ),
+        store,
+    )
+
+    assert result.message == "Xin chào! Mình là Sentinel."
+    assert result.events == (
+        PolicyMessageEvent("Xin chào! Mình là Sentinel."),
+    )
+    assert result.policy == original_policy
+    assert store.get("session-1") == original_policy
+    assert result.analysis_requested is False

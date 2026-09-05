@@ -3,16 +3,19 @@ from decimal import Decimal
 
 from app.application import SentinelApplication
 from app.models.analysis import PortfolioAnalysis
+from app.models.chat import GeneralChatAction, ParsedRequest
 from app.models.policy import PortfolioPolicy
 from app.models.portfolio import Portfolio
 from app.models.risk import RiskDecision, RiskReasonCode, RiskStatus
 from app.models.trade import PlanStatus, RebalancePlan
 from app.services.policy_conversation_service import (
     PolicyConversationResult,
+    PolicyConversationService,
     PolicyMessageEvent,
     PortfolioAnalysisEvent,
 )
 from app.services.portfolio_analysis_service import AnalysisDataError
+from app.sessions import InMemoryPolicySessionStore
 
 
 def _analysis(policy: PortfolioPolicy) -> PortfolioAnalysis:
@@ -76,6 +79,17 @@ class FailingReporter(FakeReporter):
         raise RuntimeError("provider unavailable")
 
 
+class StaticInterpreter:
+    async def interpret(
+        self,
+        message: str,
+        current_policy: PortfolioPolicy,
+    ) -> ParsedRequest:
+        return ParsedRequest(
+            actions=[GeneralChatAction(response="Xin chào! Mình là Sentinel.")]
+        )
+
+
 def _conversation_result(
     *,
     message: str,
@@ -136,6 +150,24 @@ def test_clarification_skips_downstream_collaborators() -> None:
     result = asyncio.run(application.handle("user-1", "Giảm giới hạn."))
 
     assert result.message == "Bạn muốn giới hạn bao nhiêu?"
+    assert analysis_service.calls == []
+    assert reporter.calls == []
+
+
+def test_general_chat_skips_analysis_and_reporter_end_to_end() -> None:
+    analysis_service = FakeAnalysisService()
+    reporter = FakeReporter()
+    conversation = PolicyConversationService(
+        interpreter=StaticInterpreter(),
+        store=InMemoryPolicySessionStore(),
+    )
+    application = SentinelApplication(conversation, analysis_service, reporter)
+
+    result = asyncio.run(application.handle("user-1", "xin chào"))
+
+    assert result.message == "Xin chào! Mình là Sentinel."
+    assert result.policy == PortfolioPolicy()
+    assert result.analysis is None
     assert analysis_service.calls == []
     assert reporter.calls == []
 

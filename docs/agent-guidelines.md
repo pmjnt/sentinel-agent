@@ -5,7 +5,7 @@
 LLM chịu trách nhiệm:
 
 - hiểu tiếng Việt hoặc tiếng Anh của người dùng;
-- phân biệt cập nhật, xem policy, phân tích và yêu cầu cần làm rõ;
+- phân biệt cập nhật, xem policy, phân tích, general chat và yêu cầu cần làm rõ;
 - giữ đúng thứ tự khi một message chứa nhiều action;
 - chọn thông tin portfolio/market cần đọc;
 - thêm interpretation định tính cho kết quả Python đã xác minh.
@@ -38,9 +38,17 @@ UPDATE_POLICY
 VIEW_POLICY
 ANALYZE_PORTFOLIO
 NEEDS_CLARIFICATION
+GENERAL_CHAT
 ```
 
 Không tồn tại action đặt lệnh hoặc chuyển tiền.
+
+`GENERAL_CHAT` dùng cho lời chào, câu hỏi về khả năng hoặc trò chuyện thông
+thường và phải là action duy nhất. Interpreter nhận policy hiện tại làm context,
+nhưng service chỉ chuyển `response` đã validate thành message trả về. Nhánh này
+không sửa policy, không yêu cầu analysis, không gọi gateway và không kết nối
+Binance. LLM không được bịa dữ liệu tài chính, đề xuất giao dịch hay
+tuyên bố đã thực thi trong response này.
 
 ## Structured output
 

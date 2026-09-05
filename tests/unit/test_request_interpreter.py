@@ -31,7 +31,9 @@ def test_request_interpreter_uses_structured_output_and_configured_model() -> No
     assert agent.model == "litellm/gemini/gemini-3.5-flash-lite"
     assert agent.output_type is ParsedRequest
     assert agent.tools == []
+    assert "GENERAL_CHAT" in REQUEST_INTERPRETER_INSTRUCTIONS
     assert "Never create a numeric threshold" in REQUEST_INTERPRETER_INSTRUCTIONS
+    assert "Never invent portfolio or market data" in REQUEST_INTERPRETER_INSTRUCTIONS
     assert "Never create an execution action" in REQUEST_INTERPRETER_INSTRUCTIONS
 
 

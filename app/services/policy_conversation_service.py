@@ -4,6 +4,7 @@ from typing import Protocol
 from app.models.chat import (
     AnalyzePortfolioAction,
     ClarificationAction,
+    GeneralChatAction,
     ParsedRequest,
     UpdatePolicyAction,
     ViewPolicyAction,
@@ -102,6 +103,10 @@ class PolicyConversationService:
             )
 
         for action in interpreted.actions:
+            if isinstance(action, GeneralChatAction):
+                events.append(PolicyMessageEvent(action.response))
+                continue
+
             if isinstance(action, UpdatePolicyAction):
                 policy = self._store.apply(session_id, action.patch)
                 events.append(

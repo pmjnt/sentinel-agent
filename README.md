@@ -20,6 +20,13 @@ Python renders authoritative facts and status; Reporter LLM adds qualitative int
 The LLM is not authoritative for arithmetic, thresholds, permissions, or trade
 execution.
 
+The Request Interpreter can return five typed actions:
+`UPDATE_POLICY`, `VIEW_POLICY`, `ANALYZE_PORTFOLIO`,
+`NEEDS_CLARIFICATION`, and `GENERAL_CHAT`. `GENERAL_CHAT` handles greetings and
+capability questions in natural language. It only creates a text response: it
+receives the current policy as Interpreter context, but does not change it,
+inspect the portfolio, call the gateway, or contact Binance.
+
 ## Policy-driven agent loop
 
 For:
@@ -197,6 +204,12 @@ Try policy chat:
 ```text
 Sentinel > Giữ ít nhất 30% USDT, không asset nào trên 40%, chặn rebalance khi volatility HIGH, rồi phân tích portfolio.
 Sentinel > Xem policy hiện tại.
+```
+
+Try general chat:
+
+```text
+Sentinel > Xin chào.
 ```
 
 Policy state is kept per console session in memory and is lost when the process

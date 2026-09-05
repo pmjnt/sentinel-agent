@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.policy import PolicyPatch
 
@@ -11,6 +11,7 @@ class ActionType(str, Enum):
     VIEW_POLICY = "VIEW_POLICY"
     ANALYZE_PORTFOLIO = "ANALYZE_PORTFOLIO"
     NEEDS_CLARIFICATION = "NEEDS_CLARIFICATION"
+    GENERAL_CHAT = "GENERAL_CHAT"
 
 
 class UpdatePolicyAction(BaseModel):
@@ -58,11 +59,27 @@ class ClarificationAction(BaseModel):
         return question
 
 
+class GeneralChatAction(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: Literal[ActionType.GENERAL_CHAT] = ActionType.GENERAL_CHAT
+    response: str
+
+    @field_validator("response")
+    @classmethod
+    def validate_response(cls, value: str) -> str:
+        response = value.strip()
+        if not response:
+            raise ValueError("General chat response must not be empty.")
+        return response
+
+
 RequestedAction = Annotated[
     UpdatePolicyAction
     | ViewPolicyAction
     | AnalyzePortfolioAction
-    | ClarificationAction,
+    | ClarificationAction
+    | GeneralChatAction,
     Field(discriminator="type"),
 ]
 
@@ -71,3 +88,12 @@ class ParsedRequest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     actions: list[RequestedAction] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_general_chat_is_standalone(self) -> "ParsedRequest":
+        has_general_chat = any(
+            isinstance(action, GeneralChatAction) for action in self.actions
+        )
+        if has_general_chat and len(self.actions) != 1:
+            raise ValueError("GENERAL_CHAT must be the only requested action.")
+        return self

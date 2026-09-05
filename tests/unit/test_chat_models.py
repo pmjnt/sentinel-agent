@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from app.models.chat import (
     ActionType,
     AnalyzePortfolioAction,
+    GeneralChatAction,
     ParsedRequest,
     UpdatePolicyAction,
 )
@@ -63,4 +64,46 @@ def test_blank_clarification_question_is_rejected() -> None:
                     }
                 ]
             }
+        )
+
+
+def test_general_chat_action_is_discriminated_and_normalized() -> None:
+    request = ParsedRequest.model_validate(
+        {
+            "actions": [
+                {
+                    "type": ActionType.GENERAL_CHAT.value,
+                    "response": "  Xin chào!  ",
+                }
+            ]
+        }
+    )
+
+    action = request.actions[0]
+    assert isinstance(action, GeneralChatAction)
+    assert action.type is ActionType.GENERAL_CHAT
+    assert action.response == "Xin chào!"
+
+
+def test_blank_general_chat_response_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        ParsedRequest.model_validate(
+            {
+                "actions": [
+                    {
+                        "type": "GENERAL_CHAT",
+                        "response": "   ",
+                    }
+                ]
+            }
+        )
+
+
+def test_general_chat_cannot_be_combined_with_financial_actions() -> None:
+    with pytest.raises(ValidationError):
+        ParsedRequest(
+            actions=[
+                GeneralChatAction(response="Xin chào!"),
+                AnalyzePortfolioAction(focus_symbols=["BTC"]),
+            ]
         )
