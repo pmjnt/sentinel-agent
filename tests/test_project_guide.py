@@ -52,7 +52,7 @@ def test_project_guide_maps_runtime_and_policy_files() -> None:
         "app/tools/market.py",
         "app/binance/gateway.py",
         "app/binance/runner.py",
-        "app/agent/policy_parser.py",
+        "app/agent/request_interpreter.py",
         "app/services/policy_conversation_service.py",
         "app/services/policy_service.py",
         "app/services/rebalance_service.py",
@@ -60,6 +60,14 @@ def test_project_guide_maps_runtime_and_policy_files() -> None:
         "binance-cli",
     ):
         assert path in source
+
+    for old_name in (
+        "PolicyParser",
+        "policy_parser",
+        "POLICY_PARSER_INSTRUCTIONS",
+        "RequestParser",
+    ):
+        assert old_name not in source
 
 
 def test_project_guide_states_current_limitations_explicitly() -> None:

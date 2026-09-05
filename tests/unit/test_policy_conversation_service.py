@@ -16,11 +16,11 @@ from app.services.policy_conversation_service import (
 from app.sessions import InMemoryPolicySessionStore
 
 
-class StaticParser:
+class StaticInterpreter:
     def __init__(self, parsed_request: ParsedRequest) -> None:
         self.parsed_request = parsed_request
 
-    async def parse(
+    async def interpret(
         self,
         message: str,
         current_policy: PortfolioPolicy,
@@ -33,7 +33,7 @@ def _handle(
     store: InMemoryPolicySessionStore | None = None,
 ) -> PolicyConversationResult:
     service = PolicyConversationService(
-        parser=StaticParser(parsed_request),
+        interpreter=StaticInterpreter(parsed_request),
         store=store or InMemoryPolicySessionStore(),
     )
     return asyncio.run(service.handle("session-1", "user message"))

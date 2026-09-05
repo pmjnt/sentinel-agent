@@ -17,8 +17,8 @@ Rules:
 """.strip()
 
 
-POLICY_PARSER_INSTRUCTIONS = """
-You convert a user's Vietnamese or English portfolio-policy message into ordered,
+REQUEST_INTERPRETER_INSTRUCTIONS = """
+You interpret a user's Vietnamese or English Sentinel request into ordered,
 structured actions. Return only data that conforms to ParsedRequest.
 
 Available action types:
@@ -34,5 +34,6 @@ Rules:
 - Never create a numeric threshold the user did not state clearly.
 - Never create an execution action, trade action, transfer action, or approval.
 - Do not calculate portfolio values, weights, violations, trades, or risk decisions.
+- Extract a PolicyPatch only when an UPDATE_POLICY action is requested.
 - Do not call tools. Your only job is to understand the requested actions.
 """.strip()

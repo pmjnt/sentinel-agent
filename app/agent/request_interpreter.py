@@ -3,7 +3,7 @@ from typing import Any
 
 from agents import Agent, ModelBehaviorError, Runner, set_tracing_disabled
 
-from app.agent.prompts import POLICY_PARSER_INSTRUCTIONS
+from app.agent.prompts import REQUEST_INTERPRETER_INSTRUCTIONS
 from app.config import Settings
 from app.models.chat import ParsedRequest
 from app.models.policy import PortfolioPolicy
@@ -12,25 +12,25 @@ from app.models.policy import PortfolioPolicy
 RunAgent = Callable[..., Awaitable[Any]]
 
 
-def create_policy_parser_agent(settings: Settings) -> Agent:
-    """Create the tool-free Agent that parses policy chat into typed actions."""
+def create_request_interpreter_agent(settings: Settings) -> Agent:
+    """Create the tool-free Agent that interprets chat into typed actions."""
     set_tracing_disabled(True)
     return Agent(
-        name="Sentinel Policy Parser",
+        name="Sentinel Request Interpreter",
         model=settings.agents_model,
-        instructions=POLICY_PARSER_INSTRUCTIONS,
+        instructions=REQUEST_INTERPRETER_INSTRUCTIONS,
         output_type=ParsedRequest,
     )
 
 
-def build_parser_input(
+def build_interpreter_input(
     message: str,
     current_policy: PortfolioPolicy,
 ) -> str:
-    """Build explicit parser context without relying on hidden mutable state."""
+    """Build explicit request context without relying on hidden mutable state."""
     normalized_message = message.strip()
     if not normalized_message:
-        raise ValueError("Policy message must not be empty.")
+        raise ValueError("Request message must not be empty.")
 
     return (
         "Current validated portfolio policy:\n"
@@ -40,35 +40,35 @@ def build_parser_input(
     )
 
 
-class AgentPolicyParser:
-    """Parse policy chat through an LLM with one schema-failure retry."""
+class AgentRequestInterpreter:
+    """Interpret chat through an LLM with one schema-failure retry."""
 
     def __init__(
         self,
         settings: Settings,
         run_agent: RunAgent | None = None,
     ) -> None:
-        self._agent = create_policy_parser_agent(settings)
+        self._agent = create_request_interpreter_agent(settings)
         self._run_agent = run_agent or Runner.run
 
-    async def parse(
+    async def interpret(
         self,
         message: str,
         current_policy: PortfolioPolicy,
     ) -> ParsedRequest:
-        parser_input = build_parser_input(message, current_policy)
+        interpreter_input = build_interpreter_input(message, current_policy)
 
         for attempt in range(2):
             try:
-                result = await self._run_agent(self._agent, parser_input)
-                parsed = result.final_output
-                if not isinstance(parsed, ParsedRequest):
+                result = await self._run_agent(self._agent, interpreter_input)
+                interpreted = result.final_output
+                if not isinstance(interpreted, ParsedRequest):
                     raise ModelBehaviorError(
-                        "Policy parser returned an unexpected output type."
+                        "Request interpreter returned an unexpected output type."
                     )
-                return parsed
+                return interpreted
             except ModelBehaviorError:
                 if attempt == 1:
                     raise
 
-        raise RuntimeError("Policy parser retry loop ended unexpectedly.")
+        raise RuntimeError("Request interpreter retry loop ended unexpectedly.")

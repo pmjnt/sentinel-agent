@@ -887,7 +887,7 @@
               <h3>Phần hiểu ngôn ngữ</h3>
               <ol class="flow-list">
                 <li><strong>User chat</strong><span>“Giữ ít nhất 30% USDT và phân tích ngay.”</span></li>
-                <li><strong>Policy Parser LLM</strong><span>Trả về typed actions: UPDATE_POLICY rồi ANALYZE_PORTFOLIO.</span></li>
+                <li><strong>Request Interpreter LLM</strong><span>Phân loại toàn bộ intent và trả về typed actions: UPDATE_POLICY rồi ANALYZE_PORTFOLIO.</span></li>
                 <li><strong>Pydantic validation</strong><span>Chặn field lạ, threshold sai và action không hợp lệ.</span></li>
                 <li><strong>Conversation service</strong><span>Apply action đúng thứ tự và trả tiếng Việt tự nhiên, không phơi JSON cho user.</span></li>
               </ol>
@@ -1008,12 +1008,12 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/prompts.py">app/agent/prompts.py</a></h4>
-                <p>Giữ Sentinel instructions và Policy Parser instructions tách khỏi construction code.</p>
-                <p class="relation"><strong>Quy tắc:</strong> không bịa dữ liệu, không trade, tách fact/interpretation, parser chỉ tạo typed actions.</p>
+                <p>Giữ Sentinel instructions và Request Interpreter instructions tách khỏi construction code.</p>
+                <p class="relation"><strong>Quy tắc:</strong> không bịa dữ liệu, không trade, tách fact/interpretation; interpreter phân loại request và chỉ tạo typed actions.</p>
               </article>
               <article class="file">
-                <h4><a href="../app/agent/policy_parser.py">app/agent/policy_parser.py</a></h4>
-                <p>Tạo tool-free LLM Agent với <code>output_type=ParsedRequest</code>; retry một lần khi structured output sai schema.</p>
+                <h4><a href="../app/agent/request_interpreter.py">app/agent/request_interpreter.py</a></h4>
+                <p>Tạo tool-free LLM Agent với <code>output_type=ParsedRequest</code>; phân loại request, trích policy patch khi cần và retry một lần khi structured output sai schema.</p>
                 <p class="relation"><strong>Input:</strong> message + current policy. <strong>Output:</strong> typed actions. <strong>Dùng bởi:</strong> policy conversation flow, chưa nối main.</p>
               </article>
               <article class="file">
@@ -1076,12 +1076,12 @@ LLM explains in natural language</pre>
               <article class="file">
                 <h4><a href="../app/models/policy.py">app/models/policy.py</a></h4>
                 <p>Validated policy, partial patch và policy violations với Decimal threshold từ 0 đến 1.</p>
-                <p class="relation"><strong>Dùng bởi:</strong> parser actions, sessions, policy service và risk service.</p>
+                <p class="relation"><strong>Dùng bởi:</strong> interpreted actions, sessions, policy service và risk service.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/models/chat.py">app/models/chat.py</a></h4>
                 <p>Discriminated union cho UPDATE_POLICY, VIEW_POLICY, ANALYZE_PORTFOLIO và NEEDS_CLARIFICATION.</p>
-                <p class="relation"><strong>Output schema của:</strong> Policy Parser LLM. <strong>Input của:</strong> conversation service.</p>
+                <p class="relation"><strong>Output schema của:</strong> Request Interpreter LLM. <strong>Input của:</strong> conversation service.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/models/trade.py">app/models/trade.py</a></h4>
@@ -1122,7 +1122,7 @@ LLM explains in natural language</pre>
               <article class="file">
                 <h4><a href="../app/services/policy_conversation_service.py">app/services/policy_conversation_service.py</a></h4>
                 <p>Điều phối typed actions đúng thứ tự và báo có cần phân tích portfolio hay không.</p>
-                <p class="relation"><strong>Phụ thuộc:</strong> RequestParser protocol, session store, response formatter. <strong>Chưa dùng bởi:</strong> main.py.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> RequestInterpreter protocol, session store, response formatter. <strong>Chưa dùng bởi:</strong> main.py.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/services/policy_response_service.py">app/services/policy_response_service.py</a></h4>

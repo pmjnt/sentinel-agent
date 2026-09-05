@@ -16,8 +16,8 @@ from app.services.policy_response_service import (
 from app.sessions import InMemoryPolicySessionStore
 
 
-class RequestParser(Protocol):
-    async def parse(
+class RequestInterpreter(Protocol):
+    async def interpret(
         self,
         message: str,
         current_policy: PortfolioPolicy,
@@ -37,10 +37,10 @@ class PolicyConversationService:
 
     def __init__(
         self,
-        parser: RequestParser,
+        interpreter: RequestInterpreter,
         store: InMemoryPolicySessionStore,
     ) -> None:
-        self._parser = parser
+        self._interpreter = interpreter
         self._store = store
 
     async def handle(
@@ -49,12 +49,12 @@ class PolicyConversationService:
         message: str,
     ) -> PolicyConversationResult:
         policy = self._store.get(session_id)
-        parsed = await self._parser.parse(message, policy)
+        interpreted = await self._interpreter.interpret(message, policy)
         response_parts: list[str] = []
         analysis_requested = False
         focus_symbols: list[str] = []
 
-        for action in parsed.actions:
+        for action in interpreted.actions:
             if isinstance(action, ClarificationAction):
                 return PolicyConversationResult(
                     message=action.question,

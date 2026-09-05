@@ -18,7 +18,7 @@
 - Modify: `tests/unit/test_policy_conversation_service.py`
 - Modify: `tests/test_project_guide.py`
 
-- [ ] **Step 1: Rename test imports and vocabulary**
+- [x] **Step 1: Rename test imports and vocabulary**
 
 Use these exact new APIs:
 
@@ -35,7 +35,7 @@ Rename fake `StaticParser.parse()` to `StaticInterpreter.interpret()` and pass i
 as `interpreter=`. Update the guide contract to require
 `app/agent/request_interpreter.py` and reject active old vocabulary.
 
-- [ ] **Step 2: Run tests to verify RED**
+- [x] **Step 2: Run tests to verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_request_interpreter.py tests/unit/test_policy_conversation_service.py tests/test_project_guide.py -q
@@ -52,19 +52,19 @@ Expected: collection fails because `app.agent.request_interpreter` does not exis
 - Modify: `app/services/policy_conversation_service.py`
 - Modify: `docs/sentinel-project-guide.html`
 
-- [ ] **Step 1: Implement the new production vocabulary**
+- [x] **Step 1: Implement the new production vocabulary**
 
 Move existing behavior to the new module and names. Define
 `RequestInterpreter.interpret(message, current_policy)` in the conversation
 service and call it from `handle()`. Do not add aliases for old names.
 
-- [ ] **Step 2: Update the current handbook**
+- [x] **Step 2: Update the current handbook**
 
 Replace active `Policy Parser` terminology with `Request Interpreter`, explain
 that policy patch extraction is one part of request interpretation, and update
 all local links.
 
-- [ ] **Step 3: Run targeted tests to verify GREEN**
+- [x] **Step 3: Run targeted tests to verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_request_interpreter.py tests/unit/test_policy_conversation_service.py tests/test_project_guide.py -q
@@ -72,15 +72,17 @@ all local links.
 
 Expected: all targeted tests pass.
 
-- [ ] **Step 4: Verify no active old vocabulary remains**
+- [x] **Step 4: Verify no active old vocabulary remains**
 
 ```bash
-rg -n "PolicyParser|policy_parser|POLICY_PARSER_INSTRUCTIONS|RequestParser" app tests docs/sentinel-project-guide.html
+rg -n "PolicyParser|policy_parser|POLICY_PARSER_INSTRUCTIONS|RequestParser" app docs/sentinel-project-guide.html
+test ! -e app/agent/policy_parser.py
+test ! -e tests/unit/test_policy_parser.py
 ```
 
 Expected: no output.
 
-- [ ] **Step 5: Run full verification and commit**
+- [x] **Step 5: Run full verification and commit**
 
 ```bash
 .venv/bin/python -m pytest -q
