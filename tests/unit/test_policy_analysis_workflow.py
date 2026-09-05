@@ -1,37 +1,22 @@
 import asyncio
 from decimal import Decimal
+from types import SimpleNamespace
 
+from app.agent.controlled_tools import (
+    evaluate_cached_portfolio,
+    read_market_data,
+    read_portfolio,
+    stage_policy_update,
+)
+from app.agent.tool_loop import SentinelToolLoop
 from app.application import SentinelApplication
-from app.models.chat import AnalyzePortfolioAction, ParsedRequest, UpdatePolicyAction
+from app.config import LLMProvider, Settings
 from app.models.market import MarketData, Volatility
-from app.models.policy import PolicyPatch, PortfolioPolicy
+from app.models.policy import PolicyChange, PolicyField
 from app.models.portfolio import PortfolioAsset
 from app.models.risk import RiskStatus
-from app.services.policy_conversation_service import PolicyConversationService
-from app.services.portfolio_analysis_service import PortfolioAnalysisService
 from app.services.portfolio_service import calculate_portfolio
 from app.sessions import InMemoryPolicySessionStore
-
-
-class SrdScenarioInterpreter:
-    async def interpret(
-        self,
-        message: str,
-        current_policy: PortfolioPolicy,
-    ) -> ParsedRequest:
-        return ParsedRequest(
-            actions=[
-                UpdatePolicyAction(
-                    patch=PolicyPatch(
-                        min_stablecoin_weight=Decimal("0.30"),
-                        max_asset_weight=Decimal("0.40"),
-                        block_high_volatility=True,
-                        max_trade_usd_without_approval=Decimal("1000"),
-                    )
-                ),
-                AnalyzePortfolioAction(),
-            ]
-        )
 
 
 class SrdScenarioGateway:
@@ -67,20 +52,51 @@ class SrdScenarioGateway:
         )
 
 
-class DecisionEchoReporter:
-    async def report(self, message: str, analysis) -> str:
-        return "BTC concentration is above the configured limit."
+async def run_srd_agent(agent, agent_input, *, context, max_turns):
+    assert max_turns == 12
+    assert "Giữ ít nhất 30% USDT" in agent_input
+    stage_policy_update(
+        context,
+        [
+            PolicyChange(
+                field=PolicyField.MIN_STABLECOIN_WEIGHT,
+                value=Decimal("0.30"),
+            ),
+            PolicyChange(
+                field=PolicyField.MAX_ASSET_WEIGHT,
+                value=Decimal("0.40"),
+            ),
+            PolicyChange(
+                field=PolicyField.BLOCK_HIGH_VOLATILITY,
+                value=True,
+            ),
+            PolicyChange(
+                field=PolicyField.MAX_TRADE_USD_WITHOUT_APPROVAL,
+                value=Decimal("1000"),
+            ),
+        ],
+    )
+    await read_portfolio(context)
+    await read_market_data(context, "BTCUSDT")
+    analysis = evaluate_cached_portfolio(context, [])
+    assert analysis.risk_decision.status is RiskStatus.BLOCKED
+    return SimpleNamespace(
+        final_output="BTC concentration is above the configured limit."
+    )
 
 
 def test_srd_policy_scenario_reaches_blocked_without_external_calls() -> None:
-    application = SentinelApplication(
-        PolicyConversationService(
-            SrdScenarioInterpreter(),
-            InMemoryPolicySessionStore(),
-        ),
-        PortfolioAnalysisService(SrdScenarioGateway()),
-        DecisionEchoReporter(),
+    settings = Settings(
+        llm_provider=LLMProvider.OPENAI,
+        llm_model="gpt-5.4-mini",
+        openai_api_key="test-key",
     )
+    loop = SentinelToolLoop(
+        settings,
+        SrdScenarioGateway(),
+        run_agent=run_srd_agent,
+    )
+    application = SentinelApplication(loop, InMemoryPolicySessionStore())
 
     result = asyncio.run(
         application.handle(

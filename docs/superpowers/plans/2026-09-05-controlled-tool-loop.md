@@ -250,7 +250,7 @@ Run the tool-loop unit tests and expect all to pass without external calls.
 - Modify: `tests/unit/test_policy_analysis_workflow.py`
 - Modify: `tests/test_agent.py`
 
-- [ ] **Step 1: Write failing application tests**
+- [x] **Step 1: Write failing application tests**
 
 Test that:
 
@@ -262,25 +262,25 @@ Test that:
 - missing portfolio/market observations produce the existing safe data message;
 - a failed Agent run leaves policy unchanged.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run application and SRD workflow tests. Expected: constructor/result mismatches
 until the new loop is integrated.
 
-- [ ] **Step 3: Add atomic policy commit support**
+- [x] **Step 3: Add atomic policy commit support**
 
 Add an explicit store method that applies an ordered tuple of validated patches.
 Call it only after the tool-loop run succeeds. Do not expose the store or commit
 method as an Agent tool.
 
-- [ ] **Step 4: Refactor SentinelApplication composition**
+- [x] **Step 4: Refactor SentinelApplication composition**
 
 Replace the main runtime's structured-output Interpreter and separate Reporter
 with the controlled tool loop. Render policy and analysis events through the
 existing deterministic response-formatting services. Append the validated Agent
 interpretation only after authoritative output.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run application, SRD workflow, and composition tests. Assert `main.py` constructs
 the controlled loop and no longer constructs `AgentRequestInterpreter` or

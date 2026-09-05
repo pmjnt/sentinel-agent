@@ -42,3 +42,18 @@ def test_clear_removes_session_policy() -> None:
     store.clear("session-1")
 
     assert store.get("session-1") == PortfolioPolicy()
+
+
+def test_apply_many_commits_validated_patches_in_order() -> None:
+    store = InMemoryPolicySessionStore()
+
+    result = store.apply_many(
+        "session-1",
+        (
+            PolicyPatch(max_asset_weight=Decimal("0.50")),
+            PolicyPatch(max_asset_weight=Decimal("0.40")),
+        ),
+    )
+
+    assert result.max_asset_weight == Decimal("0.40")
+    assert store.get("session-1") == result

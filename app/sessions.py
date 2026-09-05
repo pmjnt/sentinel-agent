@@ -18,6 +18,20 @@ class InMemoryPolicySessionStore:
         self._policies[normalized_id] = updated
         return updated
 
+    def apply_many(
+        self,
+        session_id: str,
+        patches: tuple[PolicyPatch, ...],
+    ) -> PortfolioPolicy:
+        """Atomically apply ordered validated patches after a successful Agent run."""
+        normalized_id = self._normalize_session_id(session_id)
+        updated = self.get(normalized_id)
+        for patch in patches:
+            updated = apply_policy_patch(updated, patch)
+        if patches:
+            self._policies[normalized_id] = updated
+        return updated
+
     def clear(self, session_id: str) -> None:
         normalized_id = self._normalize_session_id(session_id)
         self._policies.pop(normalized_id, None)

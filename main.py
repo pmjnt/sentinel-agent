@@ -3,15 +3,12 @@ from collections.abc import Callable
 
 import litellm
 
-from app.agent.analysis_reporter import AgentAnalysisReporter
-from app.agent.request_interpreter import AgentRequestInterpreter
+from app.agent.tool_loop import SentinelToolLoop
 from app.application import SentinelApplication
 from app.binance.gateway import BinanceCliGateway
 from app.binance.runner import BinanceCliRunner
 from app.config import Settings, load_settings
 from app.gateways import PortfolioMarketGateway
-from app.services.policy_conversation_service import PolicyConversationService
-from app.services.portfolio_analysis_service import PortfolioAnalysisService
 from app.sessions import InMemoryPolicySessionStore
 
 
@@ -64,14 +61,10 @@ def create_application(
     gateway: PortfolioMarketGateway,
 ) -> SentinelApplication:
     """Compose Sentinel's use cases; construction performs no external calls."""
-    interpreter = AgentRequestInterpreter(settings)
-    conversation = PolicyConversationService(
-        interpreter=interpreter,
+    return SentinelApplication(
+        agent_loop=SentinelToolLoop(settings, gateway),
         store=InMemoryPolicySessionStore(),
     )
-    analysis_service = PortfolioAnalysisService(gateway)
-    reporter = AgentAnalysisReporter(settings)
-    return SentinelApplication(conversation, analysis_service, reporter)
 
 
 async def run_console() -> None:

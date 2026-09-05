@@ -2,39 +2,28 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
 
+from app.agent.run_context import (
+    AnalysisCompletedEvent,
+    PolicyUpdatedEvent,
+    PolicyViewedEvent,
+)
+from app.agent.tool_loop import ToolLoopResult
 from app.models.analysis import PortfolioAnalysis
 from app.models.policy import PortfolioPolicy
 from app.services.analysis_response_service import format_authoritative_analysis
-from app.services.policy_conversation_service import (
-    PolicyConversationResult,
-    PolicyMessageEvent,
-    PortfolioAnalysisEvent,
+from app.services.policy_response_service import (
+    format_current_policy,
+    format_policy_update,
 )
-from app.services.portfolio_analysis_service import AnalysisDataError
+from app.sessions import InMemoryPolicySessionStore
 
 
-class ConversationHandler(Protocol):
-    async def handle(
+class AgentLoop(Protocol):
+    async def run(
         self,
-        session_id: str,
         message: str,
-    ) -> PolicyConversationResult: ...
-
-
-class AnalysisService(Protocol):
-    async def analyze(
-        self,
         policy: PortfolioPolicy,
-        focus_symbols: list[str],
-    ) -> PortfolioAnalysis: ...
-
-
-class AnalysisReporter(Protocol):
-    async def report(
-        self,
-        message: str,
-        analysis: PortfolioAnalysis,
-    ) -> str: ...
+    ) -> ToolLoopResult: ...
 
 
 class SentinelResponse(BaseModel):
@@ -51,57 +40,53 @@ class SentinelResponse(BaseModel):
 
 
 class SentinelApplication:
-    """Coordinate conversation, deterministic analysis, and explanation."""
+    """Commit a successful Agent run and render authoritative output."""
 
     def __init__(
         self,
-        conversation: ConversationHandler,
-        analysis_service: AnalysisService,
-        reporter: AnalysisReporter,
+        agent_loop: AgentLoop,
+        store: InMemoryPolicySessionStore,
     ) -> None:
-        self._conversation = conversation
-        self._analysis_service = analysis_service
-        self._reporter = reporter
+        self._agent_loop = agent_loop
+        self._store = store
 
     async def handle(self, session_id: str, message: str) -> SentinelResponse:
-        conversation_result = await self._conversation.handle(session_id, message)
+        starting_policy = self._store.get(session_id)
+        loop_result = await self._agent_loop.run(message, starting_policy)
+        committed_policy = self._store.apply_many(
+            session_id,
+            loop_result.policy_patches,
+        )
+        if committed_policy != loop_result.final_policy:
+            raise RuntimeError("Agent policy state did not match committed state.")
+
         response_parts: list[str] = []
-        analyses: list[PortfolioAnalysis] = []
-
-        for event in conversation_result.events:
-            if isinstance(event, PolicyMessageEvent):
-                response_parts.append(event.message)
+        for event in loop_result.events:
+            if isinstance(event, PolicyUpdatedEvent):
+                response_parts.append(
+                    format_policy_update(event.patch, event.policy)
+                )
                 continue
+            if isinstance(event, PolicyViewedEvent):
+                response_parts.append(format_current_policy(event.policy))
+                continue
+            if isinstance(event, AnalysisCompletedEvent):
+                response_parts.append(format_authoritative_analysis(event.analysis))
 
-            if isinstance(event, PortfolioAnalysisEvent):
-                try:
-                    analysis = await self._analysis_service.analyze(
-                        event.policy,
-                        list(event.focus_symbols),
-                    )
-                except AnalysisDataError:
-                    response_parts.append(
-                        "Dữ liệu Binance Demo cần thiết không thể được xác minh. "
-                        "Sentinel không tạo khuyến nghị hoặc cho phép thực thi."
-                    )
-                    continue
-
-                analyses.append(analysis)
-                response_parts.append(format_authoritative_analysis(analysis))
-                try:
-                    report = await self._reporter.report(message, analysis)
-                except Exception:
-                    response_parts.append(
-                        "AI interpretation không khả dụng; dữ kiện và quyết định "
-                        "Risk Engine ở trên vẫn giữ nguyên."
-                    )
-                else:
-                    response_parts.append(f"AI interpretation:\n{report}")
+        if loop_result.data_errors:
+            response_parts.append(
+                "Dữ liệu Binance Demo cần thiết không thể được xác minh. "
+                "Sentinel không tạo khuyến nghị hoặc cho phép thực thi."
+            )
+        elif loop_result.analyses:
+            response_parts.append(f"AI interpretation:\n{loop_result.final_text}")
+        elif not loop_result.events:
+            response_parts.append(loop_result.final_text)
 
         return SentinelResponse(
             message=_join_messages(*response_parts),
-            policy=conversation_result.policy,
-            analyses=tuple(analyses),
+            policy=committed_policy,
+            analyses=loop_result.analyses,
         )
 
 
