@@ -4,7 +4,7 @@ from agents import SQLiteSession
 from agents.items import TResponseInputItem
 
 
-MAX_CONVERSATION_MESSAGES = 8
+MAX_CONVERSATION_MESSAGES = 16
 _USER_MESSAGE_MARKER = "\n\nUser message:\n"
 
 

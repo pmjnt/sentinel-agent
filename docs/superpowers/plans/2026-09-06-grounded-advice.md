@@ -14,19 +14,19 @@
 
 **Files:** `app/agent/conversation_memory.py`, `tests/unit/test_conversation_memory.py`
 
-- [ ] Change the test to require the latest 16 conversational messages and verify it fails.
-- [ ] Set the limit to 16 and verify the focused test passes.
+- [x] Change the test to require the latest 16 conversational messages and verify it fails.
+- [x] Set the limit to 16 and verify the focused test passes.
 
 ### Task 2: Ground advice
 
 **Files:** `app/agent/prompts.py`, `tests/unit/test_tool_loop.py`
 
-- [ ] Add a failing instruction-contract test.
-- [ ] Require Assessment, Rationale, Recommendation, and Limitations after analysis.
-- [ ] Require current-analysis grounding and clarification before concrete allocations when objective, time horizon, or risk tolerance is missing.
-- [ ] Verify focused tests pass.
+- [x] Add a failing instruction-contract test.
+- [x] Require Assessment, Rationale, Recommendation, and Limitations after analysis.
+- [x] Require current-analysis grounding and clarification before concrete allocations when objective, time horizon, or risk tolerance is missing.
+- [x] Verify focused tests pass.
 
 ### Task 3: Verify
 
-- [ ] Run all Python tests, UI tests, compileall, and `git diff --check`.
-- [ ] Commit the implementation.
+- [x] Run all Python tests, UI tests, compileall, and `git diff --check`.
+- [x] Commit the implementation.

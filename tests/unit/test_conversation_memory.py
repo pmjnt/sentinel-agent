@@ -63,16 +63,16 @@ def test_history_filter_keeps_recent_conversation_but_removes_tool_data() -> Non
     assert all(item.get("type") != "function_call_output" for item in result)
 
 
-def test_history_filter_keeps_only_eight_recent_conversation_messages() -> None:
+def test_history_filter_keeps_only_sixteen_recent_conversation_messages() -> None:
     history = [
         {"role": "user", "content": f"message-{index}"}
-        for index in range(12)
+        for index in range(20)
     ]
     new_input = [{"role": "user", "content": "current"}]
 
     result = filter_conversation_history(history, new_input)
 
     assert [item["content"] for item in result[:-1]] == [
-        f"message-{index}" for index in range(4, 12)
+        f"message-{index}" for index in range(4, 20)
     ]
     assert result[-1] == new_input[0]

@@ -75,6 +75,19 @@ def test_tool_loop_agent_exposes_only_controlled_tools() -> None:
     assert agent.model_settings.parallel_tool_calls is False
 
 
+def test_tool_loop_instructions_require_grounded_advice() -> None:
+    instructions = create_tool_loop_agent(_settings()).instructions
+
+    assert isinstance(instructions, str)
+    assert "Assessment" in instructions
+    assert "Rationale" in instructions
+    assert "Recommendation" in instructions
+    assert "Limitations" in instructions
+    assert "objective, time horizon, and acceptable loss" in instructions
+    assert "ask one concise clarification question" in instructions
+    assert "Never expose hidden chain-of-thought" in instructions
+
+
 def test_tool_loop_input_contains_current_validated_policy() -> None:
     value = build_tool_loop_input(
         "Phân tích BTC.",

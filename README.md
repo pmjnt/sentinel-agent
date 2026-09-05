@@ -62,10 +62,15 @@ session only after the run succeeds. The earlier `request_interpreter.py`,
 
 Recent conversation is also kept in a process-local Agents SDK session so
 follow-ups such as `More growth` can refer to the preceding exchange. Before a
-new run, Sentinel keeps at most eight user/assistant messages and removes old
+new run, Sentinel keeps at most 16 user/assistant messages and removes old
 tool calls and tool results. A fresh `SentinelRunContext` and fresh Binance reads
 remain mandatory for current financial analysis. Conversation and policy state
 are both lost when the process stops.
+
+After a successful analysis, the LLM presents Assessment, Rationale,
+Recommendation, and Limitations in the user's language. Concrete asset or
+percentage allocations require the user's objective, time horizon, and risk
+tolerance; otherwise Sentinel asks a focused clarification question.
 
 To keep sequential tool use bounded, one request may inspect at most 20 market
 symbols. Larger scopes fail closed and should be split into smaller requests.
