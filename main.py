@@ -35,7 +35,14 @@ def configure_litellm_debug(
 def read_console_input(reader: Callable[[], str] = input) -> str:
     """Render the prompt ourselves to avoid terminal-specific input echo."""
     print("Sentinel > ", end="", flush=True)
-    return reader().strip()
+    try:
+        value = reader()
+    except UnicodeDecodeError as error:
+        # Some terminals or input methods can emit one malformed byte while
+        # entering Vietnamese. Preserve the rest of the line instead of
+        # terminating the interactive session.
+        value = error.object.decode(error.encoding, errors="replace")
+    return value.strip()
 
 
 def format_debug_error(error: Exception, settings: Settings) -> str | None:

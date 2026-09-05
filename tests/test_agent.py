@@ -106,6 +106,24 @@ def test_console_prompt_is_printed_once_outside_input(capsys) -> None:
     assert capsys.readouterr().out == "Sentinel > "
 
 
+def test_console_input_replaces_malformed_utf8_instead_of_crashing(capsys) -> None:
+    malformed_input = b"Ban\xc3 co the giup toi\n"
+
+    def broken_reader() -> str:
+        raise UnicodeDecodeError(
+            "utf-8",
+            malformed_input,
+            3,
+            4,
+            "invalid continuation byte",
+        )
+
+    result = read_console_input(broken_reader)
+
+    assert result == "Ban� co the giup toi"
+    assert capsys.readouterr().out == "Sentinel > "
+
+
 def test_debug_error_redacts_all_configured_credentials() -> None:
     settings = Settings(
         llm_provider=LLMProvider.OPENAI,
