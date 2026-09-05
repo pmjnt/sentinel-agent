@@ -115,7 +115,7 @@ Run the portfolio-analysis tests again and expect all to pass.
 - Create: `tests/unit/test_controlled_tools.py`
 - Modify: `app/models/policy.py`
 
-- [ ] **Step 1: Write failing context/tool tests**
+- [x] **Step 1: Write failing context/tool tests**
 
 Cover these behaviors with fake gateways:
 
@@ -127,7 +127,7 @@ Cover these behaviors with fake gateways:
 - It lists missing market symbols when required observations are absent.
 - It stores and returns `PortfolioAnalysis` after all observations exist.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -137,7 +137,7 @@ Run:
 
 Expected: imports fail because the run context and controlled tools do not exist.
 
-- [ ] **Step 3: Implement the run context**
+- [x] **Step 3: Implement the run context**
 
 Define a mutable dataclass containing:
 
@@ -156,7 +156,7 @@ analyses
 No API key or Binance secret may be placed in this context or returned to the
 LLM.
 
-- [ ] **Step 4: Implement pure handlers and SDK wrappers**
+- [x] **Step 4: Implement pure handlers and SDK wrappers**
 
 Expose five `FunctionTool` objects named exactly:
 
@@ -177,7 +177,7 @@ testable handler functions.
 When observations are missing it returns a structured requirement result rather
 than guessing.
 
-- [ ] **Step 5: Verify GREEN and tool allowlist**
+- [x] **Step 5: Verify GREEN and tool allowlist**
 
 Assert the exact five public tool names and assert that none contains `order`,
 `trade`, `transfer`, `withdraw`, generic CLI, or execution capabilities.

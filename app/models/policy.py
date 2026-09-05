@@ -22,6 +22,20 @@ class PolicyPatch(BaseModel):
     max_trade_usd_without_approval: Decimal | None = Field(default=None, ge=0)
 
 
+class PolicyField(str, Enum):
+    MIN_STABLECOIN_WEIGHT = "min_stablecoin_weight"
+    MAX_ASSET_WEIGHT = "max_asset_weight"
+    BLOCK_HIGH_VOLATILITY = "block_high_volatility"
+    MAX_TRADE_USD_WITHOUT_APPROVAL = "max_trade_usd_without_approval"
+
+
+class PolicyChange(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    field: PolicyField
+    value: Decimal | bool | None
+
+
 class ViolationType(str, Enum):
     MAX_ASSET_WEIGHT = "MAX_ASSET_WEIGHT"
     MIN_STABLECOIN_WEIGHT = "MIN_STABLECOIN_WEIGHT"
