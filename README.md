@@ -10,22 +10,19 @@ must label them as Binance Demo data.
 ## Responsibility boundaries
 
 ```text
-Request Interpreter LLM turns natural language into validated typed actions.
+The LLM decides which controlled read/policy/evaluation tool is needed next.
 Binance Skills Hub supplies Demo portfolio and market observations.
 Python calculates allocations, policy violations, proposals, and risk decisions.
 RiskEngine enforces deterministic safety rules.
-Python renders authoritative facts and status; Reporter LLM adds qualitative interpretation.
+Python renders authoritative facts; the same LLM adds qualitative interpretation.
 ```
 
 The LLM is not authoritative for arithmetic, thresholds, permissions, or trade
 execution.
 
-The Request Interpreter can return five typed actions:
-`UPDATE_POLICY`, `VIEW_POLICY`, `ANALYZE_PORTFOLIO`,
-`NEEDS_CLARIFICATION`, and `GENERAL_CHAT`. `GENERAL_CHAT` handles greetings and
-capability questions in natural language. It only creates a text response: it
-receives the current policy as Interpreter context, but does not change it,
-inspect the portfolio, call the gateway, or contact Binance.
+The Agent can call exactly five tools: `get_portfolio`, `get_market_data`,
+`update_policy`, `view_policy`, and `evaluate_portfolio_risk`. There are no
+order, trade, transfer, withdrawal, or generic CLI tools.
 
 ## Policy-driven agent loop
 
@@ -40,38 +37,40 @@ Sentinel executes this sequence:
 ```text
 User
   ↓
-Request Interpreter LLM
-  ↓ typed actions validated by Pydantic
-PolicyConversationService
+Sentinel Agent / LLM
+  ├── get_portfolio → trusted Binance Demo holdings
+  ├── get_market_data → trusted Binance Demo market observations
+  ├── update_policy / view_policy → validated working policy
+  └── evaluate_portfolio_risk
+        ├── deterministic allocation and violation checks
+        ├── deterministic rebalance proposal
+        └── RiskEngine → BLOCKED / REQUIRES_APPROVAL / SAFE_TO_PROPOSE
   ↓
-PortfolioAnalysisService
-  ├── BinanceCliGateway → Demo portfolio and market data
-  ├── policy violation checks
-  ├── deterministic rebalance proposal
-  └── RiskEngine → BLOCKED / REQUIRES_APPROVAL / SAFE_TO_PROPOSE
-  ↓
-Python renders facts/status → Reporter LLM adds a labeled interpretation
+Python renders facts/status → LLM interpretation is appended with a label
 ```
 
-The policy runtime does not let an LLM decide whether mandatory safety checks
-run. Python orchestrates and renders those checks. Neither LLM can select CLI subcommands,
-URLs, order commands, transfers, or withdrawals.
+The SDK returns every tool result to the LLM, so it can inspect the observation
+and choose the next safe tool. The LLM may judge whether concentration or market
+conditions deserve attention, but only Python can produce formal calculations,
+plans, and risk status. The LLM cannot select CLI subcommands or URLs.
 
-`app/agent/sentinel.py` and `app/tools/` remain as a small educational example
-of autonomous tool selection. The main console uses the stricter policy-driven
-workflow above.
+Policy updates are staged inside one Agent run and committed to the in-memory
+session only after the run succeeds. The earlier `request_interpreter.py`,
+`analysis_reporter.py`, `policy_conversation_service.py`, `sentinel.py`, and
+`app/tools/` paths remain as tested legacy/educational code; `tool_loop.py` and
+`controlled_tools.py` are the active console runtime.
 
 ## Project structure
 
 ```text
 sentinel-agent/
 ├── app/
-│   ├── agent/             # LLM instructions and Agent construction
+│   ├── agent/             # Active tool loop, controlled tools, prompts/context
 │   ├── application.py     # End-to-end conversational orchestration
 │   ├── binance/           # Safe CLI runner, response schemas, gateway
 │   ├── models/            # Pydantic domain models
 │   ├── services/          # Deterministic policy/planning/risk logic
-│   ├── tools/             # Two AI-callable application tools
+│   ├── tools/             # Legacy two-tool educational example
 │   ├── config.py
 │   ├── gateways.py
 │   └── sessions.py
@@ -161,9 +160,10 @@ gemini + gemini-3.5-flash-lite
 → litellm/gemini/gemini-3.5-flash-lite
 ```
 
-`LLM_MAX_TOKENS` is the maximum model output budget used by every Agent. For
-OpenAI GPT-5 models, Sentinel also sends `reasoning_effort=none`; Gemini does
-not receive this OpenAI-specific setting.
+`LLM_MAX_TOKENS` is the maximum model output budget used by every Agent.
+Sentinel omits provider-specific reasoning options. For GPT-5.4 Mini, `none` is
+already the OpenAI default; omitting the redundant parameter also keeps
+LiteLLM on its stable tool-calling path.
 
 For short-lived local troubleshooting only, enable verbose LiteLLM logs:
 

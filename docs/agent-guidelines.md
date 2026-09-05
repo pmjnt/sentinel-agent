@@ -1,152 +1,94 @@
 # Sentinel Agent Guidelines
 
-## Vai trò của LLM
+## LLM được làm gì?
 
-LLM chịu trách nhiệm:
+- Hiểu tiếng Việt hoặc tiếng Anh.
+- Phân biệt chat thường, xem/đổi policy và yêu cầu phân tích.
+- Tự chọn tool đọc portfolio/market phù hợp.
+- Sau khi nhận kết quả tool, quyết định bước an toàn tiếp theo.
+- Đưa ra nhận định định tính và lời khuyên thận trọng từ facts đã xác minh.
 
-- hiểu tiếng Việt hoặc tiếng Anh của người dùng;
-- phân biệt cập nhật, xem policy, phân tích, general chat và yêu cầu cần làm rõ;
-- giữ đúng thứ tự khi một message chứa nhiều action;
-- chọn thông tin portfolio/market cần đọc;
-- thêm interpretation định tính cho kết quả Python đã xác minh.
+LLM không được tự tạo portfolio, market data, threshold, phép tính, formal risk
+status hoặc execution state.
 
-LLM không phải nguồn sự thật cho:
+## Tool allowlist
 
-- portfolio arithmetic;
-- policy threshold checking;
-- rebalance amount;
-- volatility blocking;
-- approval requirement;
-- execution authorization.
-
-## Request Interpreter Agent
-
-Request Interpreter là một Agent riêng, không có tool tài chính. Nó nhận:
+Agent chỉ được thấy:
 
 ```text
-Current validated portfolio policy
-+
-User message
+get_portfolio()
+get_market_data(symbol)
+update_policy(changes)
+view_policy()
+evaluate_portfolio_risk(focus_symbols)
 ```
 
-và trả `ParsedRequest` theo Pydantic schema.
+Không thêm `place_order`, `trade`, `transfer`, `withdraw`, generic CLI hoặc URL
+tool vào Agent. Nếu sau này có execution, một workflow riêng phải kiểm tra plan,
+RiskEngine và explicit user approval trước khi gọi execution adapter.
 
-Các action được phép:
+## Vòng lặp bắt buộc cho phân tích
 
 ```text
-UPDATE_POLICY
-VIEW_POLICY
-ANALYZE_PORTFOLIO
-NEEDS_CLARIFICATION
-GENERAL_CHAT
+1. get_portfolio
+2. đọc holdings do tool trả về
+3. get_market_data cho symbol liên quan
+4. evaluate_portfolio_risk
+5. giải thích PortfolioAnalysis do Python trả về
 ```
 
-Không tồn tại action đặt lệnh hoặc chuyển tiền.
+Nếu evaluation trả `MISSING_OBSERVATIONS`, Agent phải gọi tool được yêu cầu rồi
+evaluation lại; không được đoán. Nếu tool trả `ERROR`, Agent phải nói dữ liệu
+không xác minh được và không khuyến nghị hành động.
 
-`GENERAL_CHAT` dùng cho lời chào, câu hỏi về khả năng hoặc trò chuyện thông
-thường và phải là action duy nhất. Interpreter nhận policy hiện tại làm context,
-nhưng service chỉ chuyển `response` đã validate thành message trả về. Nhánh này
-không sửa policy, không yêu cầu analysis, không gọi gateway và không kết nối
-Binance. LLM không được bịa dữ liệu tài chính, đề xuất giao dịch hay
-tuyên bố đã thực thi trong response này.
+OpenAI Agents SDK thực hiện loop: gửi prompt và tool schemas cho model, chạy tool
+mà model chọn, trả result vào conversation, rồi gọi model lại. Vì vậy LLM thật
+sự quan sát dữ liệu giữa các bước; nó không chỉ biến JSON thành văn bản.
 
-## Structured output
+## Policy qua chat
 
-Structured output là dữ liệu nội bộ, không phải nội dung hiển thị trực tiếp cho người dùng.
+`update_policy` nhận danh sách `PolicyChange` đã có field enum và value được
+Pydantic validate:
 
-```text
-Natural-language message
-        ↓
-Request Interpreter LLM
-        ↓
-ParsedRequest
-        ↓
-Pydantic validation
-        ↓
-PolicyConversationService
-        ↓
-Natural-language confirmation
-```
+- Field không được gọi: giữ nguyên.
+- Value `null`: xóa optional rule.
+- Giá trị ngoài range hoặc trùng field: từ chối.
+- Mơ hồ: Agent hỏi một câu làm rõ, không tự tạo số.
 
-Nếu output không đúng schema, Interpreter retry đúng một lần. Nếu vẫn sai, workflow trả lỗi; không tự đoán action thay thế. Lỗi provider hoặc network không được retry như lỗi schema và không được đổi thành kết quả giả.
+Patch chỉ được stage trong `SentinelRunContext`. Store chỉ commit sau khi
+`Runner.run` thành công; vì thế lỗi model giữa chừng không cập nhật session.
+Policy được giữ theo `session_id` trong RAM và mất khi process restart.
 
-## Patch semantics
+Ví dụ “đổi giới hạn thành 40% rồi phân tích” phải gọi `update_policy` trước các
+tool phân tích. “Phân tích trước rồi đổi thành 40%” dùng policy snapshot cũ cho
+analysis đầu tiên và giữ nguyên thứ tự event khi render.
 
-- Field không xuất hiện: giữ giá trị hiện tại.
-- Field xuất hiện với `null`: xóa optional rule.
-- Field sai range: Pydantic từ chối.
-- Python merge patch; LLM không sửa session trực tiếp.
+## Phân biệt facts và AI interpretation
 
-Ví dụ:
+Python render trước:
 
-```text
-User: Đổi giới hạn mỗi asset thành 45%.
-LLM:  UPDATE_POLICY {max_asset_weight: 0.45}
-Python: giữ nguyên các field khác
-Chat: Đã cập nhật policy: tỷ trọng tối đa ... là 45%.
-```
+- portfolio và market facts;
+- violations và proposal;
+- `BLOCKED`, `REQUIRES_APPROVAL` hoặc `SAFE_TO_PROPOSE`;
+- `Execution: NOT_EXECUTED`.
 
-## Multiple actions
+LLM chỉ viết phần có nhãn `AI interpretation`. Output định tính không được tự
+tuyên bố formal status hoặc đã thực thi. Những từ reserved đó bị validator chặn.
 
-Message:
+## Model và độ ổn định
 
-```text
-Đặt giới hạn mỗi asset là 40%, sau đó phân tích portfolio.
-```
+- Mọi Agent dùng `build_agent_model_settings()`.
+- `parallel_tool_calls=False` để bảo toàn thứ tự stateful tools.
+- Không gửi reasoning option riêng của provider. GPT-5.4 Mini mặc định là
+  `none`; bỏ parameter dư tránh LiteLLM tự bridge sang một request path khác.
+- Runtime tool loop trả text bình thường, không dùng union `ParsedRequest` phức
+  tạp làm structured output. Mỗi tool vẫn có schema nhỏ, rõ và được validate.
 
-Actions:
+## Checklist khi sửa prompt/tool
 
-```text
-1. UPDATE_POLICY
-2. ANALYZE_PORTFOLIO
-```
-
-Python thực hiện đúng thứ tự. Nếu cần clarification, Interpreter chỉ trả một
-`NEEDS_CLARIFICATION`; service dừng toàn bộ message trước khi thay đổi state.
-
-## Conversation state
-
-Policy được lưu theo `session_id` trong RAM. LLM luôn nhận policy hiện tại dưới dạng JSON đã validate; không phải tự nhớ policy từ hội thoại.
-
-Việc này tránh:
-
-- model quên một rule cũ;
-- model merge sai field;
-- lịch sử chat trở thành nguồn sự thật nghiệp vụ.
-
-Restart ứng dụng sẽ xóa session trong phiên bản hiện tại.
-
-Mỗi analysis action giữ một policy snapshot riêng. Vì vậy “phân tích rồi đổi
-policy” phân tích bằng policy cũ, còn “đổi rồi phân tích” dùng policy mới; nhiều
-analysis action không bị gộp thành một.
-
-## Hai Agent có trách nhiệm khác nhau
-
-### Request Interpreter
-
-- Không có tool.
-- Chỉ hiểu requested actions.
-- Trả structured output.
-
-### Analysis Reporter
-
-- Không có tool.
-- Nhận `PortfolioAnalysis` đã được Python xác minh.
-- Chỉ thêm interpretation định tính; Python tự render facts và formal status.
-- Không được lặp lại formal RiskStatus hoặc tuyên bố execution state.
-- Không thay đổi policy hoặc RiskDecision.
-
-Giữa hai Agent, `SentinelApplication` và `PortfolioAnalysisService` bắt buộc chạy
-gateway, policy checks, planner và RiskEngine. Vì vậy LLM không thể bỏ qua một
-bước kiểm tra an toàn. Agent hai-tool trong `app/agent/sentinel.py` chỉ còn là ví
-dụ giáo dục về autonomous tool calling, không phải runtime policy chính.
-
-## Prompt review checklist
-
-- Prompt có nói rõ source of truth không?
-- Output có schema thay vì JSON tự do không?
-- Có cấm threshold do model tự nghĩ ra không?
-- Có cấm execution action không?
-- Có chỉ dẫn hỏi lại khi mơ hồ không?
-- Có yêu cầu phân biệt tool facts và interpretation không?
-- Thay prompt có làm thay đổi behavior cần test không?
+- Source of truth có luôn là tool result hoặc validated model không?
+- Tool mới có mở rộng quyền tài chính hay shell không?
+- Arithmetic và business rule có nằm trong deterministic Python không?
+- Error có fail-closed và không rò secret không?
+- Policy update có chỉ commit sau lượt chạy thành công không?
+- Behavior mới có unit/integration test không gọi mạng không?

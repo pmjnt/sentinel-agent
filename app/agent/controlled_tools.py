@@ -1,8 +1,9 @@
 import asyncio
+from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 from agents import FunctionTool, RunContextWrapper, function_tool
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.agent.run_context import (
     AnalysisCompletedEvent,
@@ -36,6 +37,49 @@ class MissingObservations(BaseModel):
     status: Literal["MISSING_OBSERVATIONS"] = "MISSING_OBSERVATIONS"
     required_tools: list[str]
     missing_symbols: list[str] = Field(default_factory=list)
+
+
+class PolicyToolChange(BaseModel):
+    """Simple LLM-facing policy change; Python parses the field-specific value."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    field: PolicyField
+    value: str = Field(
+        description="Decimal, true, false, or null written as text."
+    )
+
+    @field_validator("value")
+    @classmethod
+    def normalize_value(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("Policy value must not be empty.")
+        return normalized
+
+
+def parse_policy_tool_changes(
+    changes: list[PolicyToolChange],
+) -> list[PolicyChange]:
+    parsed: list[PolicyChange] = []
+    for change in changes:
+        if change.value == "null":
+            value: Decimal | bool | None = None
+        elif change.field is PolicyField.BLOCK_HIGH_VOLATILITY:
+            if change.value not in {"true", "false"}:
+                raise ValueError(
+                    "block_high_volatility must be true, false, or null."
+                )
+            value = change.value == "true"
+        else:
+            try:
+                value = Decimal(change.value)
+            except InvalidOperation as error:
+                raise ValueError(
+                    f"{change.field.value} must be a decimal or null."
+                ) from error
+        parsed.append(PolicyChange(field=change.field, value=value))
+    return parsed
 
 
 async def read_portfolio(
@@ -174,10 +218,10 @@ async def get_market_data(
 @function_tool
 async def update_policy(
     ctx: RunContextWrapper[SentinelRunContext],
-    changes: list[PolicyChange],
+    changes: list[PolicyToolChange],
 ) -> PortfolioPolicy:
-    """Stage explicit portfolio-policy changes; null removes a rule."""
-    return stage_policy_update(ctx.context, changes)
+    """Stage explicit changes; send each value as decimal/true/false/null text."""
+    return stage_policy_update(ctx.context, parse_policy_tool_changes(changes))
 
 
 @function_tool

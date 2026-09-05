@@ -47,6 +47,9 @@ def test_project_guide_maps_runtime_and_policy_files() -> None:
 
     for path in (
         "main.py",
+        "app/agent/tool_loop.py",
+        "app/agent/controlled_tools.py",
+        "app/agent/run_context.py",
         "app/agent/sentinel.py",
         "app/tools/portfolio.py",
         "app/tools/market.py",

@@ -96,8 +96,7 @@ and reassessing when verified volatility falls rather than acting now.
 ## Model configuration
 
 Every Agent request sends an explicit output budget. The default is
-`LLM_MAX_TOKENS=4096`. OpenAI GPT-5 routes use `reasoning_effort=none`; Gemini
-does not receive this OpenAI-specific setting. Tool calls are sequential with
+`LLM_MAX_TOKENS=4096`. Provider-specific reasoning options are omitted. Tool calls are sequential with
 `parallel_tool_calls=false` so observation and policy order are deterministic.
 
 ## Migration

@@ -8,6 +8,11 @@
 
 **Tech Stack:** Python 3.12, OpenAI Agents SDK, LiteLLM, Pydantic, pytest.
 
+> Runtime note: this plan originally covered three Agent factories. The active
+> console runtime now uses `app/agent/tool_loop.py`; the Interpreter, Reporter,
+> and two-tool `sentinel.py` factories remain legacy/educational consumers of
+> the same model-settings builder.
+
 ---
 
 ### Task 1: Provider-aware Agent settings
@@ -29,8 +34,8 @@
 - [x] **Step 1: Write failing tests**
 
 Assert that configuration defaults to 4096 tokens, accepts `LLM_MAX_TOKENS`,
-rejects invalid values, sets OpenAI GPT-5 reasoning to `none`, omits reasoning
-for Gemini, and attaches the result to all three Agent factories.
+rejects invalid values, omits provider-specific reasoning, and attaches the
+result to every Agent factory.
 
 - [x] **Step 2: Verify RED**
 
@@ -40,16 +45,17 @@ builder do not exist.
 - [x] **Step 3: Implement configuration and builder**
 
 Add `llm_max_tokens` to `Settings`; parse it from the environment. Implement
-`build_agent_model_settings(settings)` with `ModelSettings(max_tokens=...)` and
-OpenAI GPT-5 `Reasoning(effort="none")`. Pass it as `model_settings` to every
-Agent constructor.
+`build_agent_model_settings(settings)` with `ModelSettings(max_tokens=...)`.
+OpenAI and Gemini use no explicit reasoning option. Pass it as
+`model_settings` to every Agent constructor.
 
 - [x] **Step 4: Document configuration**
 
 Add `LLM_MAX_TOKENS=4096` to `.env.example` and explain its provider-aware use
 in README.
 
-- [ ] **Step 5: Verify offline and real request**
+- [x] **Step 5: Verify offline and real request**
 
 Run all Python/UI tests, compileall, and diff validation. Then call the Request
-Interpreter once with `xin chào`; it must return a validated GENERAL_CHAT action.
+controlled tool-loop once with `xin chào`; it must return a natural-language
+answer without calling Binance.

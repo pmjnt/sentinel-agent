@@ -2,7 +2,7 @@ from app.agent.model_settings import build_agent_model_settings
 from app.config import LLMProvider, Settings
 
 
-def test_openai_gpt5_uses_explicit_budget_and_no_reasoning_effort() -> None:
+def test_openai_gpt54_omits_redundant_reasoning_effort_for_litellm_tools() -> None:
     settings = Settings(
         llm_provider=LLMProvider.OPENAI,
         llm_model="gpt-5.4-mini",
@@ -13,8 +13,7 @@ def test_openai_gpt5_uses_explicit_budget_and_no_reasoning_effort() -> None:
     model_settings = build_agent_model_settings(settings)
 
     assert model_settings.max_tokens == 4096
-    assert model_settings.reasoning is not None
-    assert model_settings.reasoning.effort == "none"
+    assert model_settings.reasoning is None
     assert model_settings.parallel_tool_calls is False
 
 

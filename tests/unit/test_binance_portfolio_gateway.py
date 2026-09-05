@@ -61,6 +61,21 @@ def test_maps_demo_account_to_authoritative_portfolio() -> None:
     assert portfolio.assets[2].usd_value == Decimal("2000")
 
 
+def test_ignores_zero_price_tickers_for_inactive_markets() -> None:
+    prices = [
+        {"symbol": "INACTIVEUSDT", "price": "0.00000000"},
+        *PRICE_FIXTURE,
+    ]
+    gateway = BinanceCliGateway(
+        FakeRunner([ACCOUNT_FIXTURE, prices]),
+        BinanceEnvironment.DEMO,
+    )
+
+    portfolio = asyncio.run(gateway.get_portfolio())
+
+    assert portfolio.total_usd_value == Decimal("10000")
+
+
 def test_missing_asset_price_fails_instead_of_dropping_holding() -> None:
     runner = FakeRunner([ACCOUNT_FIXTURE, PRICE_FIXTURE[:1]])
     gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)

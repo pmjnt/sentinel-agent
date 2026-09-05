@@ -29,7 +29,8 @@ class PriceTickerPayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     symbol: str
-    price: Decimal = Field(gt=0)
+    # Binance's bulk endpoint includes inactive markets with an explicit zero.
+    price: Decimal = Field(ge=0)
 
     @field_validator("symbol")
     @classmethod

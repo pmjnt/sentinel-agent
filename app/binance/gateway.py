@@ -100,7 +100,11 @@ class BinanceCliGateway:
         except (ValidationError, BinanceCliError) as error:
             raise BinanceDataError("Binance returned invalid price data.") from error
 
-        prices = {ticker.symbol: ticker.price for ticker in ticker_payloads}
+        prices = {
+            ticker.symbol: ticker.price
+            for ticker in ticker_payloads
+            if ticker.price > 0
+        }
         assets: list[PortfolioAsset] = []
         for balance in account_payload.balances:
             amount = balance.free + balance.locked

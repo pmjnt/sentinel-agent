@@ -6,8 +6,10 @@ import pytest
 from app.agent.controlled_tools import (
     CONTROLLED_TOOLS,
     MissingObservations,
+    PolicyToolChange,
     ToolDataError,
     evaluate_cached_portfolio,
+    parse_policy_tool_changes,
     read_market_data,
     read_portfolio,
     stage_policy_update,
@@ -133,6 +135,40 @@ def test_duplicate_policy_fields_are_rejected() -> None:
 
     with pytest.raises(ValueError, match="Duplicate policy field"):
         stage_policy_update(context, changes)
+
+
+def test_simple_policy_tool_values_are_parsed_by_python() -> None:
+    changes = parse_policy_tool_changes(
+        [
+            PolicyToolChange(
+                field=PolicyField.MAX_ASSET_WEIGHT,
+                value="0.40",
+            ),
+            PolicyToolChange(
+                field=PolicyField.BLOCK_HIGH_VOLATILITY,
+                value="true",
+            ),
+        ]
+    )
+
+    assert changes == [
+        PolicyChange(
+            field=PolicyField.MAX_ASSET_WEIGHT,
+            value=Decimal("0.40"),
+        ),
+        PolicyChange(
+            field=PolicyField.BLOCK_HIGH_VOLATILITY,
+            value=True,
+        ),
+    ]
+
+
+def test_update_policy_tool_schema_avoids_mixed_type_union() -> None:
+    update_tool = next(
+        tool for tool in CONTROLLED_TOOLS if tool.name == "update_policy"
+    )
+
+    assert "anyOf" not in str(update_tool.params_json_schema)
 
 
 def test_view_policy_records_the_working_policy_snapshot() -> None:

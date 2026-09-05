@@ -33,10 +33,12 @@ Keep the current working-tree changes that add `Settings.llm_max_tokens`, parse
 produce:
 
 ```python
-ModelSettings(max_tokens=4096, reasoning=Reasoning(effort="none"))
+ModelSettings(max_tokens=4096, parallel_tool_calls=False)
 ```
 
-for OpenAI GPT-5, and omit `reasoning` for Gemini.
+for both providers. Provider-specific reasoning options are omitted; GPT-5.4
+Mini already defaults to `none`, and sending the redundant field triggers an
+unstable LiteLLM Responses bridge when tools are present.
 
 - [x] **Step 2: Add sequential tool-call configuration**
 
@@ -295,14 +297,14 @@ the controlled loop and no longer constructs `AgentRequestInterpreter` or
 - Modify: `docs/sentinel-project-guide.html`
 - Modify: `docs/superpowers/plans/2026-09-05-agent-model-settings.md`
 
-- [ ] **Step 1: Update active documentation**
+- [x] **Step 1: Update active documentation**
 
 Describe the actual five-tool loop, staged policy updates, deterministic
 evaluation boundary, qualitative LLM judgment, and absence of execution tools.
 Mark the previous structured-output Interpreter/Reporter path as legacy rather
 than the active runtime.
 
-- [ ] **Step 2: Run full offline verification**
+- [x] **Step 2: Run full offline verification**
 
 Run:
 
@@ -315,14 +317,14 @@ git diff --check
 
 Expected: all commands pass without network calls.
 
-- [ ] **Step 3: Run one isolated real OpenAI smoke test**
+- [x] **Step 3: Run one isolated real OpenAI smoke test**
 
 With debug disabled, send `xin chào` and verify no tool call is made. Then send
 the sample BTC-risk request and verify the visible loop calls portfolio before
 market data and evaluation. Use Binance Demo only; never enable an execution
 capability.
 
-- [ ] **Step 4: Final safety inspection**
+- [x] **Step 4: Final safety inspection**
 
 Search active Agent tool names and runtime imports. Confirm there is no order,
 transfer, withdrawal, arbitrary CLI, or direct credential exposure reachable by
