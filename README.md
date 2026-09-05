@@ -135,6 +135,7 @@ Gemini example:
 ```dotenv
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash-lite
+LLM_MAX_TOKENS=4096
 GEMINI_API_KEY=your_gemini_api_key
 
 BINANCE_API_ENV=demo
@@ -148,6 +149,7 @@ OpenAI example:
 ```dotenv
 LLM_PROVIDER=openai
 LLM_MODEL=gpt-5.6-luna
+LLM_MAX_TOKENS=4096
 OPENAI_API_KEY=your_openai_api_key
 ```
 
@@ -158,6 +160,10 @@ route, for example:
 gemini + gemini-3.5-flash-lite
 → litellm/gemini/gemini-3.5-flash-lite
 ```
+
+`LLM_MAX_TOKENS` is the maximum model output budget used by every Agent. For
+OpenAI GPT-5 models, Sentinel also sends `reasoning_effort=none`; Gemini does
+not receive this OpenAI-specific setting.
 
 For short-lived local troubleshooting only, enable verbose LiteLLM logs:
 

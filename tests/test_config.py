@@ -8,6 +8,7 @@ def _clear_llm_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for variable in (
         "LLM_PROVIDER",
         "LLM_MODEL",
+        "LLM_MAX_TOKENS",
         "OPENAI_API_KEY",
         "GEMINI_API_KEY",
         "LITELLM_DEBUG",
@@ -32,6 +33,7 @@ def test_load_settings_builds_openai_litellm_model(
     assert settings.llm_provider.value == "openai"
     assert settings.llm_model == "gpt-5.6-luna"
     assert settings.agents_model == "litellm/openai/gpt-5.6-luna"
+    assert settings.llm_max_tokens == 4096
     assert settings.litellm_debug is False
 
 
@@ -47,6 +49,31 @@ def test_load_settings_enables_litellm_debug_explicitly(
     settings = config.load_settings()
 
     assert settings.litellm_debug is True
+
+
+def test_load_settings_accepts_custom_max_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("LLM_MAX_TOKENS", "8192")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    assert config.load_settings().llm_max_tokens == 8192
+
+
+def test_load_settings_rejects_invalid_max_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("LLM_MAX_TOKENS", "zero")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    with pytest.raises(ValueError, match="LLM_MAX_TOKENS"):
+        config.load_settings()
 
 
 def test_load_settings_rejects_invalid_litellm_debug_value(

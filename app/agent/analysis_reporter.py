@@ -4,6 +4,7 @@ from typing import Any
 
 from agents import Agent, ModelBehaviorError, Runner, set_tracing_disabled
 
+from app.agent.model_settings import build_agent_model_settings
 from app.agent.prompts import ANALYSIS_REPORTER_INSTRUCTIONS
 from app.config import Settings
 from app.models.analysis import PortfolioAnalysis
@@ -33,6 +34,7 @@ def create_analysis_reporter_agent(settings: Settings) -> Agent:
     return Agent(
         name="Sentinel Analysis Reporter",
         model=settings.agents_model,
+        model_settings=build_agent_model_settings(settings),
         instructions=ANALYSIS_REPORTER_INSTRUCTIONS,
         tools=[],
     )

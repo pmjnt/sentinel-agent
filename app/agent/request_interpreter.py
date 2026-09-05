@@ -3,6 +3,7 @@ from typing import Any
 
 from agents import Agent, ModelBehaviorError, Runner, set_tracing_disabled
 
+from app.agent.model_settings import build_agent_model_settings
 from app.agent.prompts import REQUEST_INTERPRETER_INSTRUCTIONS
 from app.config import Settings
 from app.models.chat import ParsedRequest
@@ -18,6 +19,7 @@ def create_request_interpreter_agent(settings: Settings) -> Agent:
     return Agent(
         name="Sentinel Request Interpreter",
         model=settings.agents_model,
+        model_settings=build_agent_model_settings(settings),
         instructions=REQUEST_INTERPRETER_INSTRUCTIONS,
         output_type=ParsedRequest,
     )

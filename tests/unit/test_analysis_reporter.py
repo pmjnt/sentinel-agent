@@ -56,6 +56,8 @@ def test_reporter_agent_uses_configured_model_without_tools() -> None:
     assert agent.model == "litellm/gemini/gemini-3.5-flash-lite"
     assert agent.output_type is None
     assert agent.tools == []
+    assert agent.model_settings.max_tokens == 4096
+    assert agent.model_settings.reasoning is None
     assert "must not change" in ANALYSIS_REPORTER_INSTRUCTIONS
 
 

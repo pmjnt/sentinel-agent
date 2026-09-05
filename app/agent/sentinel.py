@@ -1,5 +1,6 @@
 from agents import Agent, set_tracing_disabled
 
+from app.agent.model_settings import build_agent_model_settings
 from app.agent.prompts import SENTINEL_INSTRUCTIONS
 from app.config import Settings
 from app.gateways import PortfolioMarketGateway
@@ -17,6 +18,7 @@ def create_sentinel_agent(
     return Agent(
         name="Sentinel",
         model=settings.agents_model,
+        model_settings=build_agent_model_settings(settings),
         instructions=SENTINEL_INSTRUCTIONS,
         tools=[create_portfolio_tool(gateway), create_market_data_tool(gateway)],
     )

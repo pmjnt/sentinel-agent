@@ -33,6 +33,8 @@ def test_create_sentinel_agent_uses_configured_litellm_model() -> None:
         "get_portfolio",
         "get_market_data",
     ]
+    assert agent.model_settings.max_tokens == 4096
+    assert agent.model_settings.reasoning is None
     assert "Binance Demo" in agent.instructions
     assert "real portfolio" in agent.instructions
     assert "Never execute trades" in agent.instructions

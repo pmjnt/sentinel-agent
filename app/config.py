@@ -26,6 +26,7 @@ class Settings(BaseModel):
 
     llm_provider: LLMProvider
     llm_model: str
+    llm_max_tokens: int = Field(default=4096, gt=0)
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
     litellm_debug: bool = False
@@ -54,6 +55,14 @@ def load_settings() -> Settings:
     if not model:
         raise ValueError("LLM_MODEL is missing. Add the provider's model ID to .env.")
 
+    max_tokens_value = os.getenv("LLM_MAX_TOKENS", "4096").strip()
+    try:
+        max_tokens = int(max_tokens_value)
+    except ValueError as error:
+        raise ValueError("LLM_MAX_TOKENS must be a positive integer.") from error
+    if max_tokens <= 0:
+        raise ValueError("LLM_MAX_TOKENS must be a positive integer.")
+
     openai_api_key = os.getenv("OPENAI_API_KEY", "").strip() or None
     gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip() or None
 
@@ -79,6 +88,7 @@ def load_settings() -> Settings:
     return Settings(
         llm_provider=provider,
         llm_model=model,
+        llm_max_tokens=max_tokens,
         openai_api_key=openai_api_key,
         gemini_api_key=gemini_api_key,
         litellm_debug=os.getenv("LITELLM_DEBUG", "false"),
