@@ -20,6 +20,8 @@ get_portfolio()
 get_market_data(symbol)
 update_policy(changes)
 view_policy()
+update_investor_profile(changes)
+view_investor_profile()
 evaluate_portfolio_risk(focus_symbols)
 ```
 
@@ -63,6 +65,22 @@ thành `PolicyChange` typed rồi Pydantic validate:
 Patch chỉ được stage trong `SentinelRunContext`. Store chỉ commit sau khi
 `Runner.run` thành công; vì thế lỗi model giữa chừng không cập nhật session.
 Policy được giữ theo `session_id` trong RAM và mất khi process restart.
+
+## Investor profile qua chat
+
+Profile chỉ lưu preference người dùng nói rõ: mục tiêu, thời hạn, mức chịu rủi
+ro, mức lỗ chấp nhận, nhu cầu thanh khoản và asset loại trừ. LLM dùng hai tool
+profile để stage/view; Python parse và Pydantic validate. Profile không phải
+portfolio observation, policy, approval hay quyền thực thi. Với phân bổ cụ thể,
+Agent phải biết tối thiểu mục tiêu, thời hạn và risk tolerance/acceptable loss.
+
+## Activity và structured response
+
+- Chỉ map semantic tool event nằm trong allowlist sang timeline.
+- Không gửi raw tool args/result, prompt, chain-of-thought hoặc secret.
+- Text của model được buffer đến khi safety validation thành công.
+- SSE `completed` trả policy, profile, analysis, activity và
+  `execution_status=NOT_EXECUTED` dưới dạng JSON typed.
 
 Ví dụ “đổi giới hạn thành 40% rồi phân tích” phải gọi `update_policy` trước các
 tool phân tích. “Phân tích trước rồi đổi thành 40%” dùng policy snapshot cũ cho

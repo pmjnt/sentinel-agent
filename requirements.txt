@@ -3,3 +3,6 @@ litellm==1.83.0
 pydantic
 python-dotenv
 pytest
+fastapi
+uvicorn[standard]
+httpx

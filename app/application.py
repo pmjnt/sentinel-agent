@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
@@ -6,17 +7,30 @@ from app.agent.run_context import (
     AnalysisCompletedEvent,
     PolicyUpdatedEvent,
     PolicyViewedEvent,
+    ProfileUpdatedEvent,
+    ProfileViewedEvent,
 )
-from app.agent.tool_loop import ToolLoopResult
+from app.agent.tool_loop import ToolLoopResult, ToolLoopStreamCompleted
 from app.models.analysis import PortfolioAnalysis
+from app.models.api import (
+    ActivityEvent,
+    StructuredSentinelResponse,
+    TextDeltaEvent,
+)
+from app.models.profile import InvestorProfile
 from app.models.policy import PortfolioPolicy
 from app.services.analysis_response_service import format_authoritative_analysis
 from app.services.policy_service import apply_policy_patch
+from app.services.profile_response_service import (
+    format_current_profile,
+    format_profile_update,
+)
+from app.services.profile_service import apply_profile_patch
 from app.services.policy_response_service import (
     format_current_policy,
     format_policy_update,
 )
-from app.sessions import InMemoryPolicySessionStore
+from app.sessions import InMemoryInvestorProfileSessionStore, InMemoryPolicySessionStore
 
 
 class AgentLoop(Protocol):
@@ -25,6 +39,7 @@ class AgentLoop(Protocol):
         message: str,
         policy: PortfolioPolicy,
         session_id: str = "default",
+        profile: InvestorProfile | None = None,
     ) -> ToolLoopResult: ...
 
 
@@ -33,7 +48,9 @@ class SentinelResponse(BaseModel):
 
     message: str
     policy: PortfolioPolicy
+    profile: InvestorProfile = InvestorProfile()
     analyses: tuple[PortfolioAnalysis, ...] = ()
+    ai_interpretation: str | None = None
 
     @property
     def analysis(self) -> PortfolioAnalysis | None:
@@ -48,27 +65,100 @@ class SentinelApplication:
         self,
         agent_loop: AgentLoop,
         store: InMemoryPolicySessionStore,
+        profile_store: InMemoryInvestorProfileSessionStore | None = None,
     ) -> None:
         self._agent_loop = agent_loop
         self._store = store
+        self._profile_store = profile_store or InMemoryInvestorProfileSessionStore()
 
     async def handle(self, session_id: str, message: str) -> SentinelResponse:
         starting_policy = self._store.get(session_id)
+        starting_profile = self._profile_store.get(session_id)
         loop_result = await self._agent_loop.run(
             message,
             starting_policy,
             session_id,
+            profile=starting_profile,
         )
+        return self._commit_and_render(
+            session_id,
+            starting_policy,
+            starting_profile,
+            loop_result,
+        )
+
+    async def stream_handle(
+        self,
+        session_id: str,
+        message: str,
+    ) -> AsyncIterator[
+        ActivityEvent | TextDeltaEvent | StructuredSentinelResponse
+    ]:
+        starting_policy = self._store.get(session_id)
+        starting_profile = self._profile_store.get(session_id)
+        activities: list[ActivityEvent] = []
+        async for event in self._agent_loop.stream(
+            message,
+            starting_policy,
+            session_id,
+            profile=starting_profile,
+        ):
+            if isinstance(event, ActivityEvent):
+                activities.append(event)
+                yield event
+                continue
+
+            if not isinstance(event, ToolLoopStreamCompleted):
+                continue
+            response = self._commit_and_render(
+                session_id,
+                starting_policy,
+                starting_profile,
+                event.result,
+            )
+            display_text = response.ai_interpretation or response.message
+            for chunk in _text_chunks(display_text):
+                yield TextDeltaEvent(text=chunk)
+            yield StructuredSentinelResponse(
+                session_id=session_id,
+                message=response.message,
+                policy=response.policy,
+                profile=response.profile,
+                analysis=response.analysis,
+                activity=activities,
+                ai_interpretation=response.ai_interpretation,
+            )
+
+    def _commit_and_render(
+        self,
+        session_id: str,
+        starting_policy: PortfolioPolicy,
+        starting_profile: InvestorProfile,
+        loop_result: ToolLoopResult,
+    ) -> SentinelResponse:
         expected_final_policy = starting_policy
         for patch in loop_result.policy_patches:
             expected_final_policy = apply_policy_patch(expected_final_policy, patch)
         if expected_final_policy != loop_result.final_policy:
             raise RuntimeError("Agent policy state did not match staged patches.")
+        expected_final_profile = starting_profile
+        for patch in loop_result.profile_patches:
+            expected_final_profile = apply_profile_patch(
+                expected_final_profile,
+                patch,
+            )
+        if expected_final_profile != loop_result.final_profile:
+            raise RuntimeError("Agent profile state did not match staged patches.")
 
         committed_policy = self._store.apply_many(
             session_id,
             loop_result.policy_patches,
             expected_policy=starting_policy,
+        )
+        committed_profile = self._profile_store.apply_many(
+            session_id,
+            loop_result.profile_patches,
+            expected_profile=starting_profile,
         )
 
         response_parts: list[str] = []
@@ -80,6 +170,14 @@ class SentinelApplication:
                 continue
             if isinstance(event, PolicyViewedEvent):
                 response_parts.append(format_current_policy(event.policy))
+                continue
+            if isinstance(event, ProfileUpdatedEvent):
+                response_parts.append(
+                    format_profile_update(event.patch, event.profile)
+                )
+                continue
+            if isinstance(event, ProfileViewedEvent):
+                response_parts.append(format_current_profile(event.profile))
                 continue
             if isinstance(event, AnalysisCompletedEvent):
                 response_parts.append(format_authoritative_analysis(event.analysis))
@@ -97,9 +195,17 @@ class SentinelApplication:
         return SentinelResponse(
             message=_join_messages(*response_parts),
             policy=committed_policy,
+            profile=committed_profile,
             analyses=loop_result.analyses,
+            ai_interpretation=(
+                loop_result.final_text if loop_result.analyses else None
+            ),
         )
 
 
 def _join_messages(*messages: str) -> str:
     return "\n\n".join(message for message in messages if message)
+
+
+def _text_chunks(text: str, size: int = 80) -> list[str]:
+    return [text[index:index + size] for index in range(0, len(text), size)]

@@ -14,62 +14,62 @@
 
 **Files:** `app/models/profile.py`, `app/sessions.py`, `tests/unit/test_profile.py`, `tests/unit/test_sessions.py`
 
-- [ ] Write failing tests for profile validation, patch application, session isolation, and compare-and-set commit.
-- [ ] Implement immutable profile models and deterministic patch application.
-- [ ] Implement the in-memory profile session store.
-- [ ] Run focused tests.
+- [x] Write failing tests for profile validation, patch application, session isolation, and compare-and-set commit.
+- [x] Implement immutable profile models and deterministic patch application.
+- [x] Implement the in-memory profile session store.
+- [x] Run focused tests.
 
 ### Task 2: Controlled profile tools
 
 **Files:** `app/agent/run_context.py`, `app/agent/controlled_tools.py`, `app/agent/prompts.py`, `tests/unit/test_controlled_tools.py`, `tests/unit/test_tool_loop.py`
 
-- [ ] Write failing tests for simple LLM-facing schemas, staging, viewing, and exposed tool names.
-- [ ] Add profile state/events to the run context.
-- [ ] Add `update_investor_profile` and `view_investor_profile` without execution capabilities.
-- [ ] Update instructions and run focused tests.
+- [x] Write failing tests for simple LLM-facing schemas, staging, viewing, and exposed tool names.
+- [x] Add profile state/events to the run context.
+- [x] Add `update_investor_profile` and `view_investor_profile` without execution capabilities.
+- [x] Update instructions and run focused tests.
 
 ### Task 3: Application profile commit and structured response
 
 **Files:** `app/application.py`, `app/models/api.py`, `tests/unit/test_tool_loop_application.py`, `tests/unit/test_api_models.py`
 
-- [ ] Write failing tests for successful atomic profile commit and typed final snapshots.
-- [ ] Pass profile through the Agent loop and commit only validated staged patches.
-- [ ] Add structured response fields without removing terminal compatibility.
-- [ ] Run focused tests.
+- [x] Write failing tests for successful profile commit and typed final snapshots.
+- [x] Pass profile through the Agent loop and commit only validated staged patches.
+- [x] Add structured response fields without removing terminal compatibility.
+- [x] Run focused tests.
 
 ### Task 4: Real Agent activity stream
 
 **Files:** `app/agent/streaming.py`, `app/agent/tool_loop.py`, `tests/unit/test_agent_streaming.py`
 
-- [ ] Write failing tests for allowlisted STARTED/COMPLETED activity mapping and redaction.
-- [ ] Add the `Runner.run_streamed` path and collect validated final state.
-- [ ] Buffer LLM prose until safety validation, then emit safe display deltas.
-- [ ] Run focused tests.
+- [x] Write failing tests for allowlisted STARTED/COMPLETED activity mapping and redaction.
+- [x] Add the `Runner.run_streamed` path and collect validated final state.
+- [x] Buffer LLM prose until safety validation, then emit safe display deltas.
+- [x] Run focused tests.
 
 ### Task 5: FastAPI SSE endpoint
 
 **Files:** `requirements.txt`, `app/api.py`, `tests/unit/test_api.py`
 
-- [ ] Add FastAPI dependencies and install them in the local environment.
-- [ ] Write failing endpoint tests using a fake streaming application.
-- [ ] Implement `/api/chat/stream`, `/api/config`, health, and static web serving.
-- [ ] Encode named SSE events with Pydantic JSON and safe errors.
-- [ ] Run focused tests.
+- [x] Add FastAPI dependencies and install them in the local environment.
+- [x] Write failing endpoint tests using a fake streaming application.
+- [x] Implement `/api/chat/stream`, `/api/config`, health, and static web serving.
+- [x] Encode named SSE events with Pydantic JSON and safe errors.
+- [x] Run focused tests.
 
 ### Task 6: Connect the vintage UI
 
 **Files:** `web/index.html`, `web/app.js`, `web/styles.css`, `tests/test_ui.js`
 
-- [ ] Replace simulation assertions with SSE parsing and structured rendering tests.
-- [ ] Replace mock notices/data and timer logic with real fetch streaming.
-- [ ] Render real activity, profile, evidence, risk status, and validated interpretation.
-- [ ] Preserve responsive behavior, focus states, and reduced motion.
-- [ ] Run Node tests and inspect the rendered page locally.
+- [x] Replace simulation assertions with SSE parsing and structured rendering tests.
+- [x] Replace mock notices/data and timer logic with real fetch streaming.
+- [x] Render real activity, profile, evidence, risk status, and validated interpretation.
+- [x] Preserve responsive behavior, focus states, and reduced motion.
+- [x] Run Node tests and inspect the local HTTP responses.
 
 ### Task 7: Documentation and verification
 
 **Files:** `README.md`, `docs/architecture.md`, `docs/agent-guidelines.md`
 
-- [ ] Document the API, SSE contract, profile boundary, startup command, and UI mapping.
-- [ ] Run all Python tests, Node tests, compileall, and `git diff --check`.
-- [ ] Commit the implementation.
+- [x] Document the API, SSE contract, profile boundary, startup command, and UI mapping.
+- [x] Run all Python tests, Node tests, compileall, and `git diff --check`.
+- [x] Commit the implementation.

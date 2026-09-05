@@ -4,60 +4,55 @@ const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 
 const {
-  buildActivitySteps,
-  getAgentModelRoute,
-  getModelsForProvider,
-  getTierLabel,
+  buildChatRequest,
+  createSseParser,
+  formatActivityLabel,
   isValidPrompt,
 } = require("../web/app.js");
-
-test("returns the supported OpenAI models", () => {
-  assert.deepEqual(getModelsForProvider("openai"), [
-    "gpt-5.6-luna",
-    "gpt-5.4-mini",
-  ]);
-});
-
-test("returns the supported Gemini models", () => {
-  assert.deepEqual(getModelsForProvider("gemini"), [
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3-flash-preview",
-  ]);
-});
-
-test("builds the LiteLLM route passed to the Agents SDK", () => {
-  assert.equal(
-    getAgentModelRoute("gemini", "gemini-3.5-flash-lite"),
-    "litellm/gemini/gemini-3.5-flash-lite",
-  );
-});
-
-test("only labels Gemini as free tier", () => {
-  assert.equal(getTierLabel("gemini"), "Free tier");
-  assert.equal(getTierLabel("openai"), "");
-});
 
 test("accepts meaningful prompts and rejects whitespace", () => {
   assert.equal(isValidPrompt("Analyze my BTC exposure."), true);
   assert.equal(isValidPrompt("   \n  "), false);
 });
 
-test("activity calls portfolio before market data and finishes with a report", () => {
-  const labels = buildActivitySteps().map((step) => step.label);
-  const portfolioIndex = labels.indexOf("Calling get_portfolio()");
-  const marketIndex = labels.indexOf('Calling get_market_data("BTCUSDT")');
-
-  assert.ok(portfolioIndex >= 0);
-  assert.ok(marketIndex > portfolioIndex);
-  assert.equal(labels.at(-1), "Report ready");
+test("builds a normalized chat request", () => {
+  assert.deepEqual(buildChatRequest(" user-1 ", " Analyze. "), {
+    session_id: "user-1",
+    message: "Analyze.",
+  });
 });
 
-test("uses a compact model toolbar without verbose route help", () => {
+test("parses SSE events across network chunks", () => {
+  const events = [];
+  const parser = createSseParser((event, data) => events.push({ event, data }));
+
+  parser.push('event: activity\ndata: {"status":"STAR');
+  parser.push('TED"}\n\nevent: text_delta\ndata: {"text":"Hi"}\n\n');
+
+  assert.deepEqual(events, [
+    { event: "activity", data: { status: "STARTED" } },
+    { event: "text_delta", data: { text: "Hi" } },
+  ]);
+});
+
+test("formats backend activity without exposing implementation data", () => {
+  assert.equal(
+    formatActivityLabel({
+      kind: "PORTFOLIO_READ",
+      status: "COMPLETED",
+      message: "Completed portfolio retrieval.",
+    }),
+    "Completed portfolio retrieval.",
+  );
+});
+
+test("page is a real streaming chat client, not a simulation", () => {
   const html = readFileSync(join(__dirname, "../web/index.html"), "utf8");
 
-  assert.match(html, /class="model-toolbar"/);
-  assert.doesNotMatch(html, /class="route-preview"/);
-  assert.doesNotMatch(html, /class="model-note"/);
+  assert.match(html, /id="chat-log"/);
+  assert.match(html, /id="activity-log"/);
+  assert.match(html, /id="policy-data"/);
+  assert.match(html, /id="profile-data"/);
+  assert.doesNotMatch(html, /simulates the Agent loop/i);
+  assert.doesNotMatch(html, /Mock<br>Data/);
 });

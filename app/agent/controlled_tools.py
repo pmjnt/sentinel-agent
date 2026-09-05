@@ -9,13 +9,24 @@ from app.agent.run_context import (
     AnalysisCompletedEvent,
     PolicyUpdatedEvent,
     PolicyViewedEvent,
+    ProfileUpdatedEvent,
+    ProfileViewedEvent,
     SentinelRunContext,
 )
 from app.models.analysis import PortfolioAnalysis
 from app.models.market import MarketData, MarketDataError
+from app.models.profile import (
+    InvestmentObjective,
+    InvestorProfile,
+    InvestorProfileField,
+    InvestorProfilePatch,
+    LiquidityNeed,
+    RiskTolerance,
+)
 from app.models.policy import PolicyChange, PolicyField, PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
 from app.services.policy_service import apply_policy_patch
+from app.services.profile_service import apply_profile_patch
 from app.services.portfolio_analysis_service import (
     AnalysisDataError,
     evaluate_portfolio_observations,
@@ -59,6 +70,58 @@ class PolicyToolChange(BaseModel):
         if not normalized:
             raise ValueError("Policy value must not be empty.")
         return normalized
+
+
+class ProfileToolChange(BaseModel):
+    """Simple LLM-facing investor profile change parsed by trusted Python."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    field: InvestorProfileField
+    value: str = Field(
+        description=(
+            "Enum, integer, decimal, comma-separated asset symbols, or null as text."
+        )
+    )
+
+    @field_validator("value")
+    @classmethod
+    def normalize_value(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Profile value must not be empty.")
+        return normalized
+
+
+def parse_profile_tool_changes(
+    changes: list[ProfileToolChange],
+) -> InvestorProfilePatch:
+    values: dict[str, object] = {}
+    for change in changes:
+        field_name = change.field.value
+        if field_name in values:
+            raise ValueError(f"Duplicate profile field: {field_name}.")
+        raw = change.value.strip()
+        normalized = raw.upper()
+        if normalized == "NULL":
+            value: object = None
+        elif change.field is InvestorProfileField.OBJECTIVE:
+            value = InvestmentObjective(normalized)
+        elif change.field is InvestorProfileField.RISK_TOLERANCE:
+            value = RiskTolerance(normalized)
+        elif change.field is InvestorProfileField.LIQUIDITY_NEED:
+            value = LiquidityNeed(normalized)
+        elif change.field is InvestorProfileField.TIME_HORIZON_MONTHS:
+            value = int(raw)
+        elif change.field is InvestorProfileField.ACCEPTABLE_LOSS_PERCENT:
+            value = Decimal(raw)
+        else:
+            value = [symbol.strip() for symbol in raw.split(",")]
+        values[field_name] = value
+
+    if not values:
+        raise ValueError("At least one profile change is required.")
+    return InvestorProfilePatch.model_validate(values)
 
 
 def parse_policy_tool_changes(
@@ -159,6 +222,23 @@ def view_working_policy(context: SentinelRunContext) -> PortfolioPolicy:
     return context.working_policy
 
 
+def stage_profile_update(
+    context: SentinelRunContext,
+    patch: InvestorProfilePatch,
+) -> InvestorProfile:
+    context.working_profile = apply_profile_patch(context.working_profile, patch)
+    context.profile_patches.append(patch)
+    context.ordered_events.append(
+        ProfileUpdatedEvent(patch=patch, profile=context.working_profile)
+    )
+    return context.working_profile
+
+
+def view_working_profile(context: SentinelRunContext) -> InvestorProfile:
+    context.ordered_events.append(ProfileViewedEvent(context.working_profile))
+    return context.working_profile
+
+
 def evaluate_cached_portfolio(
     context: SentinelRunContext,
     focus_symbols: list[str],
@@ -242,6 +322,26 @@ async def view_policy(
 
 
 @function_tool
+async def update_investor_profile(
+    ctx: RunContextWrapper[SentinelRunContext],
+    changes: list[ProfileToolChange],
+) -> InvestorProfile:
+    """Stage explicit investor preferences using simple string values."""
+    return stage_profile_update(
+        ctx.context,
+        parse_profile_tool_changes(changes),
+    )
+
+
+@function_tool
+async def view_investor_profile(
+    ctx: RunContextWrapper[SentinelRunContext],
+) -> InvestorProfile:
+    """Read the current validated investor profile."""
+    return view_working_profile(ctx.context)
+
+
+@function_tool
 async def evaluate_portfolio_risk(
     ctx: RunContextWrapper[SentinelRunContext],
     focus_symbols: list[str],
@@ -255,5 +355,7 @@ CONTROLLED_TOOLS: list[FunctionTool] = [
     get_market_data,
     update_policy,
     view_policy,
+    update_investor_profile,
+    view_investor_profile,
     evaluate_portfolio_risk,
 ]

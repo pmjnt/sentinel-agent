@@ -3,15 +3,28 @@ from decimal import Decimal
 
 import pytest
 
-from app.agent.run_context import AnalysisCompletedEvent, PolicyUpdatedEvent
+from app.agent.run_context import (
+    AnalysisCompletedEvent,
+    PolicyUpdatedEvent,
+    ProfileUpdatedEvent,
+)
 from app.agent.tool_loop import ToolLoopResult
+from app.agent.tool_loop import ToolLoopStreamCompleted
 from app.application import SentinelApplication
+from app.models.api import (
+    ActivityEvent,
+    ActivityKind,
+    ActivityStatus,
+    StructuredSentinelResponse,
+    TextDeltaEvent,
+)
 from app.models.analysis import PortfolioAnalysis
+from app.models.profile import InvestmentObjective, InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
 from app.models.risk import RiskDecision, RiskReasonCode, RiskStatus
 from app.models.trade import PlanStatus, RebalancePlan
-from app.sessions import InMemoryPolicySessionStore
+from app.sessions import InMemoryInvestorProfileSessionStore, InMemoryPolicySessionStore
 
 
 def _analysis(policy: PortfolioPolicy) -> PortfolioAnalysis:
@@ -42,19 +55,30 @@ class FakeToolLoop:
     ) -> None:
         self.result = result
         self.error = error
-        self.calls: list[tuple[str, str, PortfolioPolicy]] = []
+        self.calls: list[tuple[str, str, PortfolioPolicy, InvestorProfile]] = []
 
     async def run(
         self,
         message: str,
         policy: PortfolioPolicy,
         session_id: str = "default",
+        profile: InvestorProfile | None = None,
     ) -> ToolLoopResult:
-        self.calls.append((session_id, message, policy))
+        self.calls.append((session_id, message, policy, profile or InvestorProfile()))
         if self.error is not None:
             raise self.error
         assert self.result is not None
         return self.result
+
+    async def stream(self, *args, **kwargs):
+        yield ActivityEvent(
+            sequence=1,
+            kind=ActivityKind.PORTFOLIO_READ,
+            status=ActivityStatus.COMPLETED,
+            message="Completed portfolio retrieval.",
+        )
+        assert self.result is not None
+        yield ToolLoopStreamCompleted(self.result)
 
 
 def _result(
@@ -65,6 +89,8 @@ def _result(
     events: tuple = (),
     analyses: tuple[PortfolioAnalysis, ...] = (),
     data_errors: tuple[str, ...] = (),
+    profile: InvestorProfile | None = None,
+    profile_patches: tuple[InvestorProfilePatch, ...] = (),
 ) -> ToolLoopResult:
     return ToolLoopResult(
         final_text=final_text,
@@ -73,6 +99,8 @@ def _result(
         final_policy=policy or PortfolioPolicy(),
         analyses=analyses,
         data_errors=data_errors,
+        profile_patches=profile_patches,
+        final_profile=profile or InvestorProfile(),
     )
 
 
@@ -86,7 +114,63 @@ def test_general_chat_uses_agent_text_without_policy_change() -> None:
     assert response.message == "Xin chào!"
     assert response.policy == PortfolioPolicy()
     assert response.analysis is None
-    assert loop.calls == [("user-1", "xin chào", PortfolioPolicy())]
+    assert loop.calls == [
+        ("user-1", "xin chào", PortfolioPolicy(), InvestorProfile())
+    ]
+
+
+def test_staged_investor_profile_commits_after_successful_run() -> None:
+    profile_store = InMemoryInvestorProfileSessionStore()
+    patch = InvestorProfilePatch(objective=InvestmentObjective.GROWTH)
+    profile = InvestorProfile(objective=InvestmentObjective.GROWTH)
+    loop = FakeToolLoop(
+        _result(
+            final_text="Profile handled.",
+            profile=profile,
+            profile_patches=(patch,),
+            events=(ProfileUpdatedEvent(patch, profile),),
+        )
+    )
+    application = SentinelApplication(
+        loop,
+        InMemoryPolicySessionStore(),
+        profile_store,
+    )
+
+    response = asyncio.run(
+        application.handle("user-1", "I want long-term growth.")
+    )
+
+    assert response.profile == profile
+    assert profile_store.get("user-1") == profile
+    assert "Investor profile updated" in response.message
+
+
+def test_application_stream_finishes_with_structured_snapshot() -> None:
+    analysis = _analysis(PortfolioPolicy())
+    loop = FakeToolLoop(
+        _result(
+            final_text="Assessment: Low volatility.",
+            events=(AnalysisCompletedEvent(analysis),),
+            analyses=(analysis,),
+        )
+    )
+    application = SentinelApplication(loop, InMemoryPolicySessionStore())
+
+    async def collect():
+        return [
+            event
+            async for event in application.stream_handle("user-1", "Analyze.")
+        ]
+
+    events = asyncio.run(collect())
+
+    assert isinstance(events[0], ActivityEvent)
+    assert any(isinstance(event, TextDeltaEvent) for event in events)
+    assert isinstance(events[-1], StructuredSentinelResponse)
+    assert events[-1].analysis == analysis
+    assert events[-1].activity == [events[0]]
+    assert events[-1].execution_status.value == "NOT_EXECUTED"
 
 
 def test_staged_policy_patch_commits_only_after_successful_run() -> None:

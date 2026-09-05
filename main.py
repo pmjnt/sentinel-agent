@@ -3,13 +3,10 @@ from collections.abc import Callable
 
 import litellm
 
-from app.agent.tool_loop import SentinelToolLoop
-from app.application import SentinelApplication
 from app.binance.gateway import BinanceCliGateway
 from app.binance.runner import BinanceCliRunner
+from app.bootstrap import create_application
 from app.config import Settings, load_settings
-from app.gateways import PortfolioMarketGateway
-from app.sessions import InMemoryPolicySessionStore
 
 
 SAMPLE_PROMPT = (
@@ -61,17 +58,6 @@ def format_debug_error(error: Exception, settings: Settings) -> str | None:
         if secret:
             diagnostic = diagnostic.replace(secret, "[REDACTED]")
     return diagnostic
-
-
-def create_application(
-    settings: Settings,
-    gateway: PortfolioMarketGateway,
-) -> SentinelApplication:
-    """Compose Sentinel's use cases; construction performs no external calls."""
-    return SentinelApplication(
-        agent_loop=SentinelToolLoop(settings, gateway),
-        store=InMemoryPolicySessionStore(),
-    )
 
 
 async def run_console() -> None:

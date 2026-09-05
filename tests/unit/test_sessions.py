@@ -2,8 +2,9 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.profile import InvestmentObjective, InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
-from app.sessions import InMemoryPolicySessionStore
+from app.sessions import InMemoryInvestorProfileSessionStore, InMemoryPolicySessionStore
 
 
 def test_unknown_session_returns_empty_policy() -> None:
@@ -75,3 +76,25 @@ def test_apply_many_rejects_stale_policy_without_mutating_current_state() -> Non
         )
 
     assert store.get("session-1") == current
+
+
+def test_profile_store_isolates_sessions_and_rejects_stale_commit() -> None:
+    store = InMemoryInvestorProfileSessionStore()
+    empty = InvestorProfile()
+    growth = store.apply_many(
+        "user-1",
+        (InvestorProfilePatch(objective=InvestmentObjective.GROWTH),),
+        expected_profile=empty,
+    )
+
+    assert growth.objective is InvestmentObjective.GROWTH
+    assert store.get("user-2") == empty
+
+    with pytest.raises(RuntimeError, match="Profile changed"):
+        store.apply_many(
+            "user-1",
+            (InvestorProfilePatch(time_horizon_months=36),),
+            expected_profile=empty,
+        )
+
+    assert store.get("user-1") == growth

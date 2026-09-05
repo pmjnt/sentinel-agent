@@ -672,7 +672,7 @@
               <p class="eyebrow">Đọc phần này trước</p>
               <h2>Sentinel hiện đang ở đâu?</h2>
             </div>
-            <p>Luồng policy-driven end-to-end đã hoạt động trong console: hiểu request, lưu policy, đọc Binance Demo, tính toán, kiểm tra risk và giải thích kết quả.</p>
+            <p>Luồng policy-driven end-to-end hoạt động trong console và web: hiểu request, lưu policy/profile, đọc Binance Demo, tính toán, stream activity, kiểm tra risk và giải thích kết quả.</p>
           </div>
 
           <div class="cards">
@@ -684,19 +684,19 @@
             <article class="card">
               <span class="status live">ĐÃ HOẠT ĐỘNG</span>
               <h3>Policy core</h3>
-              <p>Năm controlled tools, session RAM, allocation, violation, rebalance và RiskEngine đã nằm trong console loop.</p>
+              <p>Bảy controlled tools, policy/profile session RAM, allocation, violation, rebalance và RiskEngine đã nằm trong Agent loop.</p>
             </article>
             <article class="card">
-              <span class="status future">TƯƠNG LAI</span>
-              <h3>Ứng dụng hoàn chỉnh</h3>
-              <p>FastAPI, UI thật, activity stream, Approve/Reject, execution và verification chưa được triển khai.</p>
+              <span class="status live">ĐÃ HOẠT ĐỘNG</span>
+              <h3>FastAPI + streaming UI</h3>
+              <p>UI chat vintage gọi SSE thật, hiển thị activity allowlist và map structured response. Approval, execution và verification vẫn chưa có.</p>
             </article>
           </div>
 
           <div class="warning">
             <strong>Bốn giới hạn cần nhớ.</strong>
-            <p>UI hiện tại là bản tĩnh; tiến trình phân tích trên web đang được mô phỏng.</p>
-            <p>Policy state hiện chỉ được lưu trong RAM.</p>
+            <p>UI gọi FastAPI qua SSE; activity đến từ tool events thật.</p>
+            <p>Policy và investor profile hiện chỉ được lưu trong RAM.</p>
             <p>Custom MCP hiện không hoạt động.</p>
             <p>Sentinel hiện không có khả năng giao dịch.</p>
           </div>
@@ -822,7 +822,7 @@
               <span class="rail-index">02</span>
               <div class="rail-body">
                 <h3>Sentinel Agent hiểu ý định và chọn tool</h3>
-                <p>LLM qua LiteLLM nhận current policy cùng năm tool schemas, rồi tự chọn capability an toàn cần gọi.</p>
+                <p>LLM qua LiteLLM nhận current policy, investor profile cùng bảy tool schemas, rồi tự chọn capability an toàn cần gọi.</p>
                 <a class="path" href="../app/agent/tool_loop.py">app/agent/tool_loop.py</a>
               </div>
             </li>
@@ -933,18 +933,20 @@ LLM explains in natural language</pre>
           </div>
 
           <pre class="tree" aria-label="Cây thư mục chính">sentinel-agent/
-├── main.py                 # composition root + console loop
+├── main.py                 # console loop
 ├── app/
+│   ├── api.py              # FastAPI + SSE + static web
+│   ├── bootstrap.py        # composition root dùng chung
 │   ├── agent/              # controlled tool loop, context và prompts
 │   ├── tools/              # ví dụ giáo dục cũ
 │   ├── gateways.py         # application-owned interface
 │   ├── binance/            # external adapter
 │   ├── models/             # Pydantic domain contracts
 │   ├── services/           # deterministic business rules
-│   ├── sessions.py         # policy state trong RAM
+│   ├── sessions.py         # policy/profile state trong RAM
 │   └── config.py           # environment → validated Settings
 ├── tests/                  # offline verification
-├── web/                    # static vintage UI prototype
+├── web/                    # vintage streaming chat UI
 └── docs/                   # kiến trúc và hướng dẫn</pre>
 
           <div class="file-toolbar" aria-label="Điều khiển danh sách file">
@@ -957,13 +959,18 @@ LLM explains in natural language</pre>
             <div class="file-list">
               <article class="file">
                 <h4><a href="../main.py">main.py</a></h4>
-                <p>Composition root: load config, tạo runner → gateway → <code>SentinelToolLoop</code> → <code>SentinelApplication</code>.</p>
+                <p>Console entry point: load config rồi dùng composition root chung để tạo SentinelApplication.</p>
                 <p class="relation"><strong>Phụ thuộc:</strong> config và các implementation ở rìa. <strong>Được gọi bởi:</strong> người dùng qua <code>python main.py</code>.</p>
               </article>
               <article class="file">
+                <h4><a href="../app/api.py">app/api.py</a> · <a href="../app/bootstrap.py">app/bootstrap.py</a></h4>
+                <p><code>bootstrap.py</code> ghép dependencies dùng chung. <code>api.py</code> expose health/config/chat SSE và phục vụ web cùng origin.</p>
+                <p class="relation"><strong>Output:</strong> activity, validated text delta và structured completed JSON. <strong>Không expose:</strong> API key, raw tool args/result hay chain-of-thought.</p>
+              </article>
+              <article class="file">
                 <h4><a href="../app/application.py">app/application.py</a></h4>
-                <p>Use-case boundary: chạy Agent loop, commit staged policy sau thành công, render authoritative facts rồi nối AI interpretation.</p>
-                <p class="relation"><strong>Không phụ thuộc:</strong> Binance CLI cụ thể. <strong>Output:</strong> SentinelResponse gồm text, policy và optional analysis.</p>
+                <p>Use-case boundary: chạy Agent loop, commit staged policy/profile sau thành công, render authoritative facts rồi nối AI interpretation.</p>
+                <p class="relation"><strong>Không phụ thuộc:</strong> Binance CLI cụ thể. <strong>Output:</strong> text cho console hoặc typed stream cho UI.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/config.py">app/config.py</a></h4>
@@ -977,8 +984,8 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../app/sessions.py">app/sessions.py</a></h4>
-                <p>Lưu <code>PortfolioPolicy</code> theo session ID trong RAM và apply patch đã validate.</p>
-                <p class="relation"><strong>Phụ thuộc:</strong> policy model/service. <strong>Dùng bởi:</strong> SentinelApplication sau Agent run thành công. Mất dữ liệu khi process dừng.</p>
+                <p>Lưu <code>PortfolioPolicy</code> và <code>InvestorProfile</code> theo session ID trong RAM, chỉ apply patch đã validate.</p>
+                <p class="relation"><strong>Dùng bởi:</strong> SentinelApplication sau Agent run thành công. Mất dữ liệu khi process dừng.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/__init__.py">app/__init__.py</a></h4>
@@ -992,8 +999,8 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../requirements.txt">requirements.txt</a></h4>
-                <p>Liệt kê các package Python: Agents SDK với LiteLLM extra, dotenv, Pydantic và pytest; hiện chỉ LiteLLM được pin phiên bản cụ thể.</p>
-                <p class="relation"><strong>Dùng bởi:</strong> pip khi dựng virtual environment. <strong>Không chứa:</strong> MCP, web framework hay Binance SDK riêng.</p>
+                <p>Liệt kê Agents SDK với LiteLLM, dotenv, Pydantic, FastAPI, Uvicorn, HTTPX và pytest; LiteLLM được pin phiên bản cụ thể.</p>
+                <p class="relation"><strong>Dùng bởi:</strong> pip khi dựng virtual environment. <strong>Không chứa:</strong> MCP hay Binance SDK riêng.</p>
               </article>
               <article class="file">
                 <h4><a href="../.gitignore">.gitignore</a></h4>
@@ -1008,18 +1015,23 @@ LLM explains in natural language</pre>
             <div class="file-list">
               <article class="file">
                 <h4><a href="../app/agent/tool_loop.py">app/agent/tool_loop.py</a></h4>
-                <p>Runtime chính: tạo text-output Agent với đúng năm controlled tools, tạo context mới và để SDK tiếp tục loop sau mỗi tool result.</p>
-                <p class="relation"><strong>Input:</strong> message + current policy. <strong>Output:</strong> final text, ordered events, staged patches và validated analyses.</p>
+                <p>Runtime chính: tạo Agent với đúng bảy controlled tools, tạo context mới và để SDK tiếp tục loop sau mỗi tool result.</p>
+                <p class="relation"><strong>Input:</strong> message + policy + profile. <strong>Output:</strong> final text, safe activity, staged patches và validated analyses.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/controlled_tools.py">app/agent/controlled_tools.py</a></h4>
-                <p>Định nghĩa năm tool đọc portfolio/market, update/view policy và deterministic risk evaluation. Policy wire value là text đơn giản rồi Python parse; không có execution tool.</p>
+                <p>Định nghĩa bảy tool: đọc portfolio/market, update/view policy, update/view investor profile và deterministic risk evaluation. Wire value đơn giản rồi Python parse; không có execution tool.</p>
                 <p class="relation"><strong>Ủy quyền:</strong> gateway cho I/O, services cho tính toán. <strong>Không được:</strong> nhận CLI command tùy ý.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/run_context.py">app/agent/run_context.py</a></h4>
-                <p>Giữ working policy, trusted observations, event order và analyses trong đúng một Agent run; không chứa credentials.</p>
+                <p>Giữ working policy/profile, trusted observations, event order và analyses trong đúng một Agent run; không chứa credentials.</p>
                 <p class="relation"><strong>Commit:</strong> staged patches chỉ được application ghi vào session sau khi run thành công.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/agent/streaming.py">app/agent/streaming.py</a> · <a href="../app/models/profile.py">app/models/profile.py</a></h4>
+                <p>Streaming mapper chỉ phát semantic activity đã allowlist. Profile model giữ preference typed và immutable theo session.</p>
+                <p class="relation"><strong>Không phát:</strong> raw payload, hidden reasoning hoặc secret. <strong>Không đại diện:</strong> approval hay portfolio facts.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/sentinel.py">app/agent/sentinel.py</a></h4>
@@ -1197,18 +1209,18 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../tests/test_ui.js">tests/test_ui.js</a></h4>
-                <p>Kiểm tra model selector, LiteLLM route preview, prompt validation và thứ tự activity mô phỏng của UI.</p>
+                <p>Kiểm tra prompt/request normalization, parser SSE qua nhiều network chunks và contract DOM của UI thật.</p>
                 <p class="relation"><strong>Chạy bằng:</strong> Node built-in test runner; không cần browser.</p>
               </article>
               <article class="file">
                 <h4><a href="../web/index.html">web/index.html</a></h4>
-                <p>Vintage static UI shell cho demo giao diện.</p>
-                <p class="relation"><strong>Liên kết:</strong> styles.css + app.js. <strong>Hiện chưa liên kết:</strong> Python Agent hoặc Binance.</p>
+                <p>Vintage chat UI thật: input, conversation, activity, policy/profile context, tool evidence và report.</p>
+                <p class="relation"><strong>Liên kết:</strong> styles.css + app.js + FastAPI cùng origin.</p>
               </article>
               <article class="file">
                 <h4><a href="../web/app.js">web/app.js và web/styles.css</a></h4>
-                <p>Model selector và simulated activity/result presentation; CSS giữ visual language vintage.</p>
-                <p class="relation"><strong>Không chứa:</strong> LLM key, Binance key hoặc backend API call.</p>
+                <p>Gửi chat, đọc SSE stream và map structured JSON lên UI; CSS giữ visual language vintage.</p>
+                <p class="relation"><strong>Không chứa:</strong> LLM key, Binance key, raw tool result hoặc hard-coded financial facts.</p>
               </article>
               <article class="file">
                 <h4><a href="../README.md">README.md</a></h4>
@@ -1386,7 +1398,7 @@ usd_value ÷ total = weight</pre>
             <li>Agent tool loop, output safety và model route qua LiteLLM</li>
             <li>Application commit boundary và deterministic analysis end-to-end</li>
             <li>Legacy Interpreter/Reporter vẫn có regression tests nhưng không nằm trong main</li>
-            <li>Static UI behavior bằng Node test runner</li>
+            <li>SSE API, structured response và UI behavior bằng Python/Node tests</li>
             <li>HTML guide semantic/content contract</li>
           </ul>
 
@@ -1397,7 +1409,7 @@ usd_value ÷ total = weight</pre>
               <tbody>
                 <tr><td><code>tests/test_config.py</code></td><td>LLM route, active provider key, Binance Demo-only config.</td></tr>
                 <tr><td><code>tests/test_agent.py</code></td><td>Model settings, console behavior và application composition.</td></tr>
-                <tr><td><code>tests/unit/test_tool_loop.py</code></td><td>Đúng năm tools, run context, text output và interpretation guard.</td></tr>
+                <tr><td><code>tests/unit/test_tool_loop.py</code></td><td>Đúng bảy tools, run context, text output và interpretation guard.</td></tr>
                 <tr><td><code>tests/unit/test_controlled_tools.py</code></td><td>Trusted observations, staged policy và deterministic evaluation boundary.</td></tr>
                 <tr><td><code>tests/unit/test_tool_loop_application.py</code></td><td>Commit sau thành công, event order, authoritative output và fail-closed.</td></tr>
                 <tr><td><code>tests/unit/test_portfolio_analysis_service.py</code></td><td>Market discovery, deduplication, plan và risk status deterministic.</td></tr>
@@ -1411,8 +1423,9 @@ usd_value ÷ total = weight</pre>
                 <tr><td><code>tests/unit/test_portfolio_service.py</code></td><td>Decimal total và allocation.</td></tr>
                 <tr><td><code>tests/unit/test_rebalance_service.py</code></td><td>Draft trade arithmetic, không phải execution.</td></tr>
                 <tr><td><code>tests/unit/test_risk_service.py</code></td><td>Risk priority và missing-market fail-closed.</td></tr>
-                <tr><td><code>tests/unit/test_sessions.py</code></td><td>Policy state theo session trong RAM.</td></tr>
-                <tr><td><code>tests/test_ui.js</code></td><td>Static UI model selection và simulated activity.</td></tr>
+                <tr><td><code>tests/unit/test_sessions.py</code></td><td>Policy/profile state theo session trong RAM.</td></tr>
+                <tr><td><code>tests/unit/test_api.py</code> / <code>test_agent_streaming.py</code></td><td>SSE event contract, safe activity allowlist và static serving.</td></tr>
+                <tr><td><code>tests/test_ui.js</code></td><td>Chat request, SSE parser và live UI contract.</td></tr>
                 <tr><td><code>tests/test_project_guide.py</code></td><td>Semantic structure, file map, status truth và secret guard của trang này.</td></tr>
               </tbody>
             </table>
@@ -1432,19 +1445,19 @@ git diff --check</pre>
               <p class="eyebrow">Road ahead</p>
               <h2>Chưa có gì, nên làm gì tiếp?</h2>
             </div>
-            <p>Core policy analysis đã chạy trong console. Các bước dưới đây chưa có trong runtime hiện tại và không được hiểu là đã sẵn sàng.</p>
+            <p>Core policy analysis, FastAPI, SSE và UI chat đã chạy. Các bước dưới đây chưa có trong runtime hiện tại.</p>
           </div>
 
           <ol class="journey">
             <li>
-              <span class="phase">NEXT 01</span>
-              <h3>FastAPI</h3>
-              <p>Expose structured analysis response và activity events; secrets chỉ ở backend.</p>
+              <span class="phase">DONE 01</span>
+              <h3>FastAPI + SSE</h3>
+              <p>Structured response và safe activity events đã có; secrets chỉ ở backend.</p>
             </li>
             <li>
-              <span class="phase">NEXT 02</span>
+              <span class="phase">DONE 02</span>
               <h3>UI thật</h3>
-              <p>Thay progress mô phỏng bằng event từ backend; render portfolio, policy, plan và risk result.</p>
+              <p>UI đã nhận activity backend và render portfolio, policy, profile, market và risk result.</p>
             </li>
             <li>
               <span class="phase">NEXT 03</span>

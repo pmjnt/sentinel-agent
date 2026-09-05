@@ -20,9 +20,10 @@ Python renders authoritative facts; the same LLM adds qualitative interpretation
 The LLM is not authoritative for arithmetic, thresholds, permissions, or trade
 execution.
 
-The Agent can call exactly five tools: `get_portfolio`, `get_market_data`,
-`update_policy`, `view_policy`, and `evaluate_portfolio_risk`. There are no
-order, trade, transfer, withdrawal, or generic CLI tools.
+The Agent can call exactly seven tools: `get_portfolio`, `get_market_data`,
+`update_policy`, `view_policy`, `update_investor_profile`,
+`view_investor_profile`, and `evaluate_portfolio_risk`. There are no order,
+trade, transfer, withdrawal, or generic CLI tools.
 
 ## Policy-driven agent loop
 
@@ -41,6 +42,7 @@ Sentinel Agent / LLM
   ├── get_portfolio → trusted Binance Demo holdings
   ├── get_market_data → trusted Binance Demo market observations
   ├── update_policy / view_policy → validated working policy
+  ├── update_investor_profile / view_investor_profile → saved preferences
   └── evaluate_portfolio_risk
         ├── deterministic allocation and violation checks
         ├── deterministic rebalance proposal
@@ -64,8 +66,12 @@ Recent conversation is also kept in a process-local Agents SDK session so
 follow-ups such as `More growth` can refer to the preceding exchange. Before a
 new run, Sentinel keeps at most 16 user/assistant messages and removes old
 tool calls and tool results. A fresh `SentinelRunContext` and fresh Binance reads
-remain mandatory for current financial analysis. Conversation and policy state
-are both lost when the process stops.
+remain mandatory for current financial analysis. Conversation, policy, and
+investor-profile state are lost when the process stops.
+
+The investor profile stores only preferences explicitly stated in chat:
+objective, time horizon, risk tolerance, acceptable loss, liquidity need, and
+excluded assets. It is neither portfolio data nor permission to trade.
 
 After a successful analysis, the LLM presents Assessment, Rationale,
 Recommendation, and Limitations in the user's language. Concrete asset or
@@ -81,7 +87,9 @@ symbols. Larger scopes fail closed and should be split into smaller requests.
 sentinel-agent/
 ├── app/
 │   ├── agent/             # Active tool loop, controlled tools, prompts/context
+│   ├── api.py             # FastAPI routes, SSE encoding, static UI
 │   ├── application.py     # End-to-end conversational orchestration
+│   ├── bootstrap.py       # Runtime dependency composition
 │   ├── binance/           # Safe CLI runner, response schemas, gateway
 │   ├── models/            # Pydantic domain models
 │   ├── services/          # Deterministic policy/planning/risk logic
@@ -90,7 +98,7 @@ sentinel-agent/
 │   ├── gateways.py
 │   └── sessions.py
 ├── tests/                 # Offline tests; no Binance or LLM calls
-├── web/                   # Static vintage UI prototype
+├── web/                   # Vintage chat UI connected to the SSE API
 ├── docs/
 ├── main.py
 └── requirements.txt
@@ -238,6 +246,37 @@ and are lost when the process stops.
 
 Type `exit` to close the console.
 
+## Run the web UI
+
+```bash
+uvicorn app.api:create_app --factory --reload
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The browser sends chat to
+`POST /api/chat/stream`. Provider and model come from `.env` and are shown as
+read-only configuration; API keys never reach the browser.
+
+The endpoint emits named SSE events:
+
+```text
+activity   → safe STARTED/COMPLETED tool progress
+text_delta → validated AI interpretation chunks
+completed  → typed JSON with policy, profile, analysis, activity, execution state
+error      → generic safe failure message
+```
+
+Tool arguments, raw results, chain-of-thought, and credentials are not placed in
+activity events. Model prose is buffered until safety validation passes, so
+activity appears live while answer chunks begin after validation.
+
+Try profile chat:
+
+```text
+My objective is growth, my horizon is 3 years, and I accept a 20% decline.
+Show my investor profile.
+Analyze my portfolio and suggest a direction consistent with my profile.
+```
+
 ## Test
 
 ```bash
@@ -248,16 +287,6 @@ python -m compileall -q app main.py tests
 
 Tests use fake gateways and fake subprocesses. They never call Binance, OpenAI,
 Gemini, or a real CLI process.
-
-## Static UI preview
-
-```bash
-python -m http.server 8000 -d web
-```
-
-Open [http://localhost:8000](http://localhost:8000). The current frontend is a
-static visual prototype: its progress animation and result cards are simulated.
-It never receives LLM or Binance API keys.
 
 ## What gets replaced later?
 

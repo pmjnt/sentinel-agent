@@ -1,4 +1,6 @@
+from app.models.profile import InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
+from app.services.profile_service import apply_profile_patch
 from app.services.policy_service import apply_policy_patch
 
 
@@ -41,6 +43,43 @@ class InMemoryPolicySessionStore:
     def clear(self, session_id: str) -> None:
         normalized_id = self._normalize_session_id(session_id)
         self._policies.pop(normalized_id, None)
+
+    @staticmethod
+    def _normalize_session_id(session_id: str) -> str:
+        normalized = session_id.strip()
+        if not normalized:
+            raise ValueError("Session ID must not be empty.")
+        return normalized
+
+
+class InMemoryInvestorProfileSessionStore:
+    """Keep validated investor preferences for local sessions."""
+
+    def __init__(self) -> None:
+        self._profiles: dict[str, InvestorProfile] = {}
+
+    def get(self, session_id: str) -> InvestorProfile:
+        normalized_id = self._normalize_session_id(session_id)
+        return self._profiles.get(normalized_id, InvestorProfile())
+
+    def apply_many(
+        self,
+        session_id: str,
+        patches: tuple[InvestorProfilePatch, ...],
+        *,
+        expected_profile: InvestorProfile,
+    ) -> InvestorProfile:
+        normalized_id = self._normalize_session_id(session_id)
+        current = self.get(normalized_id)
+        if current != expected_profile:
+            raise RuntimeError("Profile changed during Agent run.")
+
+        updated = current
+        for patch in patches:
+            updated = apply_profile_patch(updated, patch)
+        if patches:
+            self._profiles[normalized_id] = updated
+        return updated
 
     @staticmethod
     def _normalize_session_id(session_id: str) -> str:

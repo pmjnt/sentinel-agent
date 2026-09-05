@@ -21,6 +21,7 @@ from app.agent.tool_loop import (
 )
 from app.config import LLMProvider, Settings
 from app.models.market import MarketData, Volatility
+from app.models.profile import InvestorProfile
 from app.models.policy import PolicyChange, PolicyField, PortfolioPolicy
 from app.models.portfolio import PortfolioAsset
 from app.services.portfolio_service import calculate_portfolio
@@ -69,6 +70,8 @@ def test_tool_loop_agent_exposes_only_controlled_tools() -> None:
         "get_market_data",
         "update_policy",
         "view_policy",
+        "update_investor_profile",
+        "view_investor_profile",
         "evaluate_portfolio_risk",
     ]
     assert agent.output_type is None
@@ -113,6 +116,8 @@ def test_general_chat_returns_text_without_events() -> None:
     assert result.final_text == "Xin chào!"
     assert result.events == ()
     assert result.policy_patches == ()
+    assert result.profile_patches == ()
+    assert result.final_profile == InvestorProfile()
     assert result.analyses == ()
 
 
@@ -215,6 +220,19 @@ def test_financial_request_cannot_finish_without_deterministic_analysis() -> Non
         asyncio.run(
             SentinelToolLoop(_settings(), FakeGateway(), run_agent=fake_run).run(
                 "Analyze my BTC exposure.",
+                PortfolioPolicy(),
+            )
+        )
+
+
+def test_personalized_investment_advice_requires_deterministic_analysis() -> None:
+    async def fake_run(*args: Any, **kwargs: Any):
+        return SimpleNamespace(final_output="You should buy more growth assets.")
+
+    with pytest.raises(ModelBehaviorError, match="without deterministic analysis"):
+        asyncio.run(
+            SentinelToolLoop(_settings(), FakeGateway(), run_agent=fake_run).run(
+                "Bạn có lời khuyên đầu tư nào cho tài khoản của tôi không?",
                 PortfolioPolicy(),
             )
         )

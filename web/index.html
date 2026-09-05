@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Sentinel's simulated crypto portfolio risk-analysis desk.">
+    <meta name="description" content="Sentinel's read-only crypto portfolio risk-analysis desk.">
     <title>Sentinel — Risk Analysis Desk</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="styles.css">
@@ -13,15 +13,15 @@
     <main class="ledger-shell">
       <header class="masthead">
         <div>
-          <p class="edition">Field Ledger No. 001 · Phase I</p>
+          <p class="edition">Field Ledger No. 001 · Live Desk</p>
           <h1>Sentinel</h1>
           <p class="subtitle">Crypto Portfolio Risk Analysis Desk</p>
         </div>
-        <div class="stamp" aria-label="System status: mock data">Mock<br>Data</div>
+        <div class="stamp" aria-label="System status: read only">Read<br>Only</div>
       </header>
 
       <aside class="notice" aria-label="Prototype notice">
-        <strong>Demonstration only.</strong> This page simulates the Agent loop with fixed portfolio and market data. It does not call an LLM or execute trades.
+        <strong>Binance Demo data.</strong> Sentinel can analyze and propose, but it has no trading, transfer, or withdrawal tools.
       </aside>
 
       <div class="desk-grid">
@@ -30,7 +30,7 @@
             <span class="section-number">I</span>
             <div>
               <h2 id="request-title">Analysis Request</h2>
-              <p>Choose the future model route, then submit a risk question.</p>
+              <p>Chat with the configured Sentinel model.</p>
             </div>
           </div>
 
@@ -38,35 +38,36 @@
             <div class="model-toolbar" aria-label="Model configuration">
               <div class="toolbar-field provider-choice">
                 <label for="provider">Provider</label>
-                <select id="provider" name="provider">
-                  <option value="openai">OpenAI</option>
-                  <option value="gemini" selected>Gemini</option>
+                <select id="provider" name="provider" disabled>
+                  <option>Loading…</option>
                 </select>
               </div>
               <div class="toolbar-field model-choice">
                 <label for="model">Model</label>
-                <select id="model" name="model"></select>
+                <select id="model" name="model" disabled></select>
               </div>
-              <span class="tier-mark">Free tier</span>
+              <span class="tier-mark" hidden>Configured</span>
             </div>
+
+            <ol id="chat-log" class="chat-log" aria-label="Conversation"></ol>
 
             <div class="field prompt-field">
               <label for="prompt">Instruction to Sentinel</label>
-              <textarea id="prompt" name="prompt" rows="6" aria-describedby="prompt-help prompt-error">Analyze my BTC exposure and tell me whether it currently looks risky.</textarea>
+              <textarea id="prompt" name="prompt" rows="4" aria-describedby="prompt-help prompt-error">Analyze my portfolio and explain the evidence behind your recommendation.</textarea>
               <p id="prompt-help" class="field-help">Sentinel should decide which available tools it needs.</p>
               <p id="prompt-error" class="field-error" role="alert" hidden>Please enter an analysis request.</p>
             </div>
 
             <button id="run-button" type="submit">
               <span aria-hidden="true">▶</span>
-              <span id="run-button-label">Run Analysis</span>
+              <span id="run-button-label">Send to Sentinel</span>
             </button>
           </form>
 
           <dl class="run-meta" aria-label="Run information">
             <div><dt>Run</dt><dd id="run-id">Not started</dd></div>
             <div><dt>Route</dt><dd id="run-route">Gemini / gemini-3.5-flash-lite</dd></div>
-            <div><dt>Mode</dt><dd>Browser simulation</dd></div>
+            <div><dt>Mode</dt><dd>Live SSE · Read only</dd></div>
           </dl>
         </section>
 
@@ -98,24 +99,31 @@
             <summary><code>get_portfolio()</code><span class="returned-mark">Returned</span></summary>
             <div class="tool-body">
               <p class="tool-direction">Tool → Agent</p>
-              <dl class="data-list">
-                <div><dt>BTC</dt><dd>$6,000</dd></div>
-                <div><dt>ETH</dt><dd>$2,500</dd></div>
-                <div><dt>USDT</dt><dd>$1,500</dd></div>
-                <div class="total"><dt>Total portfolio</dt><dd>$10,000</dd></div>
-              </dl>
+              <dl id="portfolio-data" class="data-list"></dl>
             </div>
           </details>
 
           <details id="market-evidence" open hidden>
-            <summary><code>get_market_data("BTCUSDT")</code><span class="returned-mark">Returned</span></summary>
+            <summary><code>get_market_data()</code><span class="returned-mark">Returned</span></summary>
             <div class="tool-body">
               <p class="tool-direction">Tool → Agent</p>
-              <dl class="data-list">
-                <div><dt>Price</dt><dd>$110,000</dd></div>
-                <div><dt>24h change</dt><dd class="negative">−4.2%</dd></div>
-                <div><dt>Volatility</dt><dd class="risk-high">High</dd></div>
-              </dl>
+              <dl id="market-data" class="data-list"></dl>
+            </div>
+          </details>
+
+          <details id="profile-evidence" open hidden>
+            <summary><code>InvestorProfile</code><span class="returned-mark">Session context</span></summary>
+            <div class="tool-body">
+              <p class="tool-direction">Validated preferences → Agent</p>
+              <dl id="profile-data" class="data-list"></dl>
+            </div>
+          </details>
+
+          <details id="policy-evidence" open hidden>
+            <summary><code>PortfolioPolicy</code><span class="returned-mark">Validated rules</span></summary>
+            <div class="tool-body">
+              <p class="tool-direction">Deterministic policy → Risk Engine</p>
+              <dl id="policy-data" class="data-list"></dl>
             </div>
           </details>
         </div>
@@ -133,22 +141,18 @@
         <div class="report-grid">
           <article class="facts">
             <h3>Factual tool data</h3>
-            <ul>
-              <li><strong>60%</strong> of the mocked portfolio is BTC.</li>
-              <li>BTC changed <strong>−4.2%</strong> over 24 hours.</li>
-              <li>Mocked BTC volatility is <strong>HIGH</strong>.</li>
-            </ul>
+            <ul id="fact-list"></ul>
           </article>
           <article class="interpretation">
             <h3>AI interpretation</h3>
-            <p>Your BTC exposure currently looks risky. A 60% allocation creates concentration risk, while high volatility and a negative 24-hour move increase short-term uncertainty.</p>
-            <p class="caveat">This is a mock educational analysis, not financial advice.</p>
+            <p id="interpretation-text"></p>
+            <p class="caveat">Binance Demo data · No execution capability</p>
           </article>
         </div>
       </section>
 
       <footer>
-        <p>Sentinel Archive · Local Demonstration · No trading capability</p>
+        <p>Sentinel Archive · Read-only analysis · No trading capability</p>
       </footer>
     </main>
     <p id="live-status" class="sr-only" aria-live="polite"></p>

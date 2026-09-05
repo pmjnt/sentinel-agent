@@ -28,22 +28,23 @@ tính, threshold, `RiskStatus`, quyền thực thi hay dữ liệu tài chính.
 ```text
 app.models ← app.services ← app.gateways ← app.binance
                  ↑                 ↑
-            controlled_tools ← tool_loop ← application ← main.py
+            controlled_tools ← tool_loop ← application ← api.py / main.py
 ```
 
 - `app.models`: Pydantic domain data.
 - `app.services`: business rules deterministic, không import Agents SDK.
 - `app.gateways`: port do ứng dụng sở hữu.
 - `app.binance`: adapter read-only cho Binance Skills Hub CLI.
-- `app.agent.controlled_tools`: năm capability duy nhất LLM nhìn thấy.
+- `app.agent.controlled_tools`: bảy capability duy nhất LLM nhìn thấy.
 - `app.agent.tool_loop`: tạo Agent, context một lượt chạy và gọi SDK Runner.
 - `app.application`: commit policy sau thành công và render kết quả authoritative.
-- `web`: UI tĩnh, không nhận secret.
+- `app.api`: phát activity và kết quả typed qua SSE, không phát secret/raw tool data.
+- `web`: chat UI thật, gọi API cùng origin và không nhận secret.
 
 ## Tool loop đang dùng trong console
 
 ```text
-User message + current validated policy
+User message + current validated policy + current investor profile
   ↓
 Sentinel Agent / LLM
   ↓ chọn tool dựa trên request và tool description
@@ -72,6 +73,17 @@ khi toàn bộ lượt Agent kết thúc thành công. Store kiểm tra expected
 không ghi đè một concurrent run mới hơn. Lỗi provider không làm policy dở dang
 lọt vào session.
 
+Investor profile hoạt động giống policy: LLM chỉ stage preference người dùng
+nói rõ qua `update_investor_profile`; Pydantic validate và application chỉ commit
+sau lượt chạy thành công. Profile giúp follow-up có ngữ cảnh ổn định nhưng không
+phải dữ liệu tài chính hoặc quyền giao dịch.
+
+Web API dùng `Runner.run_streamed`. SDK semantic event `tool_called` và
+`tool_output` được map sang activity allowlist. Raw arguments/output và hidden
+reasoning không ra UI. Final prose chỉ được chunk thành `text_delta` sau output
+safety validation; event `completed` chứa snapshot JSON typed để UI map theo
+field thay vì parse câu chữ.
+
 Nếu thiếu observation, `evaluate_portfolio_risk` trả danh sách tool còn thiếu;
 LLM phải đọc dữ liệu rồi thử lại. Nếu Binance lỗi, hệ thống ghi data error và
 fail-closed, không thay bằng dữ liệu giả.
@@ -96,13 +108,15 @@ observation phân tích. Formal risk priority là `BLOCKED`, sau đó
 
 ## Security boundary
 
-Agent chỉ có năm tool:
+Agent chỉ có bảy tool:
 
 ```text
 get_portfolio
 get_market_data
 update_policy
 view_policy
+update_investor_profile
+view_investor_profile
 evaluate_portfolio_risk
 ```
 

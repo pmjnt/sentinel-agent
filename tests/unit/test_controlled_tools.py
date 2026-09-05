@@ -7,21 +7,33 @@ from app.agent.controlled_tools import (
     CONTROLLED_TOOLS,
     MissingObservations,
     PolicyToolChange,
+    ProfileToolChange,
     ToolDataError,
     evaluate_cached_portfolio,
     parse_policy_tool_changes,
+    parse_profile_tool_changes,
     read_market_data,
     read_portfolio,
     stage_policy_update,
+    stage_profile_update,
+    view_working_profile,
     view_working_policy,
 )
 from app.agent.run_context import (
     AnalysisCompletedEvent,
     PolicyUpdatedEvent,
     PolicyViewedEvent,
+    ProfileUpdatedEvent,
+    ProfileViewedEvent,
     SentinelRunContext,
 )
 from app.models.market import MarketData, MarketDataError, Volatility
+from app.models.profile import (
+    InvestmentObjective,
+    InvestorProfile,
+    InvestorProfileField,
+    RiskTolerance,
+)
 from app.models.policy import PolicyChange, PolicyField, PortfolioPolicy
 from app.models.portfolio import PortfolioAsset
 from app.models.risk import RiskStatus
@@ -180,6 +192,56 @@ def test_view_policy_records_the_working_policy_snapshot() -> None:
     assert isinstance(context.ordered_events[0], PolicyViewedEvent)
 
 
+def test_profile_tool_values_are_parsed_and_staged() -> None:
+    context = _context()
+    patch = parse_profile_tool_changes(
+        [
+            ProfileToolChange(
+                field=InvestorProfileField.OBJECTIVE,
+                value="growth",
+            ),
+            ProfileToolChange(
+                field=InvestorProfileField.TIME_HORIZON_MONTHS,
+                value="36",
+            ),
+            ProfileToolChange(
+                field=InvestorProfileField.RISK_TOLERANCE,
+                value="medium",
+            ),
+        ]
+    )
+
+    result = stage_profile_update(context, patch)
+
+    assert result.objective is InvestmentObjective.GROWTH
+    assert result.time_horizon_months == 36
+    assert result.risk_tolerance is RiskTolerance.MEDIUM
+    assert isinstance(context.ordered_events[0], ProfileUpdatedEvent)
+
+
+def test_view_profile_records_the_working_profile_snapshot() -> None:
+    context = SentinelRunContext.create(
+        FakeGateway(),
+        PortfolioPolicy(),
+        InvestorProfile(objective=InvestmentObjective.BALANCED),
+    )
+
+    result = view_working_profile(context)
+
+    assert result == context.working_profile
+    assert isinstance(context.ordered_events[0], ProfileViewedEvent)
+
+
+def test_update_profile_tool_schema_avoids_mixed_type_union() -> None:
+    update_tool = next(
+        tool
+        for tool in CONTROLLED_TOOLS
+        if tool.name == "update_investor_profile"
+    )
+
+    assert "anyOf" not in str(update_tool.params_json_schema)
+
+
 def test_evaluation_requests_portfolio_when_missing() -> None:
     result = evaluate_cached_portfolio(_context(), ["BTC"])
 
@@ -225,6 +287,8 @@ def test_controlled_tool_allowlist_contains_no_execution_capability() -> None:
         "get_market_data",
         "update_policy",
         "view_policy",
+        "update_investor_profile",
+        "view_investor_profile",
         "evaluate_portfolio_risk",
     ]
     assert not any(
