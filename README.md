@@ -60,6 +60,13 @@ session only after the run succeeds. The earlier `request_interpreter.py`,
 `app/tools/` paths remain as tested legacy/educational code; `tool_loop.py` and
 `controlled_tools.py` are the active console runtime.
 
+Recent conversation is also kept in a process-local Agents SDK session so
+follow-ups such as `More growth` can refer to the preceding exchange. Before a
+new run, Sentinel keeps at most eight user/assistant messages and removes old
+tool calls and tool results. A fresh `SentinelRunContext` and fresh Binance reads
+remain mandatory for current financial analysis. Conversation and policy state
+are both lost when the process stops.
+
 To keep sequential tool use bounded, one request may inspect at most 20 market
 symbols. Larger scopes fail closed and should be split into smaller requests.
 
@@ -221,8 +228,8 @@ Try general chat:
 Sentinel > Xin chào.
 ```
 
-Policy state is kept per console session in memory and is lost when the process
-stops.
+Policy and short conversation history are kept per console session in memory
+and are lost when the process stops.
 
 Type `exit` to close the console.
 

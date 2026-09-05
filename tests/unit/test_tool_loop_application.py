@@ -42,10 +42,15 @@ class FakeToolLoop:
     ) -> None:
         self.result = result
         self.error = error
-        self.calls: list[tuple[str, PortfolioPolicy]] = []
+        self.calls: list[tuple[str, str, PortfolioPolicy]] = []
 
-    async def run(self, message: str, policy: PortfolioPolicy) -> ToolLoopResult:
-        self.calls.append((message, policy))
+    async def run(
+        self,
+        message: str,
+        policy: PortfolioPolicy,
+        session_id: str = "default",
+    ) -> ToolLoopResult:
+        self.calls.append((session_id, message, policy))
         if self.error is not None:
             raise self.error
         assert self.result is not None
@@ -81,6 +86,7 @@ def test_general_chat_uses_agent_text_without_policy_change() -> None:
     assert response.message == "Xin chào!"
     assert response.policy == PortfolioPolicy()
     assert response.analysis is None
+    assert loop.calls == [("user-1", "xin chào", PortfolioPolicy())]
 
 
 def test_staged_policy_patch_commits_only_after_successful_run() -> None:

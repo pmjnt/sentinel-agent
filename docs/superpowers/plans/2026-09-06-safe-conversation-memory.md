@@ -16,10 +16,10 @@
 - Create: `app/agent/conversation_memory.py`
 - Create: `tests/unit/test_conversation_memory.py`
 
-- [ ] Write failing tests for session isolation/reuse and history filtering.
-- [ ] Run the focused tests and confirm they fail because the module is absent.
-- [ ] Implement the in-memory session store and filtering callback.
-- [ ] Run the focused tests and confirm they pass.
+- [x] Write failing tests for session isolation/reuse and history filtering.
+- [x] Run the focused tests and confirm they fail because the module is absent.
+- [x] Implement the in-memory session store and filtering callback.
+- [x] Run the focused tests and confirm they pass.
 
 ### Task 2: Connect memory to the Agent loop
 
@@ -30,10 +30,10 @@
 - Modify: `tests/unit/test_tool_loop_application.py`
 - Modify: `tests/unit/test_policy_analysis_workflow.py`
 
-- [ ] Write failing tests that require `session` and filtered `run_config` in `Runner.run`.
-- [ ] Pass `session_id` through the application boundary into the Agent loop.
-- [ ] Resolve and pass the per-user session plus run configuration.
-- [ ] Confirm focused tests pass.
+- [x] Write failing tests that require `session` and filtered `run_config` in `Runner.run`.
+- [x] Pass `session_id` through the application boundary into the Agent loop.
+- [x] Resolve and pass the per-user session plus run configuration.
+- [x] Confirm focused tests pass.
 
 ### Task 3: Safety instructions and verification
 
@@ -41,6 +41,6 @@
 - Modify: `app/agent/prompts.py`
 - Modify: `README.md`
 
-- [ ] State that history is only for references/preferences and current financial facts require fresh tools.
-- [ ] Run all Python tests, UI tests, compileall, and `git diff --check`.
-- [ ] Commit the implementation.
+- [x] State that history is only for references/preferences and current financial facts require fresh tools.
+- [x] Run all Python tests, UI tests, compileall, and `git diff --check`.
+- [x] Commit the implementation.

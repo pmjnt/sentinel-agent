@@ -52,8 +52,18 @@ class SrdScenarioGateway:
         )
 
 
-async def run_srd_agent(agent, agent_input, *, context, max_turns):
+async def run_srd_agent(
+    agent,
+    agent_input,
+    *,
+    context,
+    max_turns,
+    session,
+    run_config,
+):
     assert max_turns == MAX_AGENT_TURNS
+    assert session.session_id == "demo-user"
+    assert run_config.session_input_callback is not None
     assert "Giữ ít nhất 30% USDT" in agent_input
     stage_policy_update(
         context,

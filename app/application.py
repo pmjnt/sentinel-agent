@@ -24,6 +24,7 @@ class AgentLoop(Protocol):
         self,
         message: str,
         policy: PortfolioPolicy,
+        session_id: str = "default",
     ) -> ToolLoopResult: ...
 
 
@@ -53,7 +54,11 @@ class SentinelApplication:
 
     async def handle(self, session_id: str, message: str) -> SentinelResponse:
         starting_policy = self._store.get(session_id)
-        loop_result = await self._agent_loop.run(message, starting_policy)
+        loop_result = await self._agent_loop.run(
+            message,
+            starting_policy,
+            session_id,
+        )
         expected_final_policy = starting_policy
         for patch in loop_result.policy_patches:
             expected_final_policy = apply_policy_patch(expected_final_policy, patch)

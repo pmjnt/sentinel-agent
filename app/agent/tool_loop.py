@@ -3,8 +3,19 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from agents import Agent, ModelBehaviorError, Runner, set_tracing_disabled
+from agents import (
+    Agent,
+    ModelBehaviorError,
+    RunConfig,
+    Runner,
+    SessionSettings,
+    set_tracing_disabled,
+)
 
+from app.agent.conversation_memory import (
+    ConversationSessionStore,
+    filter_conversation_history,
+)
 from app.agent.controlled_tools import CONTROLLED_TOOLS, MAX_MARKET_OBSERVATIONS
 from app.agent.model_settings import build_agent_model_settings
 from app.agent.output_safety import (
@@ -69,15 +80,24 @@ class SentinelToolLoop:
         settings: Settings,
         gateway: PortfolioMarketGateway,
         run_agent: RunAgent | None = None,
+        conversation_sessions: ConversationSessionStore | None = None,
     ) -> None:
         self._agent = create_tool_loop_agent(settings)
         self._gateway = gateway
         self._run_agent = run_agent or Runner.run
+        self._conversation_sessions = (
+            conversation_sessions or ConversationSessionStore()
+        )
+        self._run_config = RunConfig(
+            session_input_callback=filter_conversation_history,
+            session_settings=SessionSettings(limit=100),
+        )
 
     async def run(
         self,
         message: str,
         policy: PortfolioPolicy,
+        session_id: str = "default",
     ) -> ToolLoopResult:
         context = SentinelRunContext.create(self._gateway, policy)
         result = await self._run_agent(
@@ -85,6 +105,8 @@ class SentinelToolLoop:
             build_tool_loop_input(message, policy),
             context=context,
             max_turns=MAX_AGENT_TURNS,
+            session=self._conversation_sessions.get(session_id),
+            run_config=self._run_config,
         )
         output = result.final_output
         if not isinstance(output, str):

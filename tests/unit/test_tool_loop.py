@@ -103,6 +103,22 @@ def test_general_chat_returns_text_without_events() -> None:
     assert result.analyses == ()
 
 
+def test_tool_loop_reuses_filtered_conversation_session_for_same_user() -> None:
+    received_sessions = []
+
+    async def fake_run(*args: Any, **kwargs: Any):
+        received_sessions.append(kwargs["session"])
+        assert kwargs["run_config"].session_input_callback is not None
+        return SimpleNamespace(final_output="Continuing our conversation.")
+
+    loop = SentinelToolLoop(_settings(), FakeGateway(), run_agent=fake_run)
+
+    asyncio.run(loop.run("First message.", PortfolioPolicy(), "user-1"))
+    asyncio.run(loop.run("Follow-up.", PortfolioPolicy(), "user-1"))
+
+    assert received_sessions[0] is received_sessions[1]
+
+
 def test_policy_update_with_weight_word_does_not_require_analysis() -> None:
     async def fake_run(*args: Any, **kwargs: Any):
         stage_policy_update(
