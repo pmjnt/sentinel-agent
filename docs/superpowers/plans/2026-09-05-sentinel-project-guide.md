@@ -22,7 +22,7 @@
 - Create: `tests/test_project_guide.py`
 - Test: `tests/test_project_guide.py`
 
-- [ ] **Step 1: Write the failing document test**
+- [x] **Step 1: Write the failing document test**
 
 Create a test that:
 
@@ -44,7 +44,7 @@ Create a test that:
 - verifies that no secret-looking assignment such as
   `BINANCE_SECRET_KEY=<non-placeholder value>` appears.
 
-- [ ] **Step 2: Run the test to verify RED**
+- [x] **Step 2: Run the test to verify RED**
 
 Run:
 
@@ -54,7 +54,7 @@ Run:
 
 Expected: FAIL because `docs/sentinel-project-guide.html` does not exist.
 
-- [ ] **Step 3: Commit the RED contract**
+- [x] **Step 3: Commit the RED contract**
 
 ```bash
 git add tests/test_project_guide.py
