@@ -1,32 +1,16 @@
 from collections.abc import Awaitable, Callable
-import re
 from typing import Any
 
 from agents import Agent, ModelBehaviorError, Runner, set_tracing_disabled
 
 from app.agent.model_settings import build_agent_model_settings
+from app.agent.output_safety import validate_qualitative_output
 from app.agent.prompts import ANALYSIS_REPORTER_INSTRUCTIONS
 from app.config import Settings
 from app.models.analysis import PortfolioAnalysis
 
 
 RunAgent = Callable[..., Awaitable[Any]]
-
-_RESERVED_REPORTER_LANGUAGE = re.compile(
-    r"\bblocked\b"
-    r"|\brequires?[\s_-]+approval\b"
-    r"|\bsafe(?:[\s_-]+to)?[\s_-]+propose\b"
-    r"|\bexecut(?:e|ed|ing|ion)\b"
-    r"|\border\s+(?:was\s+)?(?:placed|filled|completed)\b"
-    r"|\b(?:trade|sale|purchase)\s+(?:was\s+)?"
-    r"(?:completed|executed|filled)\b"
-    r"|(?:giao dịch|lệnh|lệnh bán|lệnh mua).{0,30}"
-    r"(?:đã\s+)?(?:được\s+)?(?:thực hiện|đặt|khớp|hoàn (?:tất|thành))"
-    r"|(?:cần|yêu cầu).{0,20}phê duyệt"
-    r"|an toàn.{0,20}đề xuất",
-    flags=re.IGNORECASE | re.DOTALL,
-)
-
 
 def create_analysis_reporter_agent(settings: Settings) -> Agent:
     """Create the tool-free LLM that explains an authoritative analysis."""
@@ -81,8 +65,4 @@ class AgentAnalysisReporter:
             raise ModelBehaviorError(
                 "Analysis Reporter returned an unexpected output type."
             )
-        if _RESERVED_REPORTER_LANGUAGE.search(output):
-            raise ModelBehaviorError(
-                "Analysis Reporter used reserved risk or execution language."
-            )
-        return output
+        return validate_qualitative_output(output)

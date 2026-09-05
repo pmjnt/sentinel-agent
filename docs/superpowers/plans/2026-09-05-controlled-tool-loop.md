@@ -189,7 +189,7 @@ Assert the exact five public tool names and assert that none contains `order`,
 - Create: `tests/unit/test_tool_loop.py`
 - Modify: `app/agent/prompts.py`
 
-- [ ] **Step 1: Write failing Agent-loop tests**
+- [x] **Step 1: Write failing Agent-loop tests**
 
 Using an injected fake `Runner.run`, assert:
 
@@ -202,7 +202,7 @@ Using an injected fake `Runner.run`, assert:
 - analysis interpretation using reserved execution/formal-risk language is
   rejected while the stored deterministic analysis remains available.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -212,7 +212,7 @@ Run:
 
 Expected: imports fail because the tool-loop service does not exist.
 
-- [ ] **Step 3: Implement the Agent and instructions**
+- [x] **Step 3: Implement the Agent and instructions**
 
 Create one text-output Agent with the five tools and explicit model settings.
 Instructions must enforce this sequence for risk requests:
@@ -229,14 +229,14 @@ The prompt must also require `update_policy` before analysis when the same user
 message changes a rule, forbid invented observations, and forbid any execution
 claim or unsupported financial guarantee.
 
-- [ ] **Step 4: Implement the loop service**
+- [x] **Step 4: Implement the loop service**
 
 Run the Agent with a fresh `SentinelRunContext` and `max_turns` sufficient for
 portfolio, market, evaluation, and final response. Return an immutable result
 containing final text, ordered events, staged patches, final policy, analyses,
 and data errors. Do not commit session state in this layer.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run the tool-loop unit tests and expect all to pass without external calls.
 
