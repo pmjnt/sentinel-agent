@@ -5,8 +5,8 @@
 ```text
 LLM
 ├── hiểu ngôn ngữ
-├── chọn get_portfolio / get_market_data
-└── giải thích kết quả
+├── trả typed actions đã validate
+└── giải thích kết quả deterministic
 
 BinanceCliGateway
 ├── chọn command đọc cố định
@@ -34,7 +34,7 @@ app.gateways (application port)
     ↑
 app.binance (external adapter)
     ↑
-app.tools / app.agent / main.py
+app.agent / app.application / main.py
 ```
 
 - `app.models`: Pydantic domain data.
@@ -43,14 +43,21 @@ app.tools / app.agent / main.py
 - `app.binance`: adapter Binance Skills Hub và schema transport.
 - `app.tools`: capability nhỏ, ổn định được expose cho LLM.
 - `app.agent`: prompt và Agent construction.
+- `app.application`: điều phối policy chat, analysis service và Reporter.
 - `web`: UI tĩnh, không nhận secret.
 
 `models` và `services` không import Agents SDK, LiteLLM hoặc Binance CLI.
 
-## Data flow
+## Data flow đang dùng trong console
 
 ```text
-LLM gọi get_portfolio()
+User message
+  ↓
+Request Interpreter LLM → ParsedRequest
+  ↓
+PolicyConversationService → current policy + analysis request
+  ↓
+PortfolioAnalysisService gọi get_portfolio()
   ↓
 BinanceCliGateway
   ├── spot get-account
@@ -63,10 +70,10 @@ PortfolioAsset(amount, usd_value)
 calculate_portfolio()
   ↓
 Portfolio(total, weights, BINANCE_DEMO)
-```
-
-```text
-LLM gọi get_market_data("BTCUSDT")
+  ↓
+Policy violations → required market symbols
+  ↓
+PortfolioAnalysisService gọi get_market_data("BTCUSDT")
   ↓
 validate symbol
   ↓
@@ -75,6 +82,12 @@ BinanceCliGateway
   └── spot depth
   ↓
 MarketData(price, change, volatility, slippage, BINANCE_DEMO)
+  ↓
+Rebalance planner → RiskEngine
+  ↓
+PortfolioAnalysis validated and top-level frozen
+  ↓
+Python authoritative formatter + Reporter qualitative interpretation
 ```
 
 Volatility dùng rule deterministic dựa trên độ lớn biến động 24 giờ:
@@ -106,6 +119,7 @@ không thay đổi command allowlist.
 
 ## Khả năng thay adapter
 
-Hai AI tools phụ thuộc vào `PortfolioMarketGateway`, không phụ thuộc trực tiếp
-vào CLI. Sau này có thể thay bằng MCP adapter được Binance hỗ trợ mà không đổi
-tên tool, Agent prompt hoặc domain services.
+`PortfolioAnalysisService` và hai AI tools giáo dục đều phụ thuộc vào
+`PortfolioMarketGateway`, không phụ thuộc trực tiếp vào CLI. Sau này có thể thay
+bằng MCP adapter được Binance hỗ trợ mà không đổi application workflow hoặc
+domain services.

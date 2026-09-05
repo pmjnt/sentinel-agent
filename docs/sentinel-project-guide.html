@@ -640,7 +640,7 @@
         <aside class="issue-card" aria-label="Tóm tắt phiên bản">
           <span class="number">v0.1</span>
           <p><strong>Runtime hiện tại</strong></p>
-          <p>Console Agent + LiteLLM + hai AI tools + Binance CLI read-only.</p>
+          <p>Console + hai LLM có trách nhiệm hẹp + deterministic RiskEngine + Binance CLI read-only.</p>
           <p class="utility">Python 3.12 · OpenAI Agents SDK · Pydantic · pytest</p>
         </aside>
       </div>
@@ -672,19 +672,19 @@
               <p class="eyebrow">Đọc phần này trước</p>
               <h2>Sentinel hiện đang ở đâu?</h2>
             </div>
-            <p>Dự án có một runtime phân tích đơn giản đang hoạt động và một domain core policy đã được kiểm thử nhưng chưa được ghép vào cùng một orchestration end-to-end.</p>
+            <p>Luồng policy-driven end-to-end đã hoạt động trong console: hiểu request, lưu policy, đọc Binance Demo, tính toán, kiểm tra risk và giải thích kết quả.</p>
           </div>
 
           <div class="cards">
             <article class="card">
               <span class="status live">ĐÃ HOẠT ĐỘNG</span>
-              <h3>Agent phân tích</h3>
-              <p><code>main.py</code> chạy Sentinel. LLM tự chọn đọc portfolio, đọc market hoặc cả hai rồi giải thích rủi ro.</p>
+              <h3>Policy-driven runtime</h3>
+              <p><code>main.py</code> chạy orchestrator. LLM hiểu action; Python bắt buộc chạy portfolio, market, policy, planner và RiskEngine.</p>
             </article>
             <article class="card">
-              <span class="status partial">ĐÃ VIẾT — CHƯA NỐI END-TO-END</span>
+              <span class="status live">ĐÃ HOẠT ĐỘNG</span>
               <h3>Policy core</h3>
-              <p>Parser, session, phép tính allocation, violation, rebalance và RiskEngine đã có test độc lập nhưng chưa nằm trong console loop.</p>
+              <p>Request Interpreter, session RAM, allocation, violation, rebalance, RiskEngine và Reporter đã nằm trong console loop.</p>
             </article>
             <article class="card">
               <span class="status future">TƯƠNG LAI</span>
@@ -696,7 +696,7 @@
           <div class="warning">
             <strong>Bốn giới hạn cần nhớ.</strong>
             <p>UI hiện tại là bản tĩnh; tiến trình phân tích trên web đang được mô phỏng.</p>
-            <p>Policy orchestration chưa được kết nối vào main.py.</p>
+            <p>Policy state hiện chỉ được lưu trong RAM.</p>
             <p>Custom MCP hiện không hoạt động.</p>
             <p>Sentinel hiện không có khả năng giao dịch.</p>
           </div>
@@ -761,13 +761,13 @@
               <tbody>
                 <tr>
                   <td><strong>LLM</strong></td>
-                  <td>Hiểu câu hỏi, nhận ra cần dữ liệu nào, chọn tool, diễn giải kết quả.</td>
+                  <td>Hiểu action có thứ tự và diễn giải kết quả Python đã xác minh.</td>
                   <td>Bịa dữ liệu, quyết định phép tính authoritative, chạy lệnh Binance.</td>
                   <td><code>app/agent/</code></td>
                 </tr>
                 <tr>
                   <td><strong>AI tools</strong></td>
-                  <td>Cung cấp hai capability nhỏ với tên và instruction rõ ràng.</td>
+                  <td>Minh họa autonomous tool-calling trong Agent giáo dục riêng.</td>
                   <td>Chứa business rule hoặc nhận command tùy ý.</td>
                   <td><code>app/tools/</code></td>
                 </tr>
@@ -814,62 +814,62 @@
               <span class="rail-index">01</span>
               <div class="rail-body">
                 <h3>User nhập câu hỏi</h3>
-                <p><code>main.py</code> đọc input trong console và chuyển nguyên câu cho Agents SDK.</p>
+                <p><code>main.py</code> đọc input và chuyển câu chat cùng session ID vào <code>SentinelApplication</code>.</p>
                 <a class="path" href="../main.py">main.py</a>
               </div>
             </li>
             <li class="rail-item">
               <span class="rail-index">02</span>
               <div class="rail-body">
-                <h3>Sentinel LLM đọc instruction</h3>
-                <p>LLM suy ra “BTC exposure” cần cả holdings lẫn market context. Model được gọi qua LiteLLM route.</p>
-                <a class="path" href="../app/agent/sentinel.py">app/agent/sentinel.py</a>
+                <h3>Request Interpreter hiểu ý định</h3>
+                <p>LLM qua LiteLLM route chuyển tiếng Việt/Anh thành typed actions như UPDATE_POLICY rồi ANALYZE_PORTFOLIO.</p>
+                <a class="path" href="../app/agent/request_interpreter.py">app/agent/request_interpreter.py</a>
               </div>
             </li>
             <li class="rail-item">
               <span class="rail-index">03</span>
               <div class="rail-body">
-                <h3>LLM chọn application tools</h3>
-                <p>Agents SDK gửi tool call có cấu trúc tới <code>get_portfolio()</code>, sau đó <code>get_market_data("BTCUSDT")</code>.</p>
-                <span class="path">app/tools/portfolio.py · app/tools/market.py</span>
+                <h3>Policy actions được validate và áp dụng</h3>
+                <p>Pydantic kiểm tra schema; conversation service cập nhật/xem policy trong RAM và phát tín hiệu cần phân tích.</p>
+                <span class="path">app/models/chat.py · app/services/policy_conversation_service.py</span>
               </div>
             </li>
             <li class="rail-item">
               <span class="rail-index">04</span>
               <div class="rail-body">
-                <h3>Gateway dịch nghiệp vụ sang CLI</h3>
-                <p><code>BinanceCliGateway</code> chọn command đã hard-code, validate symbol và map JSON qua Pydantic.</p>
-                <a class="path" href="../app/binance/gateway.py">app/binance/gateway.py</a>
+                <h3>Application bắt buộc chạy analysis</h3>
+                <p><code>PortfolioAnalysisService</code> đọc portfolio, tìm violation và suy ra đúng market pair cần kiểm tra; LLM không được bỏ qua bước này.</p>
+                <a class="path" href="../app/services/portfolio_analysis_service.py">app/services/portfolio_analysis_service.py</a>
               </div>
             </li>
             <li class="rail-item">
               <span class="rail-index">05</span>
               <div class="rail-body">
-                <h3>Runner tạo subprocess an toàn</h3>
-                <p><code>BinanceCliRunner</code> dùng argument array, không mở shell, đặt timeout và chỉ truyền credentials cho account command.</p>
-                <a class="path" href="../app/binance/runner.py">app/binance/runner.py</a>
+                <h3>Gateway và runner đọc Binance Demo</h3>
+                <p>Gateway chọn command read-only đã hard-code; runner dùng argument array, không mở shell, đặt timeout và cô lập credentials.</p>
+                <span class="path">app/binance/gateway.py · app/binance/runner.py</span>
               </div>
             </li>
             <li class="rail-item">
               <span class="rail-index">06</span>
               <div class="rail-body">
-                <h3>binance-cli đọc Binance Demo</h3>
-                <p>CLI chính thức gọi API Demo. Public market không cần key; portfolio private cần Demo key read-only.</p>
-                <span class="path">binance-cli 2.1.1 · BINANCE_API_ENV=demo</span>
+                <h3>Python tính và kiểm tra an toàn</h3>
+                <p>Decimal services tính allocation, violations, proposal; RiskEngine quyết định BLOCKED, REQUIRES_APPROVAL hoặc SAFE_TO_PROPOSE.</p>
+                <span class="path">policy_service.py · rebalance_service.py · risk_service.py</span>
               </div>
             </li>
             <li class="rail-item">
               <span class="rail-index">07</span>
               <div class="rail-body">
-                <h3>Structured result quay về LLM</h3>
-                <p>Pydantic model được Agents SDK chuyển thành tool result. LLM tách dữ kiện tool khỏi phần diễn giải rủi ro và ghi rõ “Binance Demo”.</p>
-                <span class="path">Portfolio · MarketData → final_output</span>
+                <h3>Python render facts, Reporter thêm interpretation</h3>
+                <p><code>PortfolioAnalysis</code> đã validate được Python render thành facts và formal RiskStatus. Tool-free Reporter chỉ thêm phần interpretation có nhãn; output chứa status hoặc claim execution sẽ bị từ chối.</p>
+                <span class="path">app/models/analysis.py · app/agent/analysis_reporter.py</span>
               </div>
             </li>
           </ol>
 
           <h3>Tại sao đây là Agent chứ không chỉ là chatbot?</h3>
-          <p>Chatbot thông thường chỉ tạo câu trả lời từ prompt. Ở đây LLM quan sát yêu cầu, tự quyết định hành động cần thiết, gọi tool, nhận observation có cấu trúc rồi tiếp tục suy luận để trả lời. Quyền hành động vẫn bị giới hạn bởi danh sách tool mà Python cấp cho nó.</p>
+          <p>Chatbot thông thường chỉ tạo câu trả lời. Sentinel dùng LLM để chuyển ý định linh hoạt thành hành động có cấu trúc và giải thích một workflow nhiều bước; Python chủ động quan sát hệ thống ngoài rồi áp dụng policy và risk rules. Đây là agentic workflow có ranh giới an toàn, không phải LLM tự do điều khiển Binance.</p>
         </section>
 
         <section id="policy">
@@ -878,12 +878,12 @@
               <p class="eyebrow">Domain core</p>
               <h2>Policy qua chat hoạt động thế nào?</h2>
             </div>
-            <p>Code nền đã hỗ trợ phân biệt cập nhật, xem và phân tích policy. Tuy nhiên orchestration này chưa được gọi từ console Agent hiện tại.</p>
+            <p>Console đã hỗ trợ cập nhật, xem và phân tích policy bằng câu chat tự nhiên trong cùng một session.</p>
           </div>
 
           <div class="split-flow">
             <article class="flow-panel">
-              <span class="status partial">ĐÃ VIẾT — CHƯA NỐI END-TO-END</span>
+              <span class="status live">ĐÃ HOẠT ĐỘNG</span>
               <h3>Phần hiểu ngôn ngữ</h3>
               <ol class="flow-list">
                 <li><strong>User chat</strong><span>“Giữ ít nhất 30% USDT và phân tích ngay.”</span></li>
@@ -893,7 +893,7 @@
               </ol>
             </article>
             <article class="flow-panel">
-              <span class="status partial">ĐÃ VIẾT — CHƯA NỐI END-TO-END</span>
+              <span class="status live">ĐÃ HOẠT ĐỘNG</span>
               <h3>Phần quyết định deterministic</h3>
               <ol class="flow-list">
                 <li><strong>Portfolio service</strong><span>Tính total và weight bằng Decimal.</span></li>
@@ -904,7 +904,7 @@
             </article>
           </div>
 
-          <pre aria-label="Luồng policy đích">USER INTENT
+          <pre aria-label="Luồng policy đang chạy">USER INTENT
     ↓
 LLM parses typed actions
     ↓
@@ -918,8 +918,8 @@ RiskEngine validates deterministically
     ↓
 LLM explains in natural language</pre>
 
-          <div class="warning">
-            <strong>Điểm chưa nối:</strong> <code>PolicyConversationService</code> có thể trả <code>analysis_requested=True</code>, nhưng chưa có orchestrator lấy cờ đó để gọi portfolio gateway, policy checks, planner và RiskEngine trong một request duy nhất.
+          <div class="note">
+            <strong>Điểm an toàn:</strong> <code>SentinelApplication</code> thực thi từng event đúng thứ tự và bắt buộc gọi gateway, policy checks, planner rồi RiskEngine cho mỗi analysis event. Python render kết quả authoritative; Reporter không được tuyên bố formal status hoặc execution.
           </div>
         </section>
 
@@ -957,8 +957,13 @@ LLM explains in natural language</pre>
             <div class="file-list">
               <article class="file">
                 <h4><a href="../main.py">main.py</a></h4>
-                <p>Composition root: load config, tạo runner → gateway → Agent, sau đó chạy console loop bằng <code>Runner.run()</code>.</p>
-                <p class="relation"><strong>Phụ thuộc:</strong> config, Binance adapter, Sentinel Agent. <strong>Được gọi bởi:</strong> người dùng qua <code>python main.py</code>.</p>
+                <p>Composition root: load config, tạo runner → gateway → Interpreter → services → Reporter → <code>SentinelApplication</code>.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> config và các implementation ở rìa. <strong>Được gọi bởi:</strong> người dùng qua <code>python main.py</code>.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/application.py">app/application.py</a></h4>
+                <p>Use-case orchestrator cho mọi câu chat: chạy conversation trước, rồi deterministic analysis và Reporter khi được yêu cầu.</p>
+                <p class="relation"><strong>Không phụ thuộc:</strong> Binance CLI cụ thể. <strong>Output:</strong> SentinelResponse gồm text, policy và optional analysis.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/config.py">app/config.py</a></h4>
@@ -968,7 +973,7 @@ LLM explains in natural language</pre>
               <article class="file">
                 <h4><a href="../app/gateways.py">app/gateways.py</a></h4>
                 <p>Protocol do application sở hữu, định nghĩa <code>get_portfolio()</code> và <code>get_market_data()</code>.</p>
-                <p class="relation"><strong>Phụ thuộc:</strong> domain models. <strong>Được implement bởi:</strong> BinanceCliGateway. <strong>Dùng bởi:</strong> AI tools.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> domain models. <strong>Được implement bởi:</strong> BinanceCliGateway. <strong>Dùng bởi:</strong> analysis service và AI tools giáo dục.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/sessions.py">app/sessions.py</a></h4>
@@ -1003,18 +1008,23 @@ LLM explains in natural language</pre>
             <div class="file-list">
               <article class="file">
                 <h4><a href="../app/agent/sentinel.py">app/agent/sentinel.py</a></h4>
-                <p>Tạo Agent tên Sentinel, gắn model route, instructions và đúng hai tool gateway-backed.</p>
-                <p class="relation"><strong>Input:</strong> Settings + PortfolioMarketGateway. <strong>Output:</strong> Agents SDK <code>Agent</code>. <strong>Dùng bởi:</strong> main.py.</p>
+                <p>Tạo Agent hai-tool để minh họa cách LLM tự chọn tool; file này vẫn có test nhưng không còn là runtime policy chính.</p>
+                <p class="relation"><strong>Input:</strong> Settings + PortfolioMarketGateway. <strong>Output:</strong> Agents SDK <code>Agent</code>. <strong>Dùng để học:</strong> autonomous tool calling.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/prompts.py">app/agent/prompts.py</a></h4>
-                <p>Giữ Sentinel instructions và Request Interpreter instructions tách khỏi construction code.</p>
-                <p class="relation"><strong>Quy tắc:</strong> không bịa dữ liệu, không trade, tách fact/interpretation; interpreter phân loại request và chỉ tạo typed actions.</p>
+                <p>Giữ instructions của Agent giáo dục, Request Interpreter và Analysis Reporter tách khỏi construction code.</p>
+                <p class="relation"><strong>Quy tắc:</strong> không bịa dữ liệu, không trade; Interpreter chỉ tạo typed actions, Reporter không sửa RiskDecision.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/request_interpreter.py">app/agent/request_interpreter.py</a></h4>
                 <p>Tạo tool-free LLM Agent với <code>output_type=ParsedRequest</code>; phân loại request, trích policy patch khi cần và retry một lần khi structured output sai schema.</p>
-                <p class="relation"><strong>Input:</strong> message + current policy. <strong>Output:</strong> typed actions. <strong>Dùng bởi:</strong> policy conversation flow, chưa nối main.</p>
+                <p class="relation"><strong>Input:</strong> message + current policy. <strong>Output:</strong> typed actions. <strong>Dùng bởi:</strong> policy conversation flow trong main.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/agent/analysis_reporter.py">app/agent/analysis_reporter.py</a></h4>
+                <p>Tạo tool-free Reporter, nhận duy nhất câu hỏi và <code>PortfolioAnalysis</code> đã validate rồi viết interpretation định tính.</p>
+                <p class="relation"><strong>Không được:</strong> gọi Binance, tính lại số liệu, sửa policy, plan hoặc RiskDecision.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/tools/portfolio.py">app/tools/portfolio.py</a></h4>
@@ -1099,6 +1109,11 @@ LLM explains in natural language</pre>
                 <p class="relation"><strong>Dùng bởi:</strong> Portfolio và MarketData để tránh gọi số dư mô phỏng là tiền thật.</p>
               </article>
               <article class="file">
+                <h4><a href="../app/models/analysis.py">app/models/analysis.py</a></h4>
+                <p>Aggregate đã validate và khóa ở top-level, gồm policy, portfolio, violations, market data, plan và risk decision.</p>
+                <p class="relation"><strong>Tạo bởi:</strong> PortfolioAnalysisService. <strong>Chỉ đọc bởi:</strong> Reporter và caller.</p>
+              </article>
+              <article class="file">
                 <h4><a href="../app/models/__init__.py">app/models/__init__.py</a></h4>
                 <p>Package marker cho domain model; không re-export hàng loạt để dependency vẫn dễ truy vết.</p>
                 <p class="relation"><strong>Được import theo file cụ thể:</strong> ví dụ <code>app.models.policy</code>.</p>
@@ -1122,12 +1137,17 @@ LLM explains in natural language</pre>
               <article class="file">
                 <h4><a href="../app/services/policy_conversation_service.py">app/services/policy_conversation_service.py</a></h4>
                 <p>Điều phối typed actions đúng thứ tự và báo có cần phân tích portfolio hay không.</p>
-                <p class="relation"><strong>Phụ thuộc:</strong> RequestInterpreter protocol, session store, response formatter. <strong>Chưa dùng bởi:</strong> main.py.</p>
+                <p class="relation"><strong>Phụ thuộc:</strong> RequestInterpreter protocol, session store, response formatter. <strong>Dùng bởi:</strong> SentinelApplication.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/services/policy_response_service.py">app/services/policy_response_service.py</a></h4>
                 <p>Chuyển policy update/current policy thành câu tiếng Việt dễ đọc.</p>
                 <p class="relation"><strong>Input:</strong> validated policy/patch. <strong>Output:</strong> natural-language text, không trả JSON thô cho user.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/analysis_response_service.py">app/services/analysis_response_service.py</a></h4>
+                <p>Render portfolio, market, violations, proposal, formal RiskStatus và NOT_EXECUTED bằng Python.</p>
+                <p class="relation"><strong>Lý do:</strong> facts hiển thị không phụ thuộc vào lời văn tự do của LLM Reporter.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/services/rebalance_service.py">app/services/rebalance_service.py</a></h4>
@@ -1138,6 +1158,11 @@ LLM explains in natural language</pre>
                 <h4><a href="../app/services/risk_service.py">app/services/risk_service.py</a></h4>
                 <p>Áp priority: high volatility BLOCKED trước, trade threshold REQUIRES_APPROVAL sau, còn lại SAFE_TO_PROPOSE.</p>
                 <p class="relation"><strong>Input:</strong> policy + plan + market. <strong>Output:</strong> RiskDecision deterministic.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/portfolio_analysis_service.py">app/services/portfolio_analysis_service.py</a></h4>
+                <p>Use case deterministic: đọc portfolio, tìm violation, lấy market cần thiết, tạo plan, chạy RiskEngine và đóng gói analysis.</p>
+                <p class="relation"><strong>Fail closed:</strong> thiếu dữ liệu bắt buộc thì không tạo recommendation và không gọi Reporter.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/services/__init__.py">app/services/__init__.py</a></h4>
@@ -1342,7 +1367,10 @@ usd_value ÷ total = weight</pre>
             <li>Policy patch, violations và session state</li>
             <li>Rebalance arithmetic và missing-market failure</li>
             <li>Risk priority: BLOCKED → APPROVAL → SAFE</li>
-            <li>Agent tool wiring và model route</li>
+            <li>Request Interpreter structured output và schema retry</li>
+            <li>Application orchestration và deterministic analysis end-to-end</li>
+            <li>Reporter không tool và model route qua LiteLLM</li>
+            <li>Agent hai-tool giáo dục và gateway boundary</li>
             <li>Static UI behavior bằng Node test runner</li>
             <li>HTML guide semantic/content contract</li>
           </ul>
@@ -1354,6 +1382,9 @@ usd_value ÷ total = weight</pre>
               <tbody>
                 <tr><td><code>tests/test_config.py</code></td><td>LLM route, active provider key, Binance Demo-only config.</td></tr>
                 <tr><td><code>tests/test_agent.py</code></td><td>Agent name, instructions và đúng hai AI-callable tools.</td></tr>
+                <tr><td><code>tests/unit/test_application.py</code></td><td>Thứ tự conversation → analysis → Reporter và fail-closed.</td></tr>
+                <tr><td><code>tests/unit/test_portfolio_analysis_service.py</code></td><td>Market discovery, deduplication, plan và risk status deterministic.</td></tr>
+                <tr><td><code>tests/unit/test_analysis_reporter.py</code></td><td>Tool-free Reporter chỉ nhận validated analysis.</td></tr>
                 <tr><td><code>tests/test_portfolio.py</code> / <code>test_market.py</code></td><td>Application tool boundary qua fake gateway.</td></tr>
                 <tr><td><code>tests/unit/test_binance_cli_runner.py</code></td><td>Subprocess arguments, HOME, timeout, credential isolation và lỗi đã sanitize.</td></tr>
                 <tr><td><code>tests/unit/test_binance_portfolio_gateway.py</code></td><td>Account + price payload thành Portfolio BINANCE_DEMO.</td></tr>
@@ -1384,24 +1415,24 @@ git diff --check</pre>
               <p class="eyebrow">Road ahead</p>
               <h2>Chưa có gì, nên làm gì tiếp?</h2>
             </div>
-            <p>Thứ tự dưới đây hoàn thiện core product trước khi nghĩ tới execution. Không bước nào được hiểu là đã có trong runtime hiện tại.</p>
+            <p>Core policy analysis đã chạy trong console. Các bước dưới đây chưa có trong runtime hiện tại và không được hiểu là đã sẵn sàng.</p>
           </div>
 
           <ol class="journey">
             <li>
               <span class="phase">NEXT 01</span>
-              <h3>Nối orchestrator</h3>
-              <p>Ghép policy chat, portfolio observation, violation, planner và RiskEngine thành một application flow.</p>
-            </li>
-            <li>
-              <span class="phase">NEXT 02</span>
               <h3>FastAPI</h3>
               <p>Expose structured analysis response và activity events; secrets chỉ ở backend.</p>
             </li>
             <li>
-              <span class="phase">NEXT 03</span>
+              <span class="phase">NEXT 02</span>
               <h3>UI thật</h3>
               <p>Thay progress mô phỏng bằng event từ backend; render portfolio, policy, plan và risk result.</p>
+            </li>
+            <li>
+              <span class="phase">NEXT 03</span>
+              <h3>Audit và persistence</h3>
+              <p>Lưu policy, analysis snapshot và trạng thái plan thay cho session RAM.</p>
             </li>
             <li>
               <span class="phase">NEXT 04</span>

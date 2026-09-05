@@ -2,6 +2,8 @@ from app.agent.sentinel import create_sentinel_agent
 from app.config import LLMProvider, Settings
 from app.models.market import MarketDataResult
 from app.models.portfolio import Portfolio
+from app.application import SentinelApplication
+from main import create_application
 
 
 class UnusedGateway:
@@ -29,3 +31,15 @@ def test_create_sentinel_agent_uses_configured_litellm_model() -> None:
     assert "Binance Demo" in agent.instructions
     assert "real portfolio" in agent.instructions
     assert "Never execute trades" in agent.instructions
+
+
+def test_create_application_wires_policy_analysis_without_external_calls() -> None:
+    settings = Settings(
+        llm_provider=LLMProvider.GEMINI,
+        llm_model="gemini-3.5-flash-lite",
+        gemini_api_key="test-gemini-key",
+    )
+
+    application = create_application(settings, UnusedGateway())
+
+    assert isinstance(application, SentinelApplication)

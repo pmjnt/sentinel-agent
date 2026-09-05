@@ -53,7 +53,10 @@ def test_project_guide_maps_runtime_and_policy_files() -> None:
         "app/binance/gateway.py",
         "app/binance/runner.py",
         "app/agent/request_interpreter.py",
+        "app/agent/analysis_reporter.py",
+        "app/application.py",
         "app/services/policy_conversation_service.py",
+        "app/services/portfolio_analysis_service.py",
         "app/services/policy_service.py",
         "app/services/rebalance_service.py",
         "app/services/risk_service.py",
@@ -74,7 +77,7 @@ def test_project_guide_states_current_limitations_explicitly() -> None:
     source = _read_guide()
 
     assert "UI hiện tại là bản tĩnh; tiến trình phân tích trên web đang được mô phỏng." in source
-    assert "Policy orchestration chưa được kết nối vào main.py." in source
+    assert "Policy state hiện chỉ được lưu trong RAM." in source
     assert "Custom MCP hiện không hoạt động." in source
     assert "Sentinel hiện không có khả năng giao dịch." in source
 

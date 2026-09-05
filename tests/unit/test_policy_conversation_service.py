@@ -125,3 +125,51 @@ def test_analyze_alone_uses_existing_policy() -> None:
 
     assert result.policy == expected_policy
     assert result.analysis_requested is True
+    assert result.message == ""
+
+
+def test_analyze_before_update_preserves_the_old_policy_snapshot() -> None:
+    store = InMemoryPolicySessionStore()
+    old_policy = store.apply(
+        "session-1",
+        PolicyPatch(max_asset_weight=Decimal("0.50")),
+    )
+
+    result = _handle(
+        ParsedRequest(
+            actions=[
+                AnalyzePortfolioAction(focus_symbols=["BTC"]),
+                UpdatePolicyAction(
+                    patch=PolicyPatch(max_asset_weight=Decimal("0.40"))
+                ),
+            ]
+        ),
+        store,
+    )
+
+    assert result.events[0].policy == old_policy
+    assert result.events[0].focus_symbols == ("BTC",)
+    assert "Đã cập nhật policy" in result.events[1].message
+    assert result.policy.max_asset_weight == Decimal("0.40")
+
+
+def test_clarification_anywhere_prevents_all_state_changes() -> None:
+    store = InMemoryPolicySessionStore()
+    original_policy = store.get("session-1")
+
+    result = _handle(
+        ParsedRequest(
+            actions=[
+                UpdatePolicyAction(
+                    patch=PolicyPatch(max_asset_weight=Decimal("0.40"))
+                ),
+                ClarificationAction(question="Bạn muốn áp dụng 40% cho asset nào?"),
+            ]
+        ),
+        store,
+    )
+
+    assert result.message == "Bạn muốn áp dụng 40% cho asset nào?"
+    assert result.analysis_requested is False
+    assert result.policy == original_policy
+    assert store.get("session-1") == original_policy

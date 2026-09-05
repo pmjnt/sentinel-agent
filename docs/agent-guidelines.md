@@ -8,7 +8,7 @@ LLM chịu trách nhiệm:
 - phân biệt cập nhật, xem policy, phân tích và yêu cầu cần làm rõ;
 - giữ đúng thứ tự khi một message chứa nhiều action;
 - chọn thông tin portfolio/market cần đọc;
-- giải thích kết quả đã được Python xác minh.
+- thêm interpretation định tính cho kết quả Python đã xác minh.
 
 LLM không phải nguồn sự thật cho:
 
@@ -19,9 +19,9 @@ LLM không phải nguồn sự thật cho:
 - approval requirement;
 - execution authorization.
 
-## Policy parser Agent
+## Request Interpreter Agent
 
-Policy parser là một Agent riêng, không có tool tài chính. Nó nhận:
+Request Interpreter là một Agent riêng, không có tool tài chính. Nó nhận:
 
 ```text
 Current validated portfolio policy
@@ -49,7 +49,7 @@ Structured output là dữ liệu nội bộ, không phải nội dung hiển th
 ```text
 Natural-language message
         ↓
-Policy parser LLM
+Request Interpreter LLM
         ↓
 ParsedRequest
         ↓
@@ -60,7 +60,7 @@ PolicyConversationService
 Natural-language confirmation
 ```
 
-Nếu output không đúng schema, parser retry đúng một lần. Nếu vẫn sai, workflow trả lỗi; không tự đoán action thay thế. Lỗi provider hoặc network không được retry như lỗi schema và không được đổi thành kết quả giả.
+Nếu output không đúng schema, Interpreter retry đúng một lần. Nếu vẫn sai, workflow trả lỗi; không tự đoán action thay thế. Lỗi provider hoặc network không được retry như lỗi schema và không được đổi thành kết quả giả.
 
 ## Patch semantics
 
@@ -93,7 +93,8 @@ Actions:
 2. ANALYZE_PORTFOLIO
 ```
 
-Python thực hiện đúng thứ tự. Một clarification action dừng workflow để tránh thực hiện yêu cầu dựa trên policy mơ hồ.
+Python thực hiện đúng thứ tự. Nếu cần clarification, Interpreter chỉ trả một
+`NEEDS_CLARIFICATION`; service dừng toàn bộ message trước khi thay đổi state.
 
 ## Conversation state
 
@@ -107,22 +108,30 @@ Việc này tránh:
 
 Restart ứng dụng sẽ xóa session trong phiên bản hiện tại.
 
+Mỗi analysis action giữ một policy snapshot riêng. Vì vậy “phân tích rồi đổi
+policy” phân tích bằng policy cũ, còn “đổi rồi phân tích” dùng policy mới; nhiều
+analysis action không bị gộp thành một.
+
 ## Hai Agent có trách nhiệm khác nhau
 
-### Policy parser
+### Request Interpreter
 
 - Không có tool.
 - Chỉ hiểu requested actions.
 - Trả structured output.
 
-### Sentinel analysis Agent
+### Analysis Reporter
 
-- Có hai tool ứng dụng ổn định: `get_portfolio()` và `get_market_data()`.
-- Chọn dữ liệu cần đọc.
-- Nhận kết quả deterministic và giải thích.
+- Không có tool.
+- Nhận `PortfolioAnalysis` đã được Python xác minh.
+- Chỉ thêm interpretation định tính; Python tự render facts và formal status.
+- Không được lặp lại formal RiskStatus hoặc tuyên bố execution state.
 - Không thay đổi policy hoặc RiskDecision.
 
-Tách hai trách nhiệm giúp prompt ngắn, output rõ và test dễ hơn.
+Giữa hai Agent, `SentinelApplication` và `PortfolioAnalysisService` bắt buộc chạy
+gateway, policy checks, planner và RiskEngine. Vì vậy LLM không thể bỏ qua một
+bước kiểm tra an toàn. Agent hai-tool trong `app/agent/sentinel.py` chỉ còn là ví
+dụ giáo dục về autonomous tool calling, không phải runtime policy chính.
 
 ## Prompt review checklist
 

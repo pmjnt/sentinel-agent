@@ -25,12 +25,16 @@ Unit test không được:
 - mở browser;
 - phụ thuộc thời gian chờ.
 
+Application orchestration cũng được test offline bằng fake Request Interpreter,
+fake gateway và fake Reporter. Fake chỉ thay thế ranh giới I/O; policy,
+allocation, planner và RiskEngine vẫn chạy code thật trong test của chúng.
+
 ### Integration tests
 
 Khi FastAPI được thêm, integration test kiểm tra:
 
 - API contract bằng dependency override;
-- workflow bằng fake intent parser và fake gateway;
+- API workflow bằng fake Request Interpreter, fake gateway và fake Reporter;
 - Binance CLI payload mapping bằng fixture đã loại dữ liệu nhạy cảm;
 - read-only allow-list;
 - error path không fallback sang mock.

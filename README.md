@@ -10,16 +10,17 @@ must label them as Binance Demo data.
 ## Responsibility boundaries
 
 ```text
-LLM understands the request, chooses application tools, and explains results.
+Request Interpreter LLM turns natural language into validated typed actions.
 Binance Skills Hub supplies Demo portfolio and market observations.
 Python calculates allocations, policy violations, proposals, and risk decisions.
 RiskEngine enforces deterministic safety rules.
+Python renders authoritative facts and status; Reporter LLM adds qualitative interpretation.
 ```
 
 The LLM is not authoritative for arithmetic, thresholds, permissions, or trade
 execution.
 
-## Agent loop
+## Policy-driven agent loop
 
 For:
 
@@ -27,29 +28,31 @@ For:
 Analyze my BTC exposure and tell me whether it currently looks risky.
 ```
 
-the OpenAI Agents SDK lets the LLM choose this sequence:
+Sentinel executes this sequence:
 
 ```text
 User
   ↓
-Sentinel Agent / LLM
-  ├── get_portfolio()
-  │         ↓
-  │   BinanceCliGateway
-  │         ↓
-  │   binance-cli spot get-account
-  │
-  └── get_market_data("BTCUSDT")
-            ↓
-      BinanceCliGateway
-            ↓
-      ticker24hr + depth
+Request Interpreter LLM
+  ↓ typed actions validated by Pydantic
+PolicyConversationService
   ↓
-LLM explains facts and interpretation separately
+PortfolioAnalysisService
+  ├── BinanceCliGateway → Demo portfolio and market data
+  ├── policy violation checks
+  ├── deterministic rebalance proposal
+  └── RiskEngine → BLOCKED / REQUIRES_APPROVAL / SAFE_TO_PROPOSE
+  ↓
+Python renders facts/status → Reporter LLM adds a labeled interpretation
 ```
 
-Only the two application tools are visible to the LLM. It cannot select CLI
-subcommands, URLs, order commands, transfers, or withdrawals.
+The policy runtime does not let an LLM decide whether mandatory safety checks
+run. Python orchestrates and renders those checks. Neither LLM can select CLI subcommands,
+URLs, order commands, transfers, or withdrawals.
+
+`app/agent/sentinel.py` and `app/tools/` remain as a small educational example
+of autonomous tool selection. The main console uses the stricter policy-driven
+workflow above.
 
 ## Project structure
 
@@ -57,6 +60,7 @@ subcommands, URLs, order commands, transfers, or withdrawals.
 sentinel-agent/
 ├── app/
 │   ├── agent/             # LLM instructions and Agent construction
+│   ├── application.py     # End-to-end conversational orchestration
 │   ├── binance/           # Safe CLI runner, response schemas, gateway
 │   ├── models/            # Pydantic domain models
 │   ├── services/          # Deterministic policy/planning/risk logic
@@ -171,11 +175,21 @@ withdrawal code path.
 python main.py
 ```
 
-Try:
+Try analysis:
 
 ```text
 Sentinel > Analyze my BTC exposure and tell me whether it currently looks risky.
 ```
+
+Try policy chat:
+
+```text
+Sentinel > Giữ ít nhất 30% USDT, không asset nào trên 40%, chặn rebalance khi volatility HIGH, rồi phân tích portfolio.
+Sentinel > Xem policy hiện tại.
+```
+
+Policy state is kept per console session in memory and is lost when the process
+stops.
 
 Type `exit` to close the console.
 
@@ -205,4 +219,4 @@ It never receives LLM or Binance API keys.
 `BinanceCliGateway` is behind the application-owned
 `PortfolioMarketGateway` protocol. If Binance later supports Sentinel as a
 direct MCP client, a new MCP gateway can implement the same two methods without
-changing the domain models, deterministic services, or AI-visible tool names.
+changing the application workflow, domain models, or deterministic services.

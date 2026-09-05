@@ -35,17 +35,21 @@ When analysis is requested, `PortfolioAnalysisService` deterministically:
 7. returns one validated `PortfolioAnalysis` model.
 
 A tool-free `Sentinel Analysis Reporter` LLM receives only the user's question
-and the validated analysis model. It explains facts and interpretation in
-natural language but cannot call Binance or alter the decision.
+and the validated analysis model. It adds qualitative interpretation but cannot
+call Binance or alter the decision. Python renders all authoritative facts,
+formal risk status, and the explicit `NOT_EXECUTED` state.
 
 ## AI responsibility
 
 The Request Interpreter autonomously selects ordered application actions from
-natural language. The Reporter performs qualitative explanation. Python remains
+natural language. Each action becomes an ordered conversation event, so an
+analysis before an update uses the old policy snapshot and multiple analyses are
+not collapsed. The Reporter performs qualitative explanation. Python remains
 authoritative for state mutation, required data retrieval, arithmetic, policy
 violations, proposal construction, and risk status.
 
-This uses two LLM calls for an analysis request and one for update/view requests.
+This uses one Interpreter LLM call per message, plus one Reporter LLM call for
+each analysis action. Update/view-only requests use only the Interpreter.
 It avoids a second Policy Parser Agent and prevents the explanatory LLM from
 controlling financial state.
 
@@ -79,10 +83,14 @@ market conditions could not be verified and never falls back to mock data.
 
 - update-only and view-only messages return deterministic Vietnamese text;
 - clarification returns the Interpreter's focused question without analysis;
-- analysis-only messages return the Reporter output;
+- any clarification short-circuits the complete message before state changes;
+- analysis-only messages return Python-rendered facts plus Reporter interpretation;
 - update/view followed by analysis returns the deterministic policy response,
-  then the Reporter output;
+  then Python-rendered facts and Reporter interpretation;
 - no response contains raw credentials or claims a trade occurred.
+
+`SentinelResponse.analyses` retains every successful analysis in event order;
+`response.analysis` is a convenience view of the latest successful item.
 
 ## Scope boundary
 

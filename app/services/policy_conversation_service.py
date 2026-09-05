@@ -25,11 +25,46 @@ class RequestInterpreter(Protocol):
 
 
 @dataclass(frozen=True)
-class PolicyConversationResult:
+class PolicyMessageEvent:
     message: str
+
+
+@dataclass(frozen=True)
+class PortfolioAnalysisEvent:
     policy: PortfolioPolicy
-    analysis_requested: bool
-    focus_symbols: list[str]
+    focus_symbols: tuple[str, ...]
+
+
+PolicyConversationEvent = PolicyMessageEvent | PortfolioAnalysisEvent
+
+
+@dataclass(frozen=True)
+class PolicyConversationResult:
+    events: tuple[PolicyConversationEvent, ...]
+    policy: PortfolioPolicy
+
+    @property
+    def message(self) -> str:
+        return "\n".join(
+            event.message
+            for event in self.events
+            if isinstance(event, PolicyMessageEvent)
+        )
+
+    @property
+    def analysis_requested(self) -> bool:
+        return any(
+            isinstance(event, PortfolioAnalysisEvent) for event in self.events
+        )
+
+    @property
+    def focus_symbols(self) -> list[str]:
+        symbols: dict[str, None] = {}
+        for event in self.events:
+            if isinstance(event, PortfolioAnalysisEvent):
+                for symbol in event.focus_symbols:
+                    symbols[symbol] = None
+        return list(symbols)
 
 
 class PolicyConversationService:
@@ -50,40 +85,43 @@ class PolicyConversationService:
     ) -> PolicyConversationResult:
         policy = self._store.get(session_id)
         interpreted = await self._interpreter.interpret(message, policy)
-        response_parts: list[str] = []
-        analysis_requested = False
-        focus_symbols: list[str] = []
+        events: list[PolicyConversationEvent] = []
+
+        clarification = next(
+            (
+                action
+                for action in interpreted.actions
+                if isinstance(action, ClarificationAction)
+            ),
+            None,
+        )
+        if clarification is not None:
+            return PolicyConversationResult(
+                events=(PolicyMessageEvent(clarification.question),),
+                policy=policy,
+            )
 
         for action in interpreted.actions:
-            if isinstance(action, ClarificationAction):
-                return PolicyConversationResult(
-                    message=action.question,
-                    policy=policy,
-                    analysis_requested=False,
-                    focus_symbols=[],
-                )
-
             if isinstance(action, UpdatePolicyAction):
                 policy = self._store.apply(session_id, action.patch)
-                response_parts.append(format_policy_update(action.patch, policy))
+                events.append(
+                    PolicyMessageEvent(format_policy_update(action.patch, policy))
+                )
                 continue
 
             if isinstance(action, ViewPolicyAction):
-                response_parts.append(format_current_policy(policy))
+                events.append(PolicyMessageEvent(format_current_policy(policy)))
                 continue
 
             if isinstance(action, AnalyzePortfolioAction):
-                analysis_requested = True
-                for symbol in action.focus_symbols:
-                    if symbol not in focus_symbols:
-                        focus_symbols.append(symbol)
-
-        if analysis_requested and not response_parts:
-            response_parts.append("Đã ghi nhận yêu cầu phân tích portfolio.")
+                events.append(
+                    PortfolioAnalysisEvent(
+                        policy=policy,
+                        focus_symbols=tuple(dict.fromkeys(action.focus_symbols)),
+                    )
+                )
 
         return PolicyConversationResult(
-            message="\n".join(response_parts),
+            events=tuple(events),
             policy=policy,
-            analysis_requested=analysis_requested,
-            focus_symbols=focus_symbols,
         )

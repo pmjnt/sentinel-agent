@@ -13,8 +13,9 @@
 - Model đặt trong `app/models/<domain>.py`.
 - Business rule đặt trong `app/services/<responsibility>_service.py`.
 - HTTP parsing và status code chỉ đặt trong `app/api`.
-- Provider payload mapping chỉ đặt trong `app/mcp`.
+- Provider payload mapping chỉ đặt trong adapter như `app/binance`.
 - Prompt và Agent construction chỉ đặt trong `app/agent`.
+- Điều phối nhiều use case đặt ở `app/application.py`, không đặt trong prompt.
 - Không đặt network call hoặc business rule trong Pydantic validator.
 
 ## 3. Dependency
@@ -22,16 +23,17 @@
 Được phép:
 
 ```text
-services → models
-agent → services + models + ports
-mcp → ports + models
-api → agent + services + models
+services → models + application-owned ports
+agent → config + models
+application → models + service protocols
+binance adapter → ports + models + deterministic mapping services
+api (future) → application + models
 ```
 
 Không được phép:
 
 ```text
-models → services/agent/mcp/api
+models → services/agent/binance/api
 services → agents/fastapi/mcp/litellm
 web → provider API hoặc Binance credential
 ```
@@ -73,25 +75,27 @@ Nếu xuất hiện circular import, xem lại trách nhiệm module thay vì tr
 ## 8. Async
 
 - Domain services là synchronous vì chỉ tính toán trong bộ nhớ.
-- Dùng async cho LLM, MCP và HTTP I/O.
+- Dùng async cho LLM, Binance CLI và HTTP/MCP I/O.
 - Không biến hàm thành async chỉ để đồng nhất hình thức.
 - Không gọi blocking I/O trực tiếp trong async request handler.
 
 ## 9. Agent rules
 
-- LLM hiểu intent, chọn tool và giải thích.
+- Request Interpreter LLM hiểu intent và trả typed actions.
+- Analysis Reporter LLM giải thích `PortfolioAnalysis` đã được xác minh.
+- Python orchestrator bắt buộc chạy các bước data/policy/planner/risk cần thiết.
 - Python là nguồn sự thật cho arithmetic và policy threshold.
 - RiskEngine là nguồn sự thật cho `BLOCKED`, `REQUIRES_APPROVAL`, `SAFE_TO_PROPOSE`.
 - Structured output phải được validate trước khi ảnh hưởng state.
 - Nếu policy mơ hồ, hỏi lại; không tự tạo threshold.
-- Không expose write tool cho Agent trong phiên bản read-only.
+- Không expose write tool cho bất kỳ Agent nào trong phiên bản read-only.
 
-## 10. MCP rules
+## 10. MCP rules cho adapter tương lai
 
 - Chỉ kết nối endpoint chính thức đã cấu hình.
 - Grant tối thiểu Market Data và Account scope.
 - Discover schema thật trước khi viết mapping.
-- Raw MCP tools không được gắn trực tiếp vào Agent.
+- Raw MCP tools không được gắn trực tiếp vào Agent; phải đi qua gateway ổn định.
 - Gateway chỉ gọi tool nằm trong allow-list đã review.
 - Unknown tool bị từ chối theo mặc định.
 - Token nằm ở backend và không xuất hiện trong prompt hoặc browser state.
