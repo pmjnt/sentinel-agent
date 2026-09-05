@@ -73,12 +73,13 @@ sentinel-agent/
 
 More detail:
 
+- [Sổ tay kiến trúc và mã nguồn hiện tại](docs/sentinel-project-guide.html)
 - [Architecture](docs/architecture.md)
 - [Development guidelines](docs/development-guidelines.md)
 - [Agent guidelines](docs/agent-guidelines.md)
 - [Testing guidelines](docs/testing.md)
 - [Binance Skills Hub setup](docs/binance-skills-hub.md)
-- [Vietnamese SRD guide](docs/sentinel-srd-guide.html)
+- [Vietnamese SRD guide — historical MCP design](docs/sentinel-srd-guide.html)
 
 ## Requirements
 

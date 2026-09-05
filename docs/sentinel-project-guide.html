@@ -985,6 +985,16 @@ LLM explains in natural language</pre>
                 <p>Template tên biến cấu hình, chỉ chứa placeholder. `.env` thật bị ignore và không bao giờ đi vào frontend.</p>
                 <p class="relation"><strong>Dùng bởi:</strong> developer khi setup. <strong>Không được import:</strong> đây không phải source code.</p>
               </article>
+              <article class="file">
+                <h4><a href="../requirements.txt">requirements.txt</a></h4>
+                <p>Liệt kê các package Python: Agents SDK với LiteLLM extra, dotenv, Pydantic và pytest; hiện chỉ LiteLLM được pin phiên bản cụ thể.</p>
+                <p class="relation"><strong>Dùng bởi:</strong> pip khi dựng virtual environment. <strong>Không chứa:</strong> MCP, web framework hay Binance SDK riêng.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../.gitignore">.gitignore</a></h4>
+                <p>Ngăn `.env`, virtual environment, cache và artifact local đi vào Git.</p>
+                <p class="relation"><strong>Vai trò an toàn:</strong> secret local không xuất hiện trong commit chỉ vì developer chạy ứng dụng.</p>
+              </article>
             </div>
           </details>
 
@@ -1017,7 +1027,7 @@ LLM explains in natural language</pre>
                 <p class="relation"><strong>Input:</strong> pair như BTCUSDT. <strong>Output:</strong> MarketData hoặc MarketDataError. <strong>Không được:</strong> tự tạo giá.</p>
               </article>
               <article class="file">
-                <h4><a href="../app/agent/__init__.py">app/agent/__init__.py và app/tools/__init__.py</a></h4>
+                <h4><a href="../app/agent/__init__.py">app/agent/__init__.py</a> và <a href="../app/tools/__init__.py">app/tools/__init__.py</a></h4>
                 <p>Đánh dấu package và cho phép API package rõ ràng về sau. Hiện để rỗng để tránh side effect khi import.</p>
                 <p class="relation"><strong>Không phải:</strong> nơi bắt buộc đặt business logic hoặc tự động khởi tạo Agent.</p>
               </article>
@@ -1336,6 +1346,29 @@ usd_value ÷ total = weight</pre>
             <li>Static UI behavior bằng Node test runner</li>
             <li>HTML guide semantic/content contract</li>
           </ul>
+
+          <h3>Test nào bảo vệ phần nào?</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Test file</th><th>Boundary được bảo vệ</th></tr></thead>
+              <tbody>
+                <tr><td><code>tests/test_config.py</code></td><td>LLM route, active provider key, Binance Demo-only config.</td></tr>
+                <tr><td><code>tests/test_agent.py</code></td><td>Agent name, instructions và đúng hai AI-callable tools.</td></tr>
+                <tr><td><code>tests/test_portfolio.py</code> / <code>test_market.py</code></td><td>Application tool boundary qua fake gateway.</td></tr>
+                <tr><td><code>tests/unit/test_binance_cli_runner.py</code></td><td>Subprocess arguments, HOME, timeout, credential isolation và lỗi đã sanitize.</td></tr>
+                <tr><td><code>tests/unit/test_binance_portfolio_gateway.py</code></td><td>Account + price payload thành Portfolio BINANCE_DEMO.</td></tr>
+                <tr><td><code>tests/unit/test_binance_market_gateway.py</code></td><td>Symbol, volatility, depth/slippage và market failure.</td></tr>
+                <tr><td><code>tests/unit/test_domain_models.py</code> / <code>test_chat_models.py</code></td><td>Pydantic validation và typed chat actions.</td></tr>
+                <tr><td><code>tests/unit/test_policy_*.py</code></td><td>Parser, conversation, response và violation logic.</td></tr>
+                <tr><td><code>tests/unit/test_portfolio_service.py</code></td><td>Decimal total và allocation.</td></tr>
+                <tr><td><code>tests/unit/test_rebalance_service.py</code></td><td>Draft trade arithmetic, không phải execution.</td></tr>
+                <tr><td><code>tests/unit/test_risk_service.py</code></td><td>Risk priority và missing-market fail-closed.</td></tr>
+                <tr><td><code>tests/unit/test_sessions.py</code></td><td>Policy state theo session trong RAM.</td></tr>
+                <tr><td><code>tests/test_ui.js</code></td><td>Static UI model selection và simulated activity.</td></tr>
+                <tr><td><code>tests/test_project_guide.py</code></td><td>Semantic structure, file map, status truth và secret guard của trang này.</td></tr>
+              </tbody>
+            </table>
+          </div>
 
           <pre>python -m pytest -q
 node --test tests/test_ui.js

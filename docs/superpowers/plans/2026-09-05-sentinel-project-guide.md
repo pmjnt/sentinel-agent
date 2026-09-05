@@ -142,12 +142,12 @@ git commit -m "docs: add Sentinel project handbook"
 - Modify: `README.md`
 - Test: `tests/test_project_guide.py`
 
-- [ ] **Step 1: Add the README documentation link**
+- [x] **Step 1: Add the README documentation link**
 
 Add `docs/sentinel-project-guide.html` to the “More detail” list with a clear
 Vietnamese label identifying it as the current implementation handbook.
 
-- [ ] **Step 2: Validate HTML and repository checks**
+- [x] **Step 2: Validate HTML and repository checks**
 
 Run:
 
@@ -161,14 +161,14 @@ git diff --check
 
 Expected: all tests pass, compile exits 0, and `git diff --check` has no output.
 
-- [ ] **Step 3: Check documentation accuracy**
+- [x] **Step 3: Check documentation accuracy**
 
 Compare the guide's current-state claims against `main.py`, `app/agent`,
 `app/tools`, `app/binance`, `app/services`, `.env.example`, and the current test
 tree. Confirm every inactive or future capability is visibly labeled and that
 no credentials or real account values appear.
 
-- [ ] **Step 4: Commit the README link and final verification record**
+- [x] **Step 4: Commit the README link and final verification record**
 
 ```bash
 git add README.md docs/superpowers/plans/2026-09-05-sentinel-project-guide.md
