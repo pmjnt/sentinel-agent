@@ -4,8 +4,8 @@ from app.models.analysis import PortfolioAnalysis
 def format_authoritative_analysis(analysis: PortfolioAnalysis) -> str:
     """Render financial facts in Python so LLM prose is never authoritative."""
     lines = [
-        "Dữ kiện đã xác thực (Binance Demo)",
-        f"- Tổng portfolio: ${analysis.portfolio.total_usd_value:,.2f}",
+        "Verified facts (Binance Demo)",
+        f"- Total portfolio: ${analysis.portfolio.total_usd_value:,.2f}",
     ]
     for asset in analysis.portfolio.assets:
         weight_percent = asset.weight * 100
@@ -20,7 +20,7 @@ def format_authoritative_analysis(analysis: PortfolioAnalysis) -> str:
                 f"  - {market.symbol}: ${market.price:,.2f}, "
                 f"24h {market.change_24h_percent}%, "
                 f"volatility {market.volatility.value}, "
-                f"slippage ước tính {market.estimated_slippage_percent}%"
+                f"estimated slippage {market.estimated_slippage_percent}%"
             )
 
     if analysis.violations:
@@ -29,17 +29,17 @@ def format_authoritative_analysis(analysis: PortfolioAnalysis) -> str:
             asset = f" {violation.asset}" if violation.asset else ""
             lines.append(f"  - {violation.type.value}{asset}: {violation.explanation}")
     else:
-        lines.append("- Policy violations: không có")
+        lines.append("- Policy violations: none")
 
     if analysis.plan.actions:
-        lines.append("- Đề xuất (chưa thực thi):")
+        lines.append("- Proposed actions (not executed):")
         for action in analysis.plan.actions:
             lines.append(
                 f"  - {action.side.value} {action.symbol}: "
                 f"{action.amount} (~${action.estimated_usd_value:,.2f})"
             )
     else:
-        lines.append("- Đề xuất: không có action")
+        lines.append("- Proposed actions: none")
 
     lines.append(f"- Risk Engine: {analysis.risk_decision.status.value}")
     for reason in analysis.risk_decision.reasons:

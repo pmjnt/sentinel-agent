@@ -88,7 +88,7 @@ def test_litellm_debug_opt_in_enables_logging_and_warns(capsys) -> None:
     warning = capsys.readouterr().out
     assert calls == 1
     assert "request body" in warning
-    assert "không chia sẻ log" in warning
+    assert "do not share these logs publicly" in warning
 
 
 def test_console_prompt_is_printed_once_outside_input(capsys) -> None:

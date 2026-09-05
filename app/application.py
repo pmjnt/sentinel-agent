@@ -81,8 +81,8 @@ class SentinelApplication:
 
         if loop_result.data_errors:
             response_parts.append(
-                "Dữ liệu Binance Demo cần thiết không thể được xác minh. "
-                "Sentinel không tạo khuyến nghị hoặc cho phép thực thi."
+                "Required Binance Demo data could not be verified. "
+                "Sentinel did not generate a recommendation or permit execution."
             )
         elif loop_result.analyses:
             response_parts.append(f"AI interpretation:\n{loop_result.final_text}")

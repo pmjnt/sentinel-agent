@@ -28,7 +28,7 @@ def configure_litellm_debug(
     enable_debug()
     print(
         "WARNING: LiteLLM debug is ON. Prompt, policy/portfolio context, and "
-        "request body may appear in this terminal; không chia sẻ log công khai."
+        "request body may appear in this terminal; do not share these logs publicly."
     )
 
 

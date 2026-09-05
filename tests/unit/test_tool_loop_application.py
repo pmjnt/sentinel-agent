@@ -101,7 +101,7 @@ def test_staged_policy_patch_commits_only_after_successful_run() -> None:
 
     assert response.policy == updated
     assert store.get("user-1") == updated
-    assert "Đã cập nhật policy" in response.message
+    assert "Policy updated" in response.message
     assert "40%" in response.message
 
 
@@ -155,6 +155,10 @@ def test_analysis_renders_authoritative_facts_before_agent_judgment() -> None:
 
     response = asyncio.run(application.handle("user-1", "Analyze."))
 
+    assert "Verified facts (Binance Demo)" in response.message
+    assert "Total portfolio: $0.00" in response.message
+    assert "Policy violations: none" in response.message
+    assert "Proposed actions: none" in response.message
     assert "Risk Engine: SAFE_TO_PROPOSE" in response.message
     assert "Execution: NOT_EXECUTED" in response.message
     assert response.message.index("Risk Engine") < response.message.index(
@@ -176,7 +180,7 @@ def test_data_error_uses_safe_deterministic_message() -> None:
 
     response = asyncio.run(application.handle("user-1", "Analyze."))
 
-    assert "không thể được xác minh" in response.message
+    assert "Required Binance Demo data could not be verified" in response.message
     assert "Unverified recommendation" not in response.message
 
 
@@ -208,6 +212,6 @@ def test_events_are_rendered_in_tool_call_order() -> None:
     )
 
     assert response.message.index("Risk Engine") < response.message.index(
-        "Đã cập nhật policy"
+        "Policy updated"
     )
     assert response.policy == new_policy

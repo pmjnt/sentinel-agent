@@ -13,68 +13,68 @@ def format_policy_update(
 
     if "min_stablecoin_weight" in fields:
         if updated.min_stablecoin_weight is None:
-            changes.append("đã bỏ yêu cầu tỷ trọng stablecoin tối thiểu")
+            changes.append("removed the minimum stablecoin allocation")
         else:
             changes.append(
-                "tỷ trọng stablecoin tối thiểu là "
+                "minimum stablecoin allocation is "
                 f"{_format_percent(updated.min_stablecoin_weight)}"
             )
 
     if "max_asset_weight" in fields:
         if updated.max_asset_weight is None:
-            changes.append("đã bỏ giới hạn tỷ trọng tối đa cho mỗi tài sản crypto")
+            changes.append("removed the maximum allocation per crypto asset")
         else:
             changes.append(
-                "tỷ trọng tối đa cho mỗi tài sản crypto là "
+                "maximum allocation per crypto asset is "
                 f"{_format_percent(updated.max_asset_weight)}"
             )
 
     if "block_high_volatility" in fields:
         if updated.block_high_volatility:
-            changes.append("chặn rebalance khi thị trường có volatility HIGH")
+            changes.append("block rebalancing when market volatility is HIGH")
         else:
             changes.append(
-                "cho phép đánh giá rebalance khi volatility HIGH; "
-                "RiskEngine vẫn kiểm tra các quy tắc khác"
+                "allow rebalance evaluation when volatility is HIGH; "
+                "RiskEngine still checks all other rules"
             )
 
     if "max_trade_usd_without_approval" in fields:
         threshold = updated.max_trade_usd_without_approval
         if threshold is None:
-            changes.append("đã bỏ ngưỡng giá trị cần phê duyệt")
+            changes.append("removed the approval threshold")
         else:
             changes.append(
-                f"proposal trên {_format_usd(threshold)} cần được phê duyệt"
+                f"a proposal over {_format_usd(threshold)} requires approval"
             )
 
     if not changes:
-        return "Không có thay đổi policy nào được áp dụng."
-    return "Đã cập nhật policy: " + "; ".join(changes) + "."
+        return "No policy changes were applied."
+    return "Policy updated: " + "; ".join(changes) + "."
 
 
 def format_current_policy(policy: PortfolioPolicy) -> str:
-    """Return a readable Vietnamese summary of the current policy."""
+    """Return a readable English summary of the current policy."""
     if _is_empty_policy(policy):
-        return "Policy hiện tại chưa có giới hạn portfolio nào."
+        return "The current policy does not contain any portfolio limits."
 
-    lines = ["Policy hiện tại:"]
+    lines = ["Current policy:"]
     if policy.min_stablecoin_weight is not None:
         lines.append(
-            "- Stablecoin tối thiểu: "
+            "- Minimum stablecoin allocation: "
             f"{_format_percent(policy.min_stablecoin_weight)}"
         )
     if policy.max_asset_weight is not None:
         lines.append(
-            "- Mỗi tài sản crypto tối đa: "
+            "- Maximum allocation per crypto asset: "
             f"{_format_percent(policy.max_asset_weight)}"
         )
     lines.append(
-        "- Rebalance khi volatility HIGH: "
-        + ("BỊ CHẶN" if policy.block_high_volatility else "không bị chặn")
+        "- Rebalancing during HIGH volatility: "
+        + ("BLOCKED" if policy.block_high_volatility else "allowed")
     )
     if policy.max_trade_usd_without_approval is not None:
         lines.append(
-            "- Proposal cần phê duyệt khi vượt: "
+            "- Proposal requires approval above: "
             f"{_format_usd(policy.max_trade_usd_without_approval)}"
         )
     return "\n".join(lines)

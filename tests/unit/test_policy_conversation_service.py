@@ -52,7 +52,7 @@ def test_update_returns_natural_language_and_new_policy() -> None:
         )
     )
 
-    assert "Đã cập nhật policy" in result.message
+    assert "Policy updated" in result.message
     assert "40%" in result.message
     assert result.policy.max_asset_weight == Decimal("0.40")
     assert result.analysis_requested is False
@@ -70,7 +70,7 @@ def test_view_returns_policy_without_changing_it() -> None:
         store,
     )
 
-    assert "Policy hiện tại" in result.message
+    assert "Current policy" in result.message
     assert "30%" in result.message
     assert store.get("session-1") == result.policy
 
@@ -151,7 +151,7 @@ def test_analyze_before_update_preserves_the_old_policy_snapshot() -> None:
 
     assert result.events[0].policy == old_policy
     assert result.events[0].focus_symbols == ("BTC",)
-    assert "Đã cập nhật policy" in result.events[1].message
+    assert "Policy updated" in result.events[1].message
     assert result.policy.max_asset_weight == Decimal("0.40")
 
 

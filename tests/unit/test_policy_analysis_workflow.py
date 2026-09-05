@@ -112,5 +112,6 @@ def test_srd_policy_scenario_reaches_blocked_without_external_calls() -> None:
     assert len(result.analysis.violations) == 2
     assert result.analysis.plan.actions[0].estimated_usd_value == Decimal("1500.00")
     assert result.analysis.risk_decision.status is RiskStatus.BLOCKED
+    assert "estimated slippage 0.05%" in result.message
     assert "Risk Engine: BLOCKED" in result.message
     assert "Execution: NOT_EXECUTED" in result.message

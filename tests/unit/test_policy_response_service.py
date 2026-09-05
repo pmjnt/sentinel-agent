@@ -13,7 +13,7 @@ def test_formats_maximum_asset_weight_update() -> None:
 
     message = format_policy_update(patch, policy)
 
-    assert "tỷ trọng tối đa" in message
+    assert "maximum allocation" in message
     assert "40%" in message
 
 
@@ -22,7 +22,7 @@ def test_formats_removed_stablecoin_minimum() -> None:
 
     message = format_policy_update(patch, PortfolioPolicy())
 
-    assert "đã bỏ" in message
+    assert "removed" in message
     assert "stablecoin" in message
 
 
@@ -36,8 +36,8 @@ def test_formats_high_volatility_block_changes() -> None:
         PortfolioPolicy(block_high_volatility=False),
     )
 
-    assert "chặn rebalance" in enabled
-    assert "cho phép đánh giá rebalance" in disabled
+    assert "block rebalancing" in enabled
+    assert "allow rebalance evaluation" in disabled
 
 
 def test_formats_approval_threshold_with_currency_separator() -> None:
@@ -49,7 +49,7 @@ def test_formats_approval_threshold_with_currency_separator() -> None:
     message = format_policy_update(patch, policy)
 
     assert "$1,000" in message
-    assert "phê duyệt" in message
+    assert "requires approval" in message
 
 
 def test_formats_empty_and_configured_policy_views() -> None:
@@ -63,7 +63,8 @@ def test_formats_empty_and_configured_policy_views() -> None:
         )
     )
 
-    assert "chưa có giới hạn" in empty
+    assert "does not contain any portfolio limits" in empty
+    assert "Current policy" in configured
     assert "30%" in configured
     assert "40%" in configured
     assert "$1,000" in configured
