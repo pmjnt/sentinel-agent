@@ -201,7 +201,12 @@ class SentinelToolLoop:
             # model prose because it is neither needed nor trusted on this path.
             final_text = ""
         elif context.analyses:
-            final_text = validate_qualitative_output(final_text)
+            try:
+                final_text = validate_qualitative_output(final_text)
+            except ModelBehaviorError:
+                # The deterministic analysis remains valid. Suppress unsafe
+                # model prose instead of discarding the verified result.
+                final_text = ""
         else:
             final_text = validate_non_analysis_output(final_text)
             observed_financial_data = (

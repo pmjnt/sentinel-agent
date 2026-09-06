@@ -201,6 +201,24 @@ def test_application_stream_finishes_with_structured_snapshot() -> None:
     assert events[-1].model == "gpt-5.4-mini"
 
 
+def test_analysis_without_safe_llm_prose_still_returns_verified_facts() -> None:
+    analysis = _analysis(PortfolioPolicy())
+    loop = FakeToolLoop(
+        _result(
+            final_text="",
+            events=(AnalysisCompletedEvent(analysis),),
+            analyses=(analysis,),
+        )
+    )
+    application = SentinelApplication(loop, InMemoryPolicySessionStore())
+
+    response = asyncio.run(application.handle("user-1", "Analyze."))
+
+    assert "Verified facts" in response.message
+    assert "AI interpretation:" not in response.message
+    assert response.ai_interpretation is None
+
+
 def test_staged_policy_patch_commits_only_after_successful_run() -> None:
     store = InMemoryPolicySessionStore()
     patch = PolicyPatch(max_asset_weight=Decimal("0.40"))

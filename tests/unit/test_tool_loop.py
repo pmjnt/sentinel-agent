@@ -252,7 +252,7 @@ def test_non_text_final_output_is_rejected() -> None:
         )
 
 
-def test_analysis_rejects_reserved_execution_claim() -> None:
+def test_analysis_suppresses_reserved_execution_claim_but_keeps_facts() -> None:
     async def fake_run(agent: Any, prompt: str, **kwargs: Any):
         context = kwargs["context"]
         await read_portfolio(context)
@@ -260,13 +260,15 @@ def test_analysis_rejects_reserved_execution_claim() -> None:
         evaluate_cached_portfolio(context, ["BTC"])
         return SimpleNamespace(final_output="The BTC order was executed.")
 
-    with pytest.raises(ModelBehaviorError, match="reserved risk or execution"):
-        asyncio.run(
-            SentinelToolLoop(_settings(), FakeGateway(), run_agent=fake_run).run(
-                "Analyze BTC.",
-                PortfolioPolicy(max_asset_weight=Decimal("0.40")),
-            )
+    result = asyncio.run(
+        SentinelToolLoop(_settings(), FakeGateway(), run_agent=fake_run).run(
+            "Analyze BTC.",
+            PortfolioPolicy(max_asset_weight=Decimal("0.40")),
         )
+    )
+
+    assert len(result.analyses) == 1
+    assert result.final_text == ""
 
 
 def test_financial_request_cannot_finish_without_deterministic_analysis() -> None:

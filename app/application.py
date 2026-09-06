@@ -211,7 +211,7 @@ class SentinelApplication:
                 "Sentinel did not generate a recommendation or permit execution."
                 f"\n{details}"
             )
-        elif loop_result.analyses:
+        elif loop_result.analyses and loop_result.final_text:
             response_parts.append(f"AI interpretation:\n{loop_result.final_text}")
         elif not loop_result.events:
             response_parts.append(loop_result.final_text)
@@ -222,7 +222,9 @@ class SentinelApplication:
             profile=committed_profile,
             analyses=loop_result.analyses,
             ai_interpretation=(
-                loop_result.final_text if loop_result.analyses else None
+                loop_result.final_text or None
+                if loop_result.analyses
+                else None
             ),
         )
 

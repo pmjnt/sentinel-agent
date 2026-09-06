@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Protocol
@@ -23,6 +24,7 @@ from app.model_catalog import ModelCatalog, ModelRoute
 
 
 WEB_DIRECTORY = Path(__file__).resolve().parent.parent / "web"
+LOGGER = logging.getLogger(__name__)
 
 
 class StreamingApplication(Protocol):
@@ -109,6 +111,10 @@ async def _encode_application_stream(
             elif isinstance(item, StructuredSentinelResponse):
                 yield _sse("completed", item)
     except Exception:
+        LOGGER.exception(
+            "Sentinel stream failed for route %s",
+            model_route.key,
+        )
         yield _sse_data(
             "error",
             '{"message":"Sentinel could not complete the request."}',
