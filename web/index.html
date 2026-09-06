@@ -3,157 +3,59 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Sentinel's read-only crypto portfolio risk-analysis desk.">
-    <title>Sentinel — Risk Analysis Desk</title>
+    <meta name="description" content="Chat with Sentinel, a read-only crypto portfolio risk agent.">
+    <title>Sentinel — Portfolio Risk Agent</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="styles.css">
     <script src="app.js" defer></script>
   </head>
   <body>
-    <main class="ledger-shell">
-      <header class="masthead">
-        <div>
-          <p class="edition">Field Ledger No. 001 · Live Desk</p>
-          <h1>Sentinel</h1>
-          <p class="subtitle">Crypto Portfolio Risk Analysis Desk</p>
+    <main class="chat-shell">
+      <header class="chat-header">
+        <div class="header-grid content-grid">
+          <a class="wordmark" href="/" aria-label="Sentinel home">SENTINEL</a>
+          <div class="model-picker">
+            <button
+              id="model-trigger"
+              class="model-trigger"
+              type="button"
+              aria-expanded="false"
+              aria-controls="model-menu"
+              disabled
+            >
+              <span id="active-model">Loading model…</span>
+              <span class="chevron" aria-hidden="true"></span>
+            </button>
+            <div id="model-menu" class="model-menu" role="menu" hidden></div>
+          </div>
         </div>
-        <div class="stamp" aria-label="System status: read only">Read<br>Only</div>
       </header>
 
-      <aside class="notice" aria-label="Prototype notice">
-        <strong>Binance Demo data.</strong> Sentinel can analyze and propose, but it has no trading, transfer, or withdrawal tools.
-      </aside>
-
-      <div class="desk-grid">
-        <section class="request-panel" aria-labelledby="request-title">
-          <div class="section-heading">
-            <span class="section-number">I</span>
-            <div>
-              <h2 id="request-title">Analysis Request</h2>
-              <p>Chat with the configured Sentinel model.</p>
-            </div>
+      <ol id="chat-thread" class="chat-thread content-grid" aria-label="Conversation">
+        <li class="turn assistant-turn welcome-turn">
+          <div class="speaker">Sentinel</div>
+          <div class="turn-content">
+            <p>I can inspect your Binance Demo portfolio, apply your policy, and explain the risk. I cannot execute trades.</p>
           </div>
+        </li>
+      </ol>
 
-          <form id="analysis-form" novalidate>
-            <div class="model-toolbar" aria-label="Model configuration">
-              <div class="toolbar-field provider-choice">
-                <label for="provider">Provider</label>
-                <select id="provider" name="provider" disabled>
-                  <option>Loading…</option>
-                </select>
-              </div>
-              <div class="toolbar-field model-choice">
-                <label for="model">Model</label>
-                <select id="model" name="model" disabled></select>
-              </div>
-              <span class="tier-mark" hidden>Configured</span>
-            </div>
-
-            <ol id="chat-log" class="chat-log" aria-label="Conversation"></ol>
-
-            <div class="field prompt-field">
-              <label for="prompt">Instruction to Sentinel</label>
-              <textarea id="prompt" name="prompt" rows="4" aria-describedby="prompt-help prompt-error">Analyze my portfolio and explain the evidence behind your recommendation.</textarea>
-              <p id="prompt-help" class="field-help">Sentinel should decide which available tools it needs.</p>
-              <p id="prompt-error" class="field-error" role="alert" hidden>Please enter an analysis request.</p>
-            </div>
-
-            <button id="run-button" type="submit">
-              <span aria-hidden="true">▶</span>
-              <span id="run-button-label">Send to Sentinel</span>
-            </button>
-          </form>
-
-          <dl class="run-meta" aria-label="Run information">
-            <div><dt>Run</dt><dd id="run-id">Not started</dd></div>
-            <div><dt>Route</dt><dd id="run-route">Gemini / gemini-3.5-flash-lite</dd></div>
-            <div><dt>Mode</dt><dd>Live SSE · Read only</dd></div>
-          </dl>
-        </section>
-
-        <section class="activity-panel" aria-labelledby="activity-title">
-          <div class="section-heading">
-            <span class="section-number">II</span>
-            <div>
-              <h2 id="activity-title">Agent Activity</h2>
-              <p>Observable decisions and tool calls, in order.</p>
-            </div>
-          </div>
-
-          <ol id="activity-log" class="activity-log" aria-label="Analysis progress"></ol>
-          <p id="empty-activity" class="empty-state">Awaiting an analysis request.<br><span>No tools have been called.</span></p>
-        </section>
-      </div>
-
-      <section id="evidence-section" class="evidence-section" aria-labelledby="evidence-title" hidden>
-        <div class="section-heading">
-          <span class="section-number">III</span>
-          <div>
-            <h2 id="evidence-title">Tool Evidence</h2>
-            <p>Structured facts returned to the LLM.</p>
-          </div>
+      <form id="chat-composer" class="composer-wrap" novalidate>
+        <div class="composer content-grid">
+          <label class="sr-only" for="prompt">Message Sentinel</label>
+          <textarea
+            id="prompt"
+            name="prompt"
+            rows="1"
+            maxlength="8000"
+            placeholder="Ask Sentinel about your portfolio…"
+            aria-describedby="prompt-error"
+          ></textarea>
+          <button id="send-button" type="submit">Send</button>
         </div>
-
-        <div class="evidence-grid">
-          <details id="portfolio-evidence" open hidden>
-            <summary><code>get_portfolio()</code><span class="returned-mark">Returned</span></summary>
-            <div class="tool-body">
-              <p class="tool-direction">Tool → Agent</p>
-              <dl id="portfolio-data" class="data-list"></dl>
-            </div>
-          </details>
-
-          <details id="market-evidence" open hidden>
-            <summary><code>get_market_data()</code><span class="returned-mark">Returned</span></summary>
-            <div class="tool-body">
-              <p class="tool-direction">Tool → Agent</p>
-              <dl id="market-data" class="data-list"></dl>
-            </div>
-          </details>
-
-          <details id="profile-evidence" open hidden>
-            <summary><code>InvestorProfile</code><span class="returned-mark">Session context</span></summary>
-            <div class="tool-body">
-              <p class="tool-direction">Validated preferences → Agent</p>
-              <dl id="profile-data" class="data-list"></dl>
-            </div>
-          </details>
-
-          <details id="policy-evidence" open hidden>
-            <summary><code>PortfolioPolicy</code><span class="returned-mark">Validated rules</span></summary>
-            <div class="tool-body">
-              <p class="tool-direction">Deterministic policy → Risk Engine</p>
-              <dl id="policy-data" class="data-list"></dl>
-            </div>
-          </details>
-        </div>
-      </section>
-
-      <section id="report-section" class="report-section" aria-labelledby="report-title" hidden>
-        <div class="section-heading">
-          <span class="section-number">IV</span>
-          <div>
-            <h2 id="report-title">Sentinel Report</h2>
-            <p>Tool facts are kept separate from model interpretation.</p>
-          </div>
-        </div>
-
-        <div class="report-grid">
-          <article class="facts">
-            <h3>Factual tool data</h3>
-            <ul id="fact-list"></ul>
-          </article>
-          <article class="interpretation">
-            <h3>AI interpretation</h3>
-            <p id="interpretation-text"></p>
-            <p class="caveat">Binance Demo data · No execution capability</p>
-          </article>
-        </div>
-      </section>
-
-      <footer>
-        <p>Sentinel Archive · Read-only analysis · No trading capability</p>
-      </footer>
+        <p id="prompt-error" class="composer-error content-grid" role="alert" hidden>Enter a message first.</p>
+        <p class="read-only-note content-grid">Read-only analysis · Binance Demo data · No execution tools</p>
+      </form>
     </main>
     <p id="live-status" class="sr-only" aria-live="polite"></p>
   </body>

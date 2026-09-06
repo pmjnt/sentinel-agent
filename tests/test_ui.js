@@ -46,13 +46,12 @@ test("formats backend activity without exposing implementation data", () => {
   );
 });
 
-test("page is a real streaming chat client, not a simulation", () => {
+test("page uses the chat-first Agent Pulse shell", () => {
   const html = readFileSync(join(__dirname, "../web/index.html"), "utf8");
 
-  assert.match(html, /id="chat-log"/);
-  assert.match(html, /id="activity-log"/);
-  assert.match(html, /id="policy-data"/);
-  assert.match(html, /id="profile-data"/);
-  assert.doesNotMatch(html, /simulates the Agent loop/i);
-  assert.doesNotMatch(html, /Mock<br>Data/);
+  assert.match(html, /id="model-trigger"/);
+  assert.match(html, /id="model-menu"/);
+  assert.match(html, /id="chat-thread"/);
+  assert.match(html, /id="chat-composer"/);
+  assert.doesNotMatch(html, /desk-grid|Analysis Request|Tool Evidence/);
 });

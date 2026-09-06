@@ -476,7 +476,7 @@ git commit -m "feat: expose validated model routes"
 - Modify: `web/styles.css`
 - Modify: `tests/test_ui.js`
 
-- [ ] **Step 1: Replace the static UI contract test**
+- [x] **Step 1: Replace the static UI contract test**
 
 Assert the new semantic structure and removal of dashboard panels:
 
@@ -491,7 +491,7 @@ test("page uses the chat-first Agent Pulse shell", () => {
 });
 ```
 
-- [ ] **Step 2: Run Node tests and verify RED**
+- [x] **Step 2: Run Node tests and verify RED**
 
 ```bash
 node --test tests/test_ui.js
@@ -499,7 +499,7 @@ node --test tests/test_ui.js
 
 Expected: FAIL because the old ledger/dashboard markup remains.
 
-- [ ] **Step 3: Implement the semantic HTML shell**
+- [x] **Step 3: Implement the semantic HTML shell**
 
 Replace the page body with:
 
@@ -529,7 +529,7 @@ Implement the approved graphite/yellow variables, shared 680px content grid,
 soft surfaces, responsive speaker column and reduced-motion rule in CSS. CSS
 chevrons must use borders/transforms, not Unicode glyphs.
 
-- [ ] **Step 4: Run Node tests and verify GREEN**
+- [x] **Step 4: Run Node tests and verify GREEN**
 
 ```bash
 node --test tests/test_ui.js
@@ -537,7 +537,7 @@ node --test tests/test_ui.js
 
 Expected: shell contract test PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/index.html web/styles.css tests/test_ui.js
