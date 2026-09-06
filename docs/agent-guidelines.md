@@ -81,6 +81,17 @@ Agent phải biết tối thiểu mục tiêu, thời hạn và risk tolerance/a
 - Text của model được buffer đến khi safety validation thành công.
 - SSE `completed` trả policy, profile, analysis, activity và
   `execution_status=NOT_EXECUTED` dưới dạng JSON typed.
+- Agent Pulse chỉ hiển thị các activity trên; đây không phải chain-of-thought.
+
+## Chọn model an toàn
+
+- `LLM_ALLOWED_MODELS` là allowlist do backend quản lý, không phải kết quả fetch
+  tự do từ provider.
+- `GET /api/models` chỉ trả provider/model đã bật và không bao giờ trả API key.
+- `POST /api/chat/stream` phải gửi provider/model; backend validate lại trước
+  khi tạo hoặc tái sử dụng Agent tương ứng.
+- Đổi model vẫn dùng cùng `session_id`, nên conversation, policy và investor
+  profile không bị reset.
 
 Ví dụ “đổi giới hạn thành 40% rồi phân tích” phải gọi `update_policy` trước các
 tool phân tích. “Phân tích trước rồi đổi thành 40%” dùng policy snapshot cũ cho

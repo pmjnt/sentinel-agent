@@ -689,7 +689,7 @@
             <article class="card">
               <span class="status live">ĐÃ HOẠT ĐỘNG</span>
               <h3>FastAPI + streaming UI</h3>
-              <p>UI chat vintage gọi SSE thật, hiển thị activity allowlist và map structured response. Approval, execution và verification vẫn chưa có.</p>
+              <p>UI chat-first gọi SSE thật, hiển thị Agent Pulse nhỏ dưới từng câu trả lời và map structured response. Approval, execution và verification vẫn chưa có.</p>
             </article>
           </div>
 
@@ -937,6 +937,7 @@ LLM explains in natural language</pre>
 ├── app/
 │   ├── api.py              # FastAPI + SSE + static web
 │   ├── bootstrap.py        # composition root dùng chung
+│   ├── model_catalog.py    # allowlist route LLM cho UI
 │   ├── agent/              # controlled tool loop, context và prompts
 │   ├── tools/              # ví dụ giáo dục cũ
 │   ├── gateways.py         # application-owned interface
@@ -946,7 +947,7 @@ LLM explains in natural language</pre>
 │   ├── sessions.py         # policy/profile state trong RAM
 │   └── config.py           # environment → validated Settings
 ├── tests/                  # offline verification
-├── web/                    # vintage streaming chat UI
+├── web/                    # chat-first UI + Agent Pulse
 └── docs/                   # kiến trúc và hướng dẫn</pre>
 
           <div class="file-toolbar" aria-label="Điều khiển danh sách file">
@@ -976,6 +977,11 @@ LLM explains in natural language</pre>
                 <h4><a href="../app/config.py">app/config.py</a></h4>
                 <p>Đọc `.env`, validate provider/model/key, khóa Binance ở Demo và tạo LiteLLM route.</p>
                 <p class="relation"><strong>Input:</strong> environment variables. <strong>Output:</strong> immutable <code>Settings</code>. <strong>Dùng bởi:</strong> main, Agent, CLI runner.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/model_catalog.py">app/model_catalog.py</a></h4>
+                <p>Biến backend allowlist thành các route LLM hợp lệ và loại provider chưa có API key.</p>
+                <p class="relation"><strong>Dùng bởi:</strong> API model picker và tool loop. UI không thể gửi model tùy ý để bỏ qua allowlist.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/gateways.py">app/gateways.py</a></h4>
@@ -1214,12 +1220,12 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../web/index.html">web/index.html</a></h4>
-                <p>Vintage chat UI thật: input, conversation, activity, policy/profile context, tool evidence và report.</p>
+                <p>Chat-first UI thật: conversation ở trung tâm, model picker nhỏ và Agent Pulse riêng dưới từng câu trả lời.</p>
                 <p class="relation"><strong>Liên kết:</strong> styles.css + app.js + FastAPI cùng origin.</p>
               </article>
               <article class="file">
                 <h4><a href="../web/app.js">web/app.js và web/styles.css</a></h4>
-                <p>Gửi chat, đọc SSE stream và map structured JSON lên UI; CSS giữ visual language vintage.</p>
+                <p>Gửi chat, đọc SSE stream và map structured JSON lên UI; CSS dùng graphite dịu cùng điểm nhấn vàng kiểu Binance.</p>
                 <p class="relation"><strong>Không chứa:</strong> LLM key, Binance key, raw tool result hoặc hard-coded financial facts.</p>
               </article>
               <article class="file">
@@ -1276,6 +1282,10 @@ gpt-5.6-luna</pre>
           </div>
 
           <p><code>Settings.agents_model</code> tạo route; <code>create_sentinel_agent()</code> truyền route đó vào <code>Agent(model=...)</code>. Vì vậy thay model là thay cấu hình, không sửa source Agent.</p>
+          <div class="note">
+            <p><strong>Model picker hoạt động an toàn:</strong> <code>LLM_ALLOWED_MODELS là allowlist ở backend</code>, không phải danh sách fetch tự do từ provider. <code>GET /api/models</code> chỉ trả route đã bật và không trả API key. UI gửi route đã chọn vào <code>POST /api/chat/stream</code>; backend validate lại trước khi chạy. Đổi model vẫn giữ cùng session nên chat, policy và profile tiếp tục.</p>
+            <p>Agent Pulse là activity an toàn từ tool events, không phải chain-of-thought.</p>
+          </div>
         </section>
 
         <section id="binance">
@@ -1457,7 +1467,7 @@ git diff --check</pre>
             <li>
               <span class="phase">DONE 02</span>
               <h3>UI thật</h3>
-              <p>UI đã nhận activity backend và render portfolio, policy, profile, market và risk result.</p>
+              <p>Chat-first UI đã nhận activity backend qua Agent Pulse và render portfolio, market cùng risk result từ structured response.</p>
             </li>
             <li>
               <span class="phase">NEXT 03</span>

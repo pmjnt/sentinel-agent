@@ -658,7 +658,7 @@ git commit -m "feat: stream Agent Pulse chat turns"
 - Modify: `docs/sentinel-project-guide.html`
 - Modify: `tests/test_project_guide.py`
 
-- [ ] **Step 1: Update documentation contracts**
+- [x] **Step 1: Update documentation contracts**
 
 Document:
 
@@ -673,7 +673,7 @@ Agent Pulse exposes activity only, never chain-of-thought.
 Replace screenshots/descriptions of the ledger dashboard with the chat-first
 layout and update the file map for `app/model_catalog.py`.
 
-- [ ] **Step 2: Run the complete automated verification**
+- [x] **Step 2: Run the complete automated verification**
 
 ```bash
 .venv/bin/python -m pytest -q
@@ -685,7 +685,7 @@ git diff --check
 Expected: zero failures and no whitespace errors. The existing third-party
 Starlette/AnyIO deprecation warning may remain until the dependency resolves it.
 
-- [ ] **Step 3: Run local HTTP smoke checks**
+- [x] **Step 3: Run local HTTP smoke checks**
 
 Start:
 
@@ -705,6 +705,10 @@ Expected: health and model JSON plus HTTP 200 for `/`; no API keys in model JSON
 
 - [ ] **Step 4: Perform visual and interaction QA**
 
+> Browser session unavailable in the current environment. Responsive, focus,
+> reduced-motion and interaction contracts were verified statically and by
+> Node tests; manual visual QA remains.
+
 At desktop and mobile widths verify:
 
 ```text
@@ -718,7 +722,7 @@ long Vietnamese wrapping
 reduced-motion behavior
 ```
 
-- [ ] **Step 5: Commit documentation and final adjustments**
+- [x] **Step 5: Commit documentation and final adjustments**
 
 ```bash
 git add README.md docs tests/test_project_guide.py web

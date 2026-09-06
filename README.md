@@ -92,13 +92,14 @@ sentinel-agent/
 │   ├── bootstrap.py       # Runtime dependency composition
 │   ├── binance/           # Safe CLI runner, response schemas, gateway
 │   ├── models/            # Pydantic domain models
+│   ├── model_catalog.py   # Backend allowlist for selectable LLM routes
 │   ├── services/          # Deterministic policy/planning/risk logic
 │   ├── tools/             # Legacy two-tool educational example
 │   ├── config.py
 │   ├── gateways.py
 │   └── sessions.py
 ├── tests/                 # Offline tests; no Binance or LLM calls
-├── web/                   # Vintage chat UI connected to the SSE API
+├── web/                   # Chat-first UI with per-response Agent Pulse
 ├── docs/
 ├── main.py
 └── requirements.txt
@@ -157,6 +158,7 @@ Gemini example:
 ```dotenv
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash-lite
+LLM_ALLOWED_MODELS=gemini/gemini-3.5-flash-lite,openai/gpt-5.6-luna
 LLM_MAX_TOKENS=4096
 GEMINI_API_KEY=your_gemini_api_key
 
@@ -171,6 +173,7 @@ OpenAI example:
 ```dotenv
 LLM_PROVIDER=openai
 LLM_MODEL=gpt-5.6-luna
+LLM_ALLOWED_MODELS=openai/gpt-5.6-luna,gemini/gemini-3.5-flash-lite
 LLM_MAX_TOKENS=4096
 OPENAI_API_KEY=your_openai_api_key
 ```
@@ -187,6 +190,12 @@ gemini + gemini-3.5-flash-lite
 Sentinel omits provider-specific reasoning options. For GPT-5.4 Mini, `none` is
 already the OpenAI default; omitting the redundant parameter also keeps
 LiteLLM on its stable tool-calling path.
+
+`LLM_ALLOWED_MODELS` is a backend allowlist, not a live provider-model fetch.
+Only routes whose provider key is configured are returned by `GET /api/models`;
+the endpoint never returns credentials. The browser includes the chosen
+`provider` and `model` in `POST /api/chat/stream`, and the backend rejects any
+route outside the allowlist.
 
 For short-lived local troubleshooting only, enable verbose LiteLLM logs:
 
@@ -253,8 +262,9 @@ uvicorn app.api:create_app --factory --reload
 ```
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The browser sends chat to
-`POST /api/chat/stream`. Provider and model come from `.env` and are shown as
-read-only configuration; API keys never reach the browser.
+`POST /api/chat/stream`. The compact header picker shows routes returned by
+`GET /api/models`; API keys never reach the browser. Changing the model keeps
+the same `session_id`, so conversation, policy, and investor profile continue.
 
 The endpoint emits named SSE events:
 
@@ -268,6 +278,10 @@ error      → generic safe failure message
 Tool arguments, raw results, chain-of-thought, and credentials are not placed in
 activity events. Model prose is buffered until safety validation passes, so
 activity appears live while answer chunks begin after validation.
+
+Each assistant response owns a small collapsible **Agent Pulse**. It shows only
+safe tool/activity status from the backend; it is not model reasoning or hidden
+chain-of-thought.
 
 Try profile chat:
 

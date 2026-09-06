@@ -60,6 +60,7 @@ def test_project_guide_maps_runtime_and_policy_files() -> None:
         "app/application.py",
         "app/api.py",
         "app/bootstrap.py",
+        "app/model_catalog.py",
         "app/models/profile.py",
         "app/agent/streaming.py",
         "app/services/policy_conversation_service.py",
@@ -87,6 +88,15 @@ def test_project_guide_states_current_limitations_explicitly() -> None:
     assert "Policy và investor profile hiện chỉ được lưu trong RAM." in source
     assert "Custom MCP hiện không hoạt động." in source
     assert "Sentinel hiện không có khả năng giao dịch." in source
+
+
+def test_project_guide_explains_safe_model_switching_and_agent_pulse() -> None:
+    source = _read_guide()
+
+    assert "LLM_ALLOWED_MODELS là allowlist ở backend" in source
+    assert "GET /api/models" in source
+    assert "POST /api/chat/stream" in source
+    assert "không phải chain-of-thought" in source
 
 
 def test_project_guide_does_not_contain_a_binance_secret() -> None:

@@ -29,6 +29,8 @@ tính, threshold, `RiskStatus`, quyền thực thi hay dữ liệu tài chính.
 app.models ← app.services ← app.gateways ← app.binance
                  ↑                 ↑
             controlled_tools ← tool_loop ← application ← api.py / main.py
+                                      ↑
+                                 model_catalog
 ```
 
 - `app.models`: Pydantic domain data.
@@ -40,6 +42,8 @@ app.models ← app.services ← app.gateways ← app.binance
 - `app.application`: commit policy sau thành công và render kết quả authoritative.
 - `app.api`: phát activity và kết quả typed qua SSE, không phát secret/raw tool data.
 - `web`: chat UI thật, gọi API cùng origin và không nhận secret.
+- `app.model_catalog`: validate allowlist route; chỉ route có API key tương ứng
+  mới xuất hiện trong model picker.
 
 ## Tool loop đang dùng trong console
 
@@ -83,6 +87,13 @@ Web API dùng `Runner.run_streamed`. SDK semantic event `tool_called` và
 reasoning không ra UI. Final prose chỉ được chunk thành `text_delta` sau output
 safety validation; event `completed` chứa snapshot JSON typed để UI map theo
 field thay vì parse câu chữ.
+
+`GET /api/models` trả các route trong backend allowlist, không fetch model trực
+tiếp từ provider và không trả secret. `POST /api/chat/stream` nhận
+`provider/model`, resolve lại qua allowlist rồi mới chạy Agent. Đổi model không
+đổi `session_id`, vì vậy conversation, policy và profile vẫn nối tiếp. Agent
+Pulse dưới từng câu trả lời chỉ hiển thị activity allowlist, không phải
+chain-of-thought.
 
 Nếu thiếu observation, `evaluate_portfolio_risk` trả danh sách tool còn thiếu;
 LLM phải đọc dữ liệu rồi thử lại. Nếu Binance lỗi, hệ thống ghi data error và
