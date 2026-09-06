@@ -550,7 +550,7 @@ git commit -m "feat: add chat-first Sentinel shell"
 - Modify: `web/app.js`
 - Modify: `tests/test_ui.js`
 
-- [ ] **Step 1: Write failing JavaScript behavior tests**
+- [x] **Step 1: Write failing JavaScript behavior tests**
 
 Update request construction and add pure state tests:
 
@@ -589,7 +589,7 @@ test("activity reducer updates only the current turn", () => {
 });
 ```
 
-- [ ] **Step 2: Run Node tests and verify RED**
+- [x] **Step 2: Run Node tests and verify RED**
 
 ```bash
 node --test tests/test_ui.js
@@ -597,7 +597,7 @@ node --test tests/test_ui.js
 
 Expected: FAIL because route-aware request/reducer are missing.
 
-- [ ] **Step 3: Implement model popover and isolated turn views**
+- [x] **Step 3: Implement model popover and isolated turn views**
 
 Implement/export these pure helpers:
 
@@ -634,7 +634,7 @@ evidence; `error` marks only that turn failed and exposes Retry.
 Use `aria-expanded`/`hidden` for Pulse and model menu. Escape all data by
 assigning `textContent`; never build provider/tool content with `innerHTML`.
 
-- [ ] **Step 4: Run Node tests and verify GREEN**
+- [x] **Step 4: Run Node tests and verify GREEN**
 
 ```bash
 node --test tests/test_ui.js
@@ -642,7 +642,7 @@ node --test tests/test_ui.js
 
 Expected: all UI unit tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/app.js tests/test_ui.js

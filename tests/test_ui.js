@@ -8,6 +8,7 @@ const {
   createSseParser,
   formatActivityLabel,
   isValidPrompt,
+  reduceActivity,
 } = require("../web/app.js");
 
 test("accepts meaningful prompts and rejects whitespace", () => {
@@ -15,11 +16,38 @@ test("accepts meaningful prompts and rejects whitespace", () => {
   assert.equal(isValidPrompt("   \n  "), false);
 });
 
-test("builds a normalized chat request", () => {
-  assert.deepEqual(buildChatRequest(" user-1 ", " Analyze. "), {
-    session_id: "user-1",
-    message: "Analyze.",
+test("chat request includes the selected validated route", () => {
+  assert.deepEqual(
+    buildChatRequest(" user-1 ", " Analyze. ", {
+      provider: "gemini",
+      model: "gemini-3.5-flash-lite",
+    }),
+    {
+      session_id: "user-1",
+      message: "Analyze.",
+      provider: "gemini",
+      model: "gemini-3.5-flash-lite",
+    },
+  );
+});
+
+test("activity reducer completes the matching step without adding a row", () => {
+  const started = reduceActivity([], {
+    sequence: 1,
+    kind: "PORTFOLIO_READ",
+    status: "STARTED",
+    message: "Started portfolio retrieval.",
   });
+  const completed = reduceActivity(started, {
+    sequence: 2,
+    kind: "PORTFOLIO_READ",
+    status: "COMPLETED",
+    message: "Completed portfolio retrieval.",
+  });
+
+  assert.equal(completed.length, 1);
+  assert.equal(completed[0].status, "COMPLETED");
+  assert.equal(started[0].status, "STARTED");
 });
 
 test("parses SSE events across network chunks", () => {

@@ -2,8 +2,26 @@ function isValidPrompt(prompt) {
   return typeof prompt === "string" && prompt.trim().length > 0;
 }
 
-function buildChatRequest(sessionId, message) {
-  return { session_id: sessionId.trim(), message: message.trim() };
+function buildChatRequest(sessionId, message, route) {
+  return {
+    session_id: sessionId.trim(),
+    message: message.trim(),
+    provider: route.provider,
+    model: route.model,
+  };
+}
+
+function reduceActivity(current, event) {
+  const next = current.map((item) => ({ ...item }));
+  if (event.status === "STARTED") return [...next, { ...event }];
+
+  for (let index = next.length - 1; index >= 0; index -= 1) {
+    if (next[index].kind === event.kind && next[index].status === "STARTED") {
+      next[index] = { ...event };
+      return next;
+    }
+  }
+  return [...next, { ...event }];
 }
 
 function createSseParser(onEvent) {
@@ -41,33 +59,23 @@ function formatMoney(value) {
   }).format(Number(value));
 }
 
+function formatPercent(value) {
+  return `${(Number(value) * 100).toFixed(2)}%`;
+}
+
 function initializeApp() {
-  const form = document.querySelector("#analysis-form");
-  const providerSelect = document.querySelector("#provider");
-  const modelSelect = document.querySelector("#model");
+  const modelTrigger = document.querySelector("#model-trigger");
+  const activeModel = document.querySelector("#active-model");
+  const modelMenu = document.querySelector("#model-menu");
+  const chatThread = document.querySelector("#chat-thread");
+  const form = document.querySelector("#chat-composer");
   const promptInput = document.querySelector("#prompt");
   const promptError = document.querySelector("#prompt-error");
-  const runButton = document.querySelector("#run-button");
-  const runButtonLabel = document.querySelector("#run-button-label");
-  const runId = document.querySelector("#run-id");
-  const runRoute = document.querySelector("#run-route");
-  const chatLog = document.querySelector("#chat-log");
-  const activityLog = document.querySelector("#activity-log");
-  const emptyActivity = document.querySelector("#empty-activity");
-  const evidenceSection = document.querySelector("#evidence-section");
-  const portfolioEvidence = document.querySelector("#portfolio-evidence");
-  const marketEvidence = document.querySelector("#market-evidence");
-  const profileEvidence = document.querySelector("#profile-evidence");
-  const policyEvidence = document.querySelector("#policy-evidence");
-  const portfolioData = document.querySelector("#portfolio-data");
-  const marketData = document.querySelector("#market-data");
-  const profileData = document.querySelector("#profile-data");
-  const policyData = document.querySelector("#policy-data");
-  const reportSection = document.querySelector("#report-section");
-  const factList = document.querySelector("#fact-list");
-  const interpretationText = document.querySelector("#interpretation-text");
+  const sendButton = document.querySelector("#send-button");
   const liveStatus = document.querySelector("#live-status");
   const sessionId = getSessionId();
+  let selectedRoute = null;
+  let isRunning = false;
 
   function getSessionId() {
     const stored = window.sessionStorage.getItem("sentinel-session-id");
@@ -77,176 +85,240 @@ function initializeApp() {
     return created;
   }
 
-  function addChatMessage(role, text) {
-    const item = document.createElement("li");
-    item.className = `chat-message ${role}`;
-    const label = document.createElement("strong");
-    label.textContent = role === "user" ? "You" : "Sentinel";
-    const content = document.createElement("p");
-    content.textContent = text;
-    item.append(label, content);
-    chatLog.append(item);
-    chatLog.scrollTop = chatLog.scrollHeight;
-    return content;
+  function setModelMenu(open) {
+    modelTrigger.setAttribute("aria-expanded", String(open));
+    modelMenu.hidden = !open;
   }
 
-  function resetRun() {
-    activityLog.replaceChildren();
-    emptyActivity.hidden = true;
-    evidenceSection.hidden = true;
-    portfolioEvidence.hidden = true;
-    marketEvidence.hidden = true;
-    profileEvidence.hidden = true;
-    policyEvidence.hidden = true;
-    reportSection.hidden = true;
-    portfolioData.replaceChildren();
-    marketData.replaceChildren();
-    profileData.replaceChildren();
-    policyData.replaceChildren();
-    factList.replaceChildren();
-    interpretationText.textContent = "";
+  function routeKey(route) {
+    return `${route.provider}/${route.model}`;
   }
 
-  function renderActivity(activity) {
+  function chooseRoute(route) {
+    selectedRoute = { provider: route.provider, model: route.model };
+    activeModel.textContent = route.label || route.model;
+    modelMenu.querySelectorAll(".model-option").forEach((option) => {
+      const selected = option.dataset.route === routeKey(route);
+      option.classList.toggle("selected", selected);
+      option.setAttribute("aria-checked", String(selected));
+    });
+    setModelMenu(false);
+  }
+
+  function renderModelCatalog(catalog) {
+    modelMenu.replaceChildren();
+    catalog.models.forEach((route) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "model-option";
+      option.dataset.route = routeKey(route);
+      option.setAttribute("role", "menuitemradio");
+      option.setAttribute("aria-checked", "false");
+
+      const label = document.createElement("span");
+      label.textContent = route.label;
+      const provider = document.createElement("span");
+      provider.className = "model-option-provider";
+      provider.textContent = route.provider;
+      option.append(label, provider);
+      option.addEventListener("click", () => chooseRoute(route));
+      modelMenu.append(option);
+    });
+    chooseRoute(catalog.default);
+    modelTrigger.disabled = false;
+  }
+
+  async function loadModelCatalog() {
+    const response = await window.fetch("/api/models");
+    if (!response.ok) throw new Error("Model list is unavailable.");
+    renderModelCatalog(await response.json());
+  }
+
+  function addUserTurn(message) {
     const item = document.createElement("li");
-    item.className = `activity-item ${activity.status.toLowerCase()}`;
-    const label = document.createElement("span");
-    label.textContent = formatActivityLabel(activity);
-    const state = document.createElement("span");
-    state.className = "activity-state";
-    state.textContent = activity.status;
-    item.append(label, state);
-    activityLog.append(item);
+    item.className = "turn user-turn";
+    const speaker = document.createElement("div");
+    speaker.className = "speaker";
+    speaker.textContent = "You";
+    const content = document.createElement("div");
+    content.className = "turn-content";
+    const text = document.createElement("p");
+    text.textContent = message;
+    content.append(text);
+    item.append(speaker, content);
+    chatThread.append(item);
+  }
+
+  function createAssistantTurn(message, route) {
+    const item = document.createElement("li");
+    item.className = "turn assistant-turn";
+    const speaker = document.createElement("div");
+    speaker.className = "speaker";
+    speaker.textContent = "Sentinel";
+    const content = document.createElement("div");
+    content.className = "turn-content";
+    const response = document.createElement("p");
+
+    const pulse = document.createElement("div");
+    pulse.className = "agent-pulse";
+    const pulseButton = document.createElement("button");
+    pulseButton.type = "button";
+    pulseButton.className = "pulse-trigger";
+    pulseButton.setAttribute("aria-expanded", "false");
+    const dot = document.createElement("span");
+    dot.className = "pulse-dot active";
+    const pulseLabel = document.createElement("span");
+    pulseLabel.className = "pulse-label";
+    pulseLabel.textContent = "Preparing request…";
+    const pulseCount = document.createElement("span");
+    pulseCount.className = "pulse-count";
+    const chevron = document.createElement("span");
+    chevron.className = "pulse-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    pulseButton.append(dot, pulseLabel, pulseCount, chevron);
+
+    const detail = document.createElement("div");
+    detail.className = "pulse-detail";
+    detail.hidden = true;
+    const activityList = document.createElement("ol");
+    activityList.className = "pulse-list";
+    detail.append(activityList);
+    pulse.append(pulseButton, detail);
+    content.append(response, pulse);
+    item.append(speaker, content);
+    chatThread.append(item);
+
+    pulseButton.addEventListener("click", () => {
+      const open = pulseButton.getAttribute("aria-expanded") === "true";
+      pulseButton.setAttribute("aria-expanded", String(!open));
+      detail.hidden = open;
+    });
+
+    return {
+      item,
+      content,
+      response,
+      pulse,
+      pulseLabel,
+      pulseCount,
+      pulseDot: dot,
+      activityList,
+      activities: [],
+      completed: false,
+      message,
+      route: { ...route },
+    };
+  }
+
+  function renderActivity(turn, activity) {
+    turn.activities = reduceActivity(turn.activities, activity);
+    turn.activityList.replaceChildren();
+    turn.activities.forEach((step) => {
+      const item = document.createElement("li");
+      item.className = `pulse-item ${step.status.toLowerCase()}`;
+      item.textContent = formatActivityLabel(step);
+      turn.activityList.append(item);
+    });
+    turn.pulseLabel.textContent = activity.message;
+    turn.pulseCount.textContent = `${turn.activities.length}`;
+    turn.pulseDot.classList.toggle(
+      "active",
+      turn.activities.some((step) => step.status === "STARTED"),
+    );
     liveStatus.textContent = activity.message;
   }
 
-  function appendDataRow(container, label, value, className = "") {
-    const row = document.createElement("div");
-    const term = document.createElement("dt");
-    const detail = document.createElement("dd");
-    term.textContent = label;
-    detail.textContent = value;
-    if (className) detail.className = className;
-    row.append(term, detail);
-    container.append(row);
+  function appendEvidence(list, label, value) {
+    const item = document.createElement("li");
+    const strong = document.createElement("strong");
+    strong.textContent = `${label}: `;
+    item.append(strong, document.createTextNode(value));
+    list.append(item);
   }
 
-  function renderCompleted(result, assistantContent) {
+  function renderEvidence(turn, result) {
     const analysis = result.analysis;
-    assistantContent.textContent = result.ai_interpretation || result.message;
+    const card = document.createElement("section");
+    card.className = "evidence-card";
+    const title = document.createElement("h2");
+    title.className = "evidence-title";
+    title.textContent = "Verified result";
+    const list = document.createElement("ul");
+    list.className = "evidence-list";
 
-    const hasSavedProfile = Object.entries(result.profile).some(([field, value]) => {
-      if (field === "excluded_assets") return Array.isArray(value) && value.length > 0;
-      return value != null;
-    });
-    const profileWasRequested = result.activity.some((activity) =>
-      activity.kind === "PROFILE_UPDATE" || activity.kind === "PROFILE_VIEW"
-    );
-    profileEvidence.hidden = !(hasSavedProfile || profileWasRequested);
-    const profileRows = [
-      ["Objective", result.profile.objective],
-      ["Time horizon", result.profile.time_horizon_months == null ? null : `${result.profile.time_horizon_months} months`],
-      ["Risk tolerance", result.profile.risk_tolerance],
-      ["Acceptable loss", result.profile.acceptable_loss_percent == null ? null : `${result.profile.acceptable_loss_percent}%`],
-      ["Liquidity need", result.profile.liquidity_need],
-      ["Excluded assets", result.profile.excluded_assets?.join(", ") || null],
-    ];
-    profileRows.forEach(([label, value]) => {
-      appendDataRow(profileData, label, value ?? "Not specified");
-    });
-
-    const policyWasRequested = result.activity.some((activity) =>
-      activity.kind === "POLICY_UPDATE" || activity.kind === "POLICY_VIEW"
-    );
-    const hasPolicy = result.policy.min_stablecoin_weight != null
-      || result.policy.max_asset_weight != null
-      || result.policy.block_high_volatility
-      || result.policy.max_trade_usd_without_approval != null;
-    policyEvidence.hidden = !(analysis || hasPolicy || policyWasRequested);
-    const percentage = (value) => value == null
-      ? "Not configured"
-      : `${(Number(value) * 100).toFixed(2)}%`;
-    appendDataRow(policyData, "Minimum stablecoin", percentage(result.policy.min_stablecoin_weight));
-    appendDataRow(policyData, "Maximum per asset", percentage(result.policy.max_asset_weight));
-    appendDataRow(policyData, "High volatility", result.policy.block_high_volatility ? "BLOCK" : "Allowed");
-    appendDataRow(
-      policyData,
-      "Approval threshold",
-      result.policy.max_trade_usd_without_approval == null
-        ? "Not configured"
-        : formatMoney(result.policy.max_trade_usd_without_approval),
-    );
-
-    if (!analysis) {
-      evidenceSection.hidden = profileEvidence.hidden && policyEvidence.hidden;
-      return;
+    appendEvidence(list, "Model", `${result.provider}/${result.model}`);
+    if (analysis) {
+      appendEvidence(list, "Portfolio", formatMoney(analysis.portfolio.total_usd_value));
+      const allocations = analysis.portfolio.assets
+        .map((asset) => `${asset.symbol} ${formatPercent(asset.weight)}`)
+        .join(" · ");
+      appendEvidence(list, "Allocation", allocations);
+      appendEvidence(list, "Violations", String(analysis.violations.length));
+      if (analysis.market_data.length) {
+        const markets = analysis.market_data
+          .map((market) => `${market.symbol} ${market.volatility}`)
+          .join(" · ");
+        appendEvidence(list, "Market", markets);
+      }
+      appendEvidence(list, "Risk Engine", analysis.risk_decision.status);
     }
-
-    evidenceSection.hidden = false;
-    portfolioEvidence.hidden = false;
-    analysis.portfolio.assets.forEach((asset) => {
-      appendDataRow(
-        portfolioData,
-        asset.symbol,
-        `${formatMoney(asset.usd_value)} · ${(Number(asset.weight) * 100).toFixed(2)}%`,
-      );
-    });
-    appendDataRow(
-      portfolioData,
-      "Total portfolio",
-      formatMoney(analysis.portfolio.total_usd_value),
-    );
-
-    if (analysis.market_data.length) {
-      marketEvidence.hidden = false;
-      analysis.market_data.forEach((market) => {
-        appendDataRow(
-          marketData,
-          market.symbol,
-          `${formatMoney(market.price)} · ${market.change_24h_percent}% · ${market.volatility}`,
-          market.volatility === "HIGH" ? "risk-high" : "",
-        );
-      });
-    }
-
-    const facts = [
-      `Portfolio total: ${formatMoney(analysis.portfolio.total_usd_value)}.`,
-      `Policy violations: ${analysis.violations.length}.`,
-      `Risk decision: ${analysis.risk_decision.status}.`,
-      `Execution: ${result.execution_status}.`,
-    ];
-    facts.forEach((fact) => {
-      const item = document.createElement("li");
-      item.textContent = fact;
-      factList.append(item);
-    });
-    interpretationText.textContent = result.ai_interpretation || "No interpretation returned.";
-    reportSection.hidden = false;
+    appendEvidence(list, "Execution", result.execution_status);
+    card.append(title, list);
+    turn.content.append(card);
   }
 
-  async function loadConfiguration() {
-    const response = await window.fetch("/api/config");
-    if (!response.ok) throw new Error("Configuration unavailable.");
-    const config = await response.json();
-    providerSelect.replaceChildren(new Option(config.provider, config.provider));
-    modelSelect.replaceChildren(new Option(config.model, config.model));
-    providerSelect.disabled = true;
-    modelSelect.disabled = true;
-    runRoute.textContent = `${config.provider} / ${config.model}`;
+  function renderCompleted(turn, result) {
+    turn.completed = true;
+    turn.response.textContent = result.ai_interpretation || result.message;
+    turn.pulseLabel.textContent = turn.activities.length
+      ? "Agent activity complete"
+      : "Response complete";
+    turn.pulseCount.textContent = turn.activities.length
+      ? `${turn.activities.length}`
+      : "";
+    turn.pulseDot.classList.remove("active");
+    turn.pulseDot.style.background = "var(--green)";
+    renderEvidence(turn, result);
   }
 
-  async function streamChat(message, assistantContent) {
+  function renderFailure(turn, message) {
+    turn.response.textContent = message || "Sentinel could not complete the request.";
+    turn.response.classList.add("turn-error");
+    turn.pulseLabel.textContent = "Request failed";
+    turn.pulseDot.classList.remove("active");
+    turn.pulseDot.style.background = "var(--red)";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "retry-button";
+    retry.textContent = "Retry";
+    retry.addEventListener("click", () => {
+      retry.remove();
+      submitMessage(turn.message, turn.route);
+    });
+    turn.content.append(retry);
+  }
+
+  async function streamChat(turn) {
     const response = await window.fetch("/api/chat/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildChatRequest(sessionId, message)),
+      body: JSON.stringify(buildChatRequest(sessionId, turn.message, turn.route)),
     });
-    if (!response.ok || !response.body) throw new Error("Stream unavailable.");
+    if (!response.ok || !response.body) {
+      let detail = "Unable to start the Sentinel stream.";
+      try {
+        const payload = await response.json();
+        detail = payload.detail || detail;
+      } catch (_) {
+        // The safe generic message is enough when the server has no JSON body.
+      }
+      throw new Error(detail);
+    }
 
     const parser = createSseParser((event, data) => {
-      if (event === "activity") renderActivity(data);
-      if (event === "text_delta") assistantContent.textContent += data.text;
-      if (event === "completed") renderCompleted(data, assistantContent);
+      if (event === "activity") renderActivity(turn, data);
+      if (event === "text_delta") turn.response.textContent += data.text;
+      if (event === "completed") renderCompleted(turn, data);
       if (event === "error") throw new Error(data.message);
     });
     const reader = response.body.getReader();
@@ -257,9 +329,40 @@ function initializeApp() {
       parser.push(decoder.decode(value, { stream: true }));
     }
     parser.push(decoder.decode());
+    if (!turn.completed) throw new Error("Sentinel stream ended before completion.");
   }
 
-  form.addEventListener("submit", async (event) => {
+  function scrollToTurn(turn) {
+    turn.item.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function submitMessage(message, requestedRoute = selectedRoute) {
+    if (isRunning || !requestedRoute) return;
+    isRunning = true;
+    sendButton.disabled = true;
+    promptError.hidden = true;
+    addUserTurn(message);
+    const turn = createAssistantTurn(message, requestedRoute);
+    scrollToTurn(turn);
+    try {
+      await streamChat(turn);
+      liveStatus.textContent = "Sentinel response complete.";
+    } catch (error) {
+      renderFailure(turn, error.message);
+      liveStatus.textContent = turn.response.textContent;
+    } finally {
+      isRunning = false;
+      sendButton.disabled = false;
+      promptInput.focus();
+    }
+  }
+
+  function resizePrompt() {
+    promptInput.style.height = "auto";
+    promptInput.style.height = `${Math.min(promptInput.scrollHeight, 170)}px`;
+  }
+
+  form.addEventListener("submit", (event) => {
     event.preventDefault();
     if (!isValidPrompt(promptInput.value)) {
       promptError.hidden = false;
@@ -267,31 +370,39 @@ function initializeApp() {
       return;
     }
     const message = promptInput.value.trim();
-    promptError.hidden = true;
-    resetRun();
-    addChatMessage("user", message);
-    const assistantContent = addChatMessage("assistant", "");
     promptInput.value = "";
-    runButton.disabled = true;
-    runButtonLabel.textContent = "Sentinel is working";
-    runId.textContent = `SNT-${String(Date.now()).slice(-6)}`;
-    try {
-      await streamChat(message, assistantContent);
-      liveStatus.textContent = "Sentinel response complete.";
-    } catch (error) {
-      assistantContent.textContent = error.message || "Sentinel could not complete the request.";
-      liveStatus.textContent = assistantContent.textContent;
-    } finally {
-      runButton.disabled = false;
-      runButtonLabel.textContent = "Send to Sentinel";
-    }
+    resizePrompt();
+    submitMessage(message);
   });
 
   promptInput.addEventListener("input", () => {
     if (isValidPrompt(promptInput.value)) promptError.hidden = true;
+    resizePrompt();
   });
-  loadConfiguration().catch(() => {
-    runRoute.textContent = "Configuration unavailable";
+
+  promptInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  modelTrigger.addEventListener("click", () => {
+    setModelMenu(modelTrigger.getAttribute("aria-expanded") !== "true");
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".model-picker")) setModelMenu(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setModelMenu(false);
+  });
+
+  loadModelCatalog().catch((error) => {
+    activeModel.textContent = "Models unavailable";
+    sendButton.disabled = true;
+    liveStatus.textContent = error.message;
   });
 }
 
@@ -305,5 +416,6 @@ if (typeof module !== "undefined" && module.exports) {
     createSseParser,
     formatActivityLabel,
     isValidPrompt,
+    reduceActivity,
   };
 }
