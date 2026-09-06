@@ -8,6 +8,7 @@ const {
   createSseParser,
   formatActivityLabel,
   isValidPrompt,
+  parseMarkdownBlocks,
   reduceActivity,
 } = require("../web/app.js");
 
@@ -50,6 +51,17 @@ test("activity reducer completes the matching step without adding a row", () => 
   assert.equal(started[0].status, "STARTED");
 });
 
+test("parses headings, bullet lists, and paragraphs for safe rendering", () => {
+  assert.deepEqual(
+    parseMarkdownBlocks("## Đánh giá\nNội dung.\n\n- Một\n- Hai"),
+    [
+      { type: "heading", level: 2, text: "Đánh giá" },
+      { type: "paragraph", text: "Nội dung." },
+      { type: "list", items: ["Một", "Hai"] },
+    ],
+  );
+});
+
 test("parses SSE events across network chunks", () => {
   const events = [];
   const parser = createSseParser((event, data) => events.push({ event, data }));
@@ -82,4 +94,10 @@ test("page uses the chat-first Agent Pulse shell", () => {
   assert.match(html, /id="chat-thread"/);
   assert.match(html, /id="chat-composer"/);
   assert.doesNotMatch(html, /desk-grid|Analysis Request|Tool Evidence/);
+});
+
+test("user turns do not render a redundant You label", () => {
+  const script = readFileSync(join(__dirname, "../web/app.js"), "utf8");
+  assert.doesNotMatch(script, /speaker\.textContent = "You"/);
+  assert.match(script, /Verified tool facts/);
 });

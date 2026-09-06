@@ -24,6 +24,53 @@ function reduceActivity(current, event) {
   return [...next, { ...event }];
 }
 
+function parseMarkdownBlocks(markdown) {
+  const blocks = [];
+  let paragraph = [];
+  let listItems = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length) {
+      blocks.push({ type: "paragraph", text: paragraph.join(" ") });
+      paragraph = [];
+    }
+  };
+  const flushList = () => {
+    if (listItems.length) {
+      blocks.push({ type: "list", items: listItems });
+      listItems = [];
+    }
+  };
+
+  String(markdown).replaceAll("\r\n", "\n").split("\n").forEach((line) => {
+    const trimmed = line.trim();
+    const heading = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+    const bullet = /^[-*]\s+(.+)$/.exec(trimmed);
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+    } else if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        type: "heading",
+        level: heading[1].length,
+        text: heading[2],
+      });
+    } else if (bullet) {
+      flushParagraph();
+      listItems.push(bullet[1]);
+    } else {
+      flushList();
+      paragraph.push(trimmed);
+    }
+  });
+  flushParagraph();
+  flushList();
+  return blocks;
+}
+
 function createSseParser(onEvent) {
   let buffer = "";
   return {
@@ -137,15 +184,12 @@ function initializeApp() {
   function addUserTurn(message) {
     const item = document.createElement("li");
     item.className = "turn user-turn";
-    const speaker = document.createElement("div");
-    speaker.className = "speaker";
-    speaker.textContent = "You";
     const content = document.createElement("div");
     content.className = "turn-content";
     const text = document.createElement("p");
     text.textContent = message;
     content.append(text);
-    item.append(speaker, content);
+    item.append(content);
     chatThread.append(item);
   }
 
@@ -157,7 +201,8 @@ function initializeApp() {
     speaker.textContent = "Sentinel";
     const content = document.createElement("div");
     content.className = "turn-content";
-    const response = document.createElement("p");
+    const response = document.createElement("div");
+    response.className = "response-body";
 
     const pulse = document.createElement("div");
     pulse.className = "agent-pulse";
@@ -236,13 +281,39 @@ function initializeApp() {
     list.append(item);
   }
 
+  function renderMarkdown(container, markdown) {
+    container.replaceChildren();
+    parseMarkdownBlocks(markdown).forEach((block) => {
+      if (block.type === "heading") {
+        const heading = document.createElement(block.level <= 2 ? "h2" : "h3");
+        heading.textContent = block.text;
+        container.append(heading);
+      } else if (block.type === "list") {
+        const list = document.createElement("ul");
+        block.items.forEach((text) => {
+          const item = document.createElement("li");
+          item.textContent = text;
+          list.append(item);
+        });
+        container.append(list);
+      } else {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = block.text;
+        container.append(paragraph);
+      }
+    });
+  }
+
   function renderEvidence(turn, result) {
     const analysis = result.analysis;
     const card = document.createElement("section");
     card.className = "evidence-card";
     const title = document.createElement("h2");
     title.className = "evidence-title";
-    title.textContent = "Verified result";
+    title.textContent = "Verified tool facts";
+    const source = document.createElement("p");
+    source.className = "evidence-source";
+    source.textContent = "Binance Demo data checked by deterministic Python rules.";
     const list = document.createElement("ul");
     list.className = "evidence-list";
 
@@ -263,13 +334,13 @@ function initializeApp() {
       appendEvidence(list, "Risk Engine", analysis.risk_decision.status);
     }
     appendEvidence(list, "Execution", result.execution_status);
-    card.append(title, list);
+    card.append(title, source, list);
     turn.content.append(card);
   }
 
   function renderCompleted(turn, result) {
     turn.completed = true;
-    turn.response.textContent = result.ai_interpretation || result.message;
+    renderMarkdown(turn.response, result.ai_interpretation || result.message);
     turn.pulseLabel.textContent = turn.activities.length
       ? "Agent activity complete"
       : "Response complete";
@@ -416,6 +487,7 @@ if (typeof module !== "undefined" && module.exports) {
     createSseParser,
     formatActivityLabel,
     isValidPrompt,
+    parseMarkdownBlocks,
     reduceActivity,
   };
 }
