@@ -26,6 +26,7 @@ class Settings(BaseModel):
 
     llm_provider: LLMProvider
     llm_model: str
+    llm_allowed_models: tuple[str, ...] = ()
     llm_max_tokens: int = Field(default=4096, gt=0)
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
@@ -75,6 +76,23 @@ def load_settings() -> Settings:
     if key_value is None:
         raise ValueError(f"{key_name} is required when LLM_PROVIDER={provider.value}.")
 
+    default_route = f"{provider.value}/{model}"
+    configured_routes = os.getenv(
+        "LLM_ALLOWED_MODELS",
+        default_route,
+    ).split(",")
+    allowed_models = tuple(
+        dict.fromkeys(
+            route.strip()
+            for route in configured_routes
+            if route.strip()
+        )
+    )
+    if default_route not in allowed_models:
+        raise ValueError(
+            "The configured default model must be in LLM_ALLOWED_MODELS."
+        )
+
     binance_environment_value = os.getenv("BINANCE_API_ENV", "demo").strip().lower()
     try:
         binance_environment = BinanceEnvironment(binance_environment_value)
@@ -88,6 +106,7 @@ def load_settings() -> Settings:
     return Settings(
         llm_provider=provider,
         llm_model=model,
+        llm_allowed_models=allowed_models,
         llm_max_tokens=max_tokens,
         openai_api_key=openai_api_key,
         gemini_api_key=gemini_api_key,

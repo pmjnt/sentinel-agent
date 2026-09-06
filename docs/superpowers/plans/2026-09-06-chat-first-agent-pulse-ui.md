@@ -33,7 +33,7 @@
 - Modify: `.env.example`
 - Modify: `tests/test_config.py`
 
-- [ ] **Step 1: Write failing config tests**
+- [x] **Step 1: Write failing config tests**
 
 Add `LLM_ALLOWED_MODELS` to `_clear_llm_environment`, then add:
 
@@ -67,7 +67,7 @@ def test_default_model_is_allowed_when_allowlist_is_omitted(
     )
 ```
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 Run:
 
@@ -77,7 +77,7 @@ Run:
 
 Expected: FAIL because `Settings.llm_allowed_models` does not exist.
 
-- [ ] **Step 3: Implement minimal parsing**
+- [x] **Step 3: Implement minimal parsing**
 
 Add to `Settings`:
 
@@ -107,7 +107,7 @@ Add to `.env.example`:
 LLM_ALLOWED_MODELS=gemini/gemini-3.5-flash-lite,openai/gpt-5.4-mini
 ```
 
-- [ ] **Step 4: Run config tests and verify GREEN**
+- [x] **Step 4: Run config tests and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/test_config.py -q
@@ -115,7 +115,7 @@ LLM_ALLOWED_MODELS=gemini/gemini-3.5-flash-lite,openai/gpt-5.4-mini
 
 Expected: all config tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/config.py .env.example tests/test_config.py

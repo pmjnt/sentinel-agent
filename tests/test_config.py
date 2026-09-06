@@ -8,6 +8,7 @@ def _clear_llm_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for variable in (
         "LLM_PROVIDER",
         "LLM_MODEL",
+        "LLM_ALLOWED_MODELS",
         "LLM_MAX_TOKENS",
         "OPENAI_API_KEY",
         "GEMINI_API_KEY",
@@ -35,6 +36,53 @@ def test_load_settings_builds_openai_litellm_model(
     assert settings.agents_model == "litellm/openai/gpt-5.6-luna"
     assert settings.llm_max_tokens == 4096
     assert settings.litellm_debug is False
+
+
+def test_load_settings_parses_model_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.5-flash-lite")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setenv(
+        "LLM_ALLOWED_MODELS",
+        "gemini/gemini-3.5-flash-lite, openai/gpt-5.4-mini",
+    )
+
+    assert config.load_settings().llm_allowed_models == (
+        "gemini/gemini-3.5-flash-lite",
+        "openai/gpt-5.4-mini",
+    )
+
+
+def test_default_model_is_allowed_when_allowlist_is_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    assert config.load_settings().llm_allowed_models == (
+        "openai/gpt-5.4-mini",
+    )
+
+
+def test_default_model_must_be_in_explicit_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv(
+        "LLM_ALLOWED_MODELS",
+        "gemini/gemini-3.5-flash-lite",
+    )
+
+    with pytest.raises(ValueError, match="default model"):
+        config.load_settings()
 
 
 def test_load_settings_enables_litellm_debug_explicitly(
