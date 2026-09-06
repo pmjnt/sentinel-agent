@@ -31,10 +31,12 @@ from app.models.analysis import PortfolioAnalysis
 from app.models.api import ActivityEvent
 from app.models.profile import InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
+from app.model_catalog import ModelCatalog, ModelRoute
 
 
 RunAgent = Callable[..., Awaitable[Any]]
 RunStreamedAgent = Callable[..., Any]
+CreateAgent = Callable[[Settings], Any]
 MAX_AGENT_TURNS = MAX_MARKET_OBSERVATIONS + 8
 _FINANCIAL_OBSERVATION_REQUEST = re.compile(
     r"\b(?:analy[sz]e|analysis|risk|risky|exposure|holdings?|balances?|"
@@ -103,11 +105,16 @@ class SentinelToolLoop:
         run_agent: RunAgent | None = None,
         run_streamed_agent: RunStreamedAgent | None = None,
         conversation_sessions: ConversationSessionStore | None = None,
+        catalog: ModelCatalog | None = None,
+        create_agent: CreateAgent | None = None,
     ) -> None:
-        self._agent = create_tool_loop_agent(settings)
+        self._settings = settings
         self._gateway = gateway
         self._run_agent = run_agent or Runner.run
         self._run_streamed_agent = run_streamed_agent or Runner.run_streamed
+        self._catalog = catalog or ModelCatalog.from_settings(settings)
+        self._create_agent = create_agent or create_tool_loop_agent
+        self._agents: dict[str, Any] = {}
         self._conversation_sessions = (
             conversation_sessions or ConversationSessionStore()
         )
@@ -122,6 +129,7 @@ class SentinelToolLoop:
         policy: PortfolioPolicy,
         session_id: str = "default",
         profile: InvestorProfile | None = None,
+        model_route: ModelRoute | None = None,
     ) -> ToolLoopResult:
         current_profile = profile or InvestorProfile()
         context = SentinelRunContext.create(
@@ -130,7 +138,7 @@ class SentinelToolLoop:
             current_profile,
         )
         result = await self._run_agent(
-            self._agent,
+            self._agent_for(model_route),
             build_tool_loop_input(message, policy, current_profile),
             context=context,
             max_turns=MAX_AGENT_TURNS,
@@ -145,11 +153,12 @@ class SentinelToolLoop:
         policy: PortfolioPolicy,
         session_id: str = "default",
         profile: InvestorProfile | None = None,
+        model_route: ModelRoute | None = None,
     ) -> AsyncIterator[ActivityEvent | ToolLoopStreamCompleted]:
         current_profile = profile or InvestorProfile()
         context = SentinelRunContext.create(self._gateway, policy, current_profile)
         result = self._run_streamed_agent(
-            self._agent,
+            self._agent_for(model_route),
             build_tool_loop_input(message, policy, current_profile),
             context=context,
             max_turns=MAX_AGENT_TURNS,
@@ -164,6 +173,18 @@ class SentinelToolLoop:
         yield ToolLoopStreamCompleted(
             self._build_result(message, context, result.final_output)
         )
+
+    def _agent_for(self, route: ModelRoute | None) -> Any:
+        requested = route or self._catalog.default
+        selected = self._catalog.resolve(
+            requested.provider.value,
+            requested.model,
+        )
+        if selected.key not in self._agents:
+            self._agents[selected.key] = self._create_agent(
+                selected.apply(self._settings)
+            )
+        return self._agents[selected.key]
 
     @staticmethod
     def _build_result(

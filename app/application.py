@@ -19,6 +19,7 @@ from app.models.api import (
 )
 from app.models.profile import InvestorProfile
 from app.models.policy import PortfolioPolicy
+from app.model_catalog import ModelRoute
 from app.services.analysis_response_service import format_authoritative_analysis
 from app.services.policy_service import apply_policy_patch
 from app.services.profile_response_service import (
@@ -40,6 +41,7 @@ class AgentLoop(Protocol):
         policy: PortfolioPolicy,
         session_id: str = "default",
         profile: InvestorProfile | None = None,
+        model_route: ModelRoute | None = None,
     ) -> ToolLoopResult: ...
 
 
@@ -71,14 +73,22 @@ class SentinelApplication:
         self._store = store
         self._profile_store = profile_store or InMemoryInvestorProfileSessionStore()
 
-    async def handle(self, session_id: str, message: str) -> SentinelResponse:
+    async def handle(
+        self,
+        session_id: str,
+        message: str,
+        model_route: ModelRoute | None = None,
+    ) -> SentinelResponse:
         starting_policy = self._store.get(session_id)
         starting_profile = self._profile_store.get(session_id)
+        run_kwargs = {"profile": starting_profile}
+        if model_route is not None:
+            run_kwargs["model_route"] = model_route
         loop_result = await self._agent_loop.run(
             message,
             starting_policy,
             session_id,
-            profile=starting_profile,
+            **run_kwargs,
         )
         return self._commit_and_render(
             session_id,
@@ -91,17 +101,21 @@ class SentinelApplication:
         self,
         session_id: str,
         message: str,
+        model_route: ModelRoute | None = None,
     ) -> AsyncIterator[
         ActivityEvent | TextDeltaEvent | StructuredSentinelResponse
     ]:
         starting_policy = self._store.get(session_id)
         starting_profile = self._profile_store.get(session_id)
         activities: list[ActivityEvent] = []
+        stream_kwargs = {"profile": starting_profile}
+        if model_route is not None:
+            stream_kwargs["model_route"] = model_route
         async for event in self._agent_loop.stream(
             message,
             starting_policy,
             session_id,
-            profile=starting_profile,
+            **stream_kwargs,
         ):
             if isinstance(event, ActivityEvent):
                 activities.append(event)

@@ -24,6 +24,8 @@ from app.models.policy import PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
 from app.models.risk import RiskDecision, RiskReasonCode, RiskStatus
 from app.models.trade import PlanStatus, RebalancePlan
+from app.model_catalog import ModelRoute
+from app.config import LLMProvider
 from app.sessions import InMemoryInvestorProfileSessionStore, InMemoryPolicySessionStore
 
 
@@ -117,6 +119,24 @@ def test_general_chat_uses_agent_text_without_policy_change() -> None:
     assert loop.calls == [
         ("user-1", "xin chào", PortfolioPolicy(), InvestorProfile())
     ]
+
+
+def test_application_passes_selected_model_route_to_agent_loop() -> None:
+    route = ModelRoute(LLMProvider.GEMINI, "gemini-3.5-flash-lite")
+
+    class RouteCapturingLoop(FakeToolLoop):
+        selected_route: ModelRoute | None = None
+
+        async def run(self, *args, model_route=None, **kwargs):
+            self.selected_route = model_route
+            return await super().run(*args, **kwargs)
+
+    loop = RouteCapturingLoop(_result(final_text="Hello."))
+    application = SentinelApplication(loop, InMemoryPolicySessionStore())
+
+    asyncio.run(application.handle("user-1", "hello", model_route=route))
+
+    assert loop.selected_route == route
 
 
 def test_staged_investor_profile_commits_after_successful_run() -> None:

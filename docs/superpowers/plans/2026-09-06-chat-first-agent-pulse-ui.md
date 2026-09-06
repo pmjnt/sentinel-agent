@@ -265,7 +265,7 @@ git commit -m "feat: add safe model catalog"
 - Modify: `tests/unit/test_tool_loop_application.py`
 - Modify: `tests/test_agent.py`
 
-- [ ] **Step 1: Write failing routing and shared-session tests**
+- [x] **Step 1: Write failing routing and shared-session tests**
 
 Add a fake `create_agent` callback to `SentinelToolLoop` and assert that two
 routes create two Agents while both runs receive the same session object:
@@ -323,7 +323,7 @@ Add an application test asserting the route reaches the fake loop. Route fields
 are added to the public structured response in Task 4 so this task remains
 focused on runtime routing.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_tool_loop.py tests/unit/test_tool_loop_application.py tests/test_agent.py -q
@@ -331,7 +331,7 @@ focused on runtime routing.
 
 Expected: FAIL because the loop/application do not accept `model_route`.
 
-- [ ] **Step 3: Implement route-aware Agent caching**
+- [x] **Step 3: Implement route-aware Agent caching**
 
 In `SentinelToolLoop.__init__`, accept `catalog` and `create_agent`, retain one
 shared `ConversationSessionStore`, and add:
@@ -358,7 +358,7 @@ pass it to the loop, and place the selected route on the final structured DTO.
 Update `create_application(settings, gateway, catalog=None)` to create one
 catalog and pass it to `SentinelToolLoop`.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_tool_loop.py tests/unit/test_tool_loop_application.py tests/test_agent.py -q
@@ -366,7 +366,7 @@ catalog and pass it to `SentinelToolLoop`.
 
 Expected: focused tests PASS; existing console behavior still uses the default.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/agent/tool_loop.py app/application.py app/bootstrap.py tests/unit/test_tool_loop.py tests/unit/test_tool_loop_application.py tests/test_agent.py

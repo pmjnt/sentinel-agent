@@ -20,6 +20,7 @@ from app.agent.tool_loop import (
     create_tool_loop_agent,
 )
 from app.config import LLMProvider, Settings
+from app.model_catalog import ModelCatalog
 from app.models.market import MarketData, MarketDataError, Volatility
 from app.models.profile import InvestorProfile
 from app.models.policy import PolicyChange, PolicyField, PortfolioPolicy
@@ -135,6 +136,62 @@ def test_tool_loop_reuses_filtered_conversation_session_for_same_user() -> None:
     asyncio.run(loop.run("Follow-up.", PortfolioPolicy(), "user-1"))
 
     assert received_sessions[0] is received_sessions[1]
+
+
+def test_model_switch_uses_route_agent_and_same_conversation_session() -> None:
+    created_models: list[str] = []
+    seen_sessions: list[object] = []
+
+    def fake_create_agent(settings: Settings):
+        created_models.append(settings.agents_model)
+        return SimpleNamespace(model=settings.agents_model)
+
+    async def fake_run(agent: Any, prompt: str, **kwargs: Any):
+        seen_sessions.append(kwargs["session"])
+        return SimpleNamespace(final_output="Hello.")
+
+    settings = _settings().model_copy(
+        update={
+            "llm_allowed_models": (
+                "openai/gpt-5.4-mini",
+                "gemini/gemini-3.5-flash-lite",
+            ),
+            "gemini_api_key": "gemini-key",
+        }
+    )
+    catalog = ModelCatalog.from_settings(settings)
+    loop = SentinelToolLoop(
+        settings,
+        FakeGateway(),
+        catalog=catalog,
+        create_agent=fake_create_agent,
+        run_agent=fake_run,
+    )
+
+    async def run_both() -> None:
+        await loop.run(
+            "hello",
+            PortfolioPolicy(),
+            "user-1",
+            model_route=catalog.default,
+        )
+        await loop.run(
+            "hello again",
+            PortfolioPolicy(),
+            "user-1",
+            model_route=catalog.resolve(
+                "gemini",
+                "gemini-3.5-flash-lite",
+            ),
+        )
+
+    asyncio.run(run_both())
+
+    assert len({id(session) for session in seen_sessions}) == 1
+    assert created_models == [
+        "litellm/openai/gpt-5.4-mini",
+        "litellm/gemini/gemini-3.5-flash-lite",
+    ]
 
 
 def test_policy_update_with_weight_word_does_not_require_analysis() -> None:
