@@ -47,6 +47,30 @@ def format_policy_update(
                 f"a proposal over {_format_usd(threshold)} requires approval"
             )
 
+    if "max_trade_usd" in fields:
+        value = updated.max_trade_usd
+        changes.append(
+            "removed the maximum Demo trade value"
+            if value is None
+            else f"maximum Demo trade value is {_format_usd(value)}"
+        )
+
+    if "max_slippage_percent" in fields:
+        value = updated.max_slippage_percent
+        changes.append(
+            "removed the maximum estimated slippage"
+            if value is None
+            else f"maximum estimated slippage is {_format_percent(value / Decimal('100'))}"
+        )
+
+    if "allowed_trade_symbols" in fields:
+        value = updated.allowed_trade_symbols
+        changes.append(
+            "removed the policy trading-symbol allowlist"
+            if value is None
+            else "allowed Demo trading symbols are " + ", ".join(value)
+        )
+
     if not changes:
         return "No policy changes were applied."
     return "Policy updated: " + "; ".join(changes) + "."
@@ -77,6 +101,12 @@ def format_current_policy(policy: PortfolioPolicy) -> str:
             "- Proposal requires approval above: "
             f"{_format_usd(policy.max_trade_usd_without_approval)}"
         )
+    if policy.max_trade_usd is not None:
+        lines.append(f"- Maximum Demo trade value: {_format_usd(policy.max_trade_usd)}")
+    if policy.max_slippage_percent is not None:
+        lines.append(f"- Maximum estimated slippage: {policy.max_slippage_percent}%")
+    if policy.allowed_trade_symbols is not None:
+        lines.append("- Allowed Demo trading symbols: " + ", ".join(policy.allowed_trade_symbols))
     return "\n".join(lines)
 
 
@@ -86,6 +116,9 @@ def _is_empty_policy(policy: PortfolioPolicy) -> bool:
         and policy.max_asset_weight is None
         and not policy.block_high_volatility
         and policy.max_trade_usd_without_approval is None
+        and policy.max_trade_usd is None
+        and policy.max_slippage_percent is None
+        and policy.allowed_trade_symbols is None
     )
 
 

@@ -1,5 +1,8 @@
 from decimal import Decimal
 
+import pytest
+from pydantic import ValidationError
+
 from app.models.policy import (
     PolicyPatch,
     PortfolioPolicy,
@@ -40,6 +43,29 @@ def test_patch_changes_only_explicit_fields() -> None:
     assert updated.min_stablecoin_weight == Decimal("0.30")
     assert updated.block_high_volatility is True
     assert updated.max_trade_usd_without_approval == Decimal("1000")
+
+
+def test_patch_applies_execution_limits_without_changing_other_rules() -> None:
+    current = PortfolioPolicy(max_asset_weight=Decimal("0.40"))
+
+    updated = apply_policy_patch(
+        current,
+        PolicyPatch(
+            max_trade_usd=Decimal("75"),
+            max_slippage_percent=Decimal("0.10"),
+            allowed_trade_symbols=("btcusdt",),
+        ),
+    )
+
+    assert updated.max_asset_weight == Decimal("0.40")
+    assert updated.max_trade_usd == Decimal("75")
+    assert updated.max_slippage_percent == Decimal("0.10")
+    assert updated.allowed_trade_symbols == ("BTCUSDT",)
+
+
+def test_slippage_policy_is_a_percentage_between_zero_and_one_hundred() -> None:
+    with pytest.raises(ValidationError):
+        PortfolioPolicy(max_slippage_percent=Decimal("101"))
 
 
 def test_explicit_null_removes_optional_rule() -> None:

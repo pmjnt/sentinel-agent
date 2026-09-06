@@ -74,6 +74,7 @@ def test_tool_loop_agent_exposes_only_controlled_tools() -> None:
         "update_investor_profile",
         "view_investor_profile",
         "evaluate_portfolio_risk",
+        "propose_trade",
     ]
     assert agent.output_type is None
     assert agent.model_settings.parallel_tool_calls is False
@@ -90,6 +91,10 @@ def test_tool_loop_instructions_require_grounded_advice() -> None:
     assert "objective, time horizon, and acceptable loss" in instructions
     assert "ask one concise clarification question" in instructions
     assert "Never expose hidden chain-of-thought" in instructions
+    assert "max_trade_usd" in instructions
+    assert "max_slippage_percent" in instructions
+    assert "allowed_trade_symbols" in instructions
+    assert "cannot loosen" in instructions
 
 
 def test_tool_loop_input_contains_current_validated_policy() -> None:

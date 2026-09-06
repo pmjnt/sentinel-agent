@@ -17,6 +17,7 @@ def _clear_llm_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "BINANCE_CLI_PATH",
         "BINANCE_API_KEY",
         "BINANCE_SECRET_KEY",
+        "SENTINEL_DEMO_EXECUTION_ENABLED",
     ):
         monkeypatch.delenv(variable, raising=False)
 
@@ -197,6 +198,23 @@ def test_binance_settings_default_to_demo_and_standard_cli(
     assert settings.binance_cli_path == "binance-cli"
     assert settings.binance_api_key is None
     assert settings.binance_secret_key is None
+    assert settings.demo_execution_enabled is False
+
+
+def test_demo_execution_requires_explicit_valid_boolean(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.5-flash-lite")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setenv("SENTINEL_DEMO_EXECUTION_ENABLED", "true")
+
+    assert config.load_settings().demo_execution_enabled is True
+
+    monkeypatch.setenv("SENTINEL_DEMO_EXECUTION_ENABLED", "sometimes")
+    with pytest.raises(ValueError, match="valid boolean"):
+        config.load_settings()
 
 
 def test_load_settings_accepts_binance_demo_credentials(

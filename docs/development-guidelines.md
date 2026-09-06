@@ -88,7 +88,14 @@ Nếu xuất hiện circular import, xem lại trách nhiệm module thay vì tr
 - RiskEngine là nguồn sự thật cho `BLOCKED`, `REQUIRES_APPROVAL`, `SAFE_TO_PROPOSE`.
 - Structured output phải được validate trước khi ảnh hưởng state.
 - Nếu policy mơ hồ, hỏi lại; không tự tạo threshold.
-- Không expose write tool cho bất kỳ Agent nào trong phiên bản read-only.
+- Tool proposal của Agent không được gọi adapter execution.
+- Approval phải tham chiếu đúng immutable plan và đi qua API/use case riêng.
+- Re-read portfolio/market và revalidate ngay trước order; dữ liệu lúc đề xuất
+  không phải quyền thực thi.
+- Hard limits của ứng dụng luôn thắng policy do chat cập nhật.
+- Chỉ báo `EXECUTED` sau khi provider xác nhận trạng thái order.
+- Retry approval không được tạo order thứ hai; dùng client order ID idempotent.
+- Không bao giờ thêm transfer, withdrawal hoặc generic CLI tool vào Agent.
 
 ## 10. MCP rules cho adapter tương lai
 
@@ -116,7 +123,7 @@ Trước khi hoàn thành một thay đổi:
 - Business rule có vô tình nằm trong Agent/API không?
 - LLM output đã được schema validate chưa?
 - Failure có tạo fake result không?
-- Tool/capability mới có thực sự read-only không?
+- Tool write mới có nằm ngoài LLM loop và yêu cầu explicit approval không?
 - Type hint và tên hàm có nói rõ ý nghĩa không?
 - Có import ngược dependency direction không?
 - Test, compile validation và `git diff --check` có pass không?

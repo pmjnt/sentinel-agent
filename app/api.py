@@ -19,7 +19,9 @@ from app.models.api import (
     ModelOption,
     StructuredSentinelResponse,
     TextDeltaEvent,
+    PlanActionRequest,
 )
+from app.services.execution_service import ExecutionBlockedError
 from app.model_catalog import ModelCatalog, ModelRoute
 
 
@@ -36,6 +38,10 @@ class StreamingApplication(Protocol):
     ) -> AsyncIterator[
         ActivityEvent | TextDeltaEvent | StructuredSentinelResponse
     ]: ...
+
+    async def approve_plan(self, session_id: str, plan_id: str): ...
+
+    def reject_plan(self, session_id: str, plan_id: str): ...
 
 
 def create_api(
@@ -84,6 +90,24 @@ def create_api(
                 "X-Accel-Buffering": "no",
             },
         )
+
+    @api.post("/api/plans/{plan_id}/approve")
+    async def approve_plan(plan_id: str, request: PlanActionRequest):
+        try:
+            return await application.approve_plan(request.session_id, plan_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Plan was not found.") from error
+        except (ExecutionBlockedError, RuntimeError) as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+
+    @api.post("/api/plans/{plan_id}/reject")
+    async def reject_plan(plan_id: str, request: PlanActionRequest):
+        try:
+            return application.reject_plan(request.session_id, plan_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Plan was not found.") from error
+        except (ExecutionBlockedError, RuntimeError) as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
 
     api.mount(
         "/",

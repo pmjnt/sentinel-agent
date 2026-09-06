@@ -12,6 +12,7 @@ from app.agent.controlled_tools import (
     evaluate_cached_portfolio,
     parse_policy_tool_changes,
     parse_profile_tool_changes,
+    propose_trade_plan,
     read_market_data,
     read_portfolio,
     stage_policy_update,
@@ -28,6 +29,7 @@ from app.agent.run_context import (
     SentinelRunContext,
 )
 from app.models.market import MarketData, MarketDataError, Volatility
+from app.models.execution import ExecutionPlan
 from app.models.profile import (
     InvestmentObjective,
     InvestorProfile,
@@ -290,9 +292,43 @@ def test_controlled_tool_allowlist_contains_no_execution_capability() -> None:
         "update_investor_profile",
         "view_investor_profile",
         "evaluate_portfolio_risk",
+        "propose_trade",
     ]
     assert not any(
         forbidden in name
         for name in names
-        for forbidden in ("order", "trade", "transfer", "withdraw", "cli")
+        for forbidden in ("order", "execute", "transfer", "withdraw", "cli")
     )
+
+
+def test_trade_proposal_requires_fresh_observations() -> None:
+    context = _context()
+
+    result = propose_trade_plan(
+        context,
+        symbol="BTCUSDT",
+        side="BUY",
+        quote_usd="50",
+        reason="Limited growth exposure.",
+    )
+
+    assert isinstance(result, MissingObservations)
+    assert result.required_tools == ["get_portfolio", "get_market_data"]
+
+
+def test_trade_proposal_is_staged_but_not_executed() -> None:
+    context = _context()
+    context.portfolio = _portfolio()
+    context.market_by_symbol["BTCUSDT"] = _market()
+
+    result = propose_trade_plan(
+        context,
+        symbol="BTCUSDT",
+        side="BUY",
+        quote_usd="50",
+        reason="Limited growth exposure.",
+    )
+
+    assert isinstance(result, ExecutionPlan)
+    assert context.execution_plans == [result]
+    assert result.order_id is None

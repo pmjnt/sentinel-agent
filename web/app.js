@@ -11,6 +11,20 @@ function buildChatRequest(sessionId, message, route) {
   };
 }
 
+function buildPlanActionRequest(sessionId, planId, action) {
+  if (!['approve', 'reject'].includes(action)) {
+    throw new Error(`Unsupported plan action: ${action}`);
+  }
+  return {
+    url: `/api/plans/${encodeURIComponent(planId)}/${action}`,
+    options: {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId.trim() }),
+    },
+  };
+}
+
 function reduceActivity(current, event) {
   const next = current.map((item) => ({ ...item }));
   if (event.status === "STARTED") return [...next, { ...event }];
@@ -379,6 +393,66 @@ function initializeApp() {
     turn.content.append(card);
   }
 
+  function renderExecutionPlan(turn, result) {
+    const plan = result.execution_plan;
+    if (!plan || plan.status !== "PENDING_APPROVAL") return;
+
+    const card = document.createElement("section");
+    card.className = "execution-card";
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "execution-eyebrow";
+    eyebrow.textContent = "BINANCE DEMO · EXPLICIT APPROVAL REQUIRED";
+    const title = document.createElement("h3");
+    title.textContent = `${plan.side} ${plan.symbol}`;
+    const detail = document.createElement("p");
+    detail.textContent = `${formatMoney(plan.quote_usd)} · estimated ${Number(plan.estimated_quantity).toPrecision(6)} · ${plan.plan_id}`;
+    const reason = document.createElement("p");
+    reason.className = "execution-reason";
+    reason.textContent = plan.reason;
+    const status = document.createElement("p");
+    status.className = "execution-status";
+    status.textContent = "No order has been sent.";
+    const actions = document.createElement("div");
+    actions.className = "execution-actions";
+    const approve = document.createElement("button");
+    approve.type = "button";
+    approve.className = "approve-order";
+    approve.textContent = "Approve Demo order";
+    const reject = document.createElement("button");
+    reject.type = "button";
+    reject.className = "reject-order";
+    reject.textContent = "Reject";
+
+    async function perform(action) {
+      approve.disabled = true;
+      reject.disabled = true;
+      status.textContent = action === "approve"
+        ? "Revalidating before execution…"
+        : "Rejecting plan…";
+      try {
+        const request = buildPlanActionRequest(sessionId, plan.plan_id, action);
+        const response = await window.fetch(request.url, request.options);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Plan action failed.");
+        status.textContent = payload.status === "EXECUTED"
+          ? `Demo order verified: ${payload.order_status} · order ${payload.order_id}`
+          : `Plan ${payload.status.toLowerCase()}.`;
+        card.dataset.status = payload.status;
+      } catch (error) {
+        status.textContent = error.message;
+        status.classList.add("failed");
+        approve.disabled = false;
+        reject.disabled = false;
+      }
+    }
+
+    approve.addEventListener("click", () => perform("approve"));
+    reject.addEventListener("click", () => perform("reject"));
+    actions.append(approve, reject);
+    card.append(eyebrow, title, detail, reason, status, actions);
+    turn.content.append(card);
+  }
+
   function renderCompleted(turn, result) {
     turn.completed = true;
     renderMarkdown(turn.response, result.ai_interpretation || result.message);
@@ -391,6 +465,7 @@ function initializeApp() {
     turn.pulseDot.classList.remove("active");
     turn.pulseDot.style.background = "var(--green)";
     renderEvidence(turn, result);
+    renderExecutionPlan(turn, result);
   }
 
   function renderFailure(turn, message) {
@@ -525,6 +600,7 @@ if (typeof document !== "undefined") {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     buildChatRequest,
+    buildPlanActionRequest,
     createSseParser,
     formatActivityLabel,
     isValidPrompt,

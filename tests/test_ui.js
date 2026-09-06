@@ -5,6 +5,7 @@ const { join } = require("node:path");
 
 const {
   buildChatRequest,
+  buildPlanActionRequest,
   createSseParser,
   formatActivityLabel,
   isValidPrompt,
@@ -12,6 +13,24 @@ const {
   parseMarkdownBlocks,
   reduceActivity,
 } = require("../web/app.js");
+
+test("plan actions use a dedicated endpoint and exact session", () => {
+  assert.deepEqual(
+    buildPlanActionRequest(" user-1 ", "PLAN-ABC123", "approve"),
+    {
+      url: "/api/plans/PLAN-ABC123/approve",
+      options: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: "user-1" }),
+      },
+    },
+  );
+  assert.throws(
+    () => buildPlanActionRequest("user-1", "PLAN-ABC123", "execute"),
+    /Unsupported plan action/,
+  );
+});
 
 test("accepts meaningful prompts and rejects whitespace", () => {
   assert.equal(isValidPrompt("Analyze my BTC exposure."), true);
@@ -110,4 +129,6 @@ test("user turns do not render a redundant You label", () => {
   assert.doesNotMatch(script, /speaker\.textContent = "You"/);
   assert.match(script, /Verified tool facts/);
   assert.match(script, /document\.createElement\("details"\)/);
+  assert.match(script, /Approve Demo order/);
+  assert.match(script, /Reject/);
 });

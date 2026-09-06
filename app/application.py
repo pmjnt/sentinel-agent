@@ -9,17 +9,23 @@ from app.agent.run_context import (
     PolicyViewedEvent,
     ProfileUpdatedEvent,
     ProfileViewedEvent,
+    TradeProposedEvent,
 )
 from app.agent.tool_loop import ToolLoopResult, ToolLoopStreamCompleted
+from app.execution.store import InMemoryExecutionPlanStore
 from app.models.analysis import PortfolioAnalysis
 from app.models.api import (
     ActivityEvent,
+    ExecutionStatus,
     StructuredSentinelResponse,
     TextDeltaEvent,
 )
+from app.models.execution import ExecutionPlan, ExecutionPlanStatus
+from app.model_catalog import ModelRoute
 from app.models.profile import InvestorProfile
 from app.models.policy import PortfolioPolicy
-from app.model_catalog import ModelRoute
+from app.services.execution_response_service import format_pending_execution_plan
+from app.services.execution_service import DemoExecutionService
 from app.services.analysis_response_service import format_authoritative_analysis
 from app.services.policy_service import apply_policy_patch
 from app.services.profile_response_service import (
@@ -53,6 +59,7 @@ class SentinelResponse(BaseModel):
     profile: InvestorProfile = InvestorProfile()
     analyses: tuple[PortfolioAnalysis, ...] = ()
     ai_interpretation: str | None = None
+    execution_plan: ExecutionPlan | None = None
 
     @property
     def analysis(self) -> PortfolioAnalysis | None:
@@ -68,10 +75,24 @@ class SentinelApplication:
         agent_loop: AgentLoop,
         store: InMemoryPolicySessionStore,
         profile_store: InMemoryInvestorProfileSessionStore | None = None,
+        execution_plans: InMemoryExecutionPlanStore | None = None,
+        execution_service: DemoExecutionService | None = None,
     ) -> None:
         self._agent_loop = agent_loop
         self._store = store
         self._profile_store = profile_store or InMemoryInvestorProfileSessionStore()
+        self._execution_plans = execution_plans or InMemoryExecutionPlanStore()
+        self._execution_service = execution_service
+
+    async def approve_plan(self, session_id: str, plan_id: str) -> ExecutionPlan:
+        if self._execution_service is None:
+            raise RuntimeError("Binance Demo execution is not configured.")
+        return await self._execution_service.approve_and_execute(session_id, plan_id)
+
+    def reject_plan(self, session_id: str, plan_id: str) -> ExecutionPlan:
+        if self._execution_service is None:
+            return self._execution_plans.reject(session_id, plan_id)
+        return self._execution_service.reject(session_id, plan_id)
 
     async def handle(
         self,
@@ -147,6 +168,12 @@ class SentinelApplication:
                 analysis=response.analysis,
                 activity=activities,
                 ai_interpretation=response.ai_interpretation,
+                execution_status=(
+                    _api_execution_status(response.execution_plan.status)
+                    if response.execution_plan is not None
+                    else ExecutionStatus.NOT_EXECUTED
+                ),
+                execution_plan=response.execution_plan,
             )
 
     def _commit_and_render(
@@ -181,6 +208,11 @@ class SentinelApplication:
             expected_profile=starting_profile,
         )
 
+        for plan in loop_result.execution_plans:
+            if plan.session_id != session_id:
+                raise RuntimeError("Execution plan session did not match Agent run.")
+            self._execution_plans.create(plan)
+
         response_parts: list[str] = []
         for event in loop_result.events:
             if isinstance(event, PolicyUpdatedEvent):
@@ -201,6 +233,9 @@ class SentinelApplication:
                 continue
             if isinstance(event, AnalysisCompletedEvent):
                 response_parts.append(format_authoritative_analysis(event.analysis))
+                continue
+            if isinstance(event, TradeProposedEvent):
+                response_parts.append(format_pending_execution_plan(event.plan))
 
         if loop_result.data_errors:
             details = "\n".join(
@@ -226,6 +261,11 @@ class SentinelApplication:
                 if loop_result.analyses
                 else None
             ),
+            execution_plan=(
+                loop_result.execution_plans[-1]
+                if loop_result.execution_plans
+                else None
+            ),
         )
 
 
@@ -235,3 +275,7 @@ def _join_messages(*messages: str) -> str:
 
 def _text_chunks(text: str, size: int = 80) -> list[str]:
     return [text[index:index + size] for index in range(0, len(text), size)]
+
+
+def _api_execution_status(status: ExecutionPlanStatus) -> ExecutionStatus:
+    return ExecutionStatus(status.value)

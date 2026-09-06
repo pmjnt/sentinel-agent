@@ -277,6 +277,31 @@ button { color: inherit; }
   color: var(--text-soft);
 }
 
+.execution-card {
+  margin-top: 14px;
+  padding: 16px;
+  background: linear-gradient(145deg, rgba(230, 185, 47, 0.12), rgba(28, 32, 39, 0.92));
+  border: 1px solid rgba(230, 185, 47, 0.3);
+  border-radius: 14px;
+}
+
+.execution-card h3 { margin: 3px 0 5px; font-size: 1rem; }
+.execution-eyebrow { color: var(--yellow); font: 0.62rem var(--utility); letter-spacing: 0.06em; }
+.execution-reason, .execution-status { margin-top: 7px !important; color: var(--text-soft); font-size: 0.82rem; }
+.execution-status.failed { color: var(--red); }
+.execution-actions { display: flex; gap: 8px; margin-top: 13px; }
+.execution-actions button {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  cursor: pointer;
+}
+.approve-order { color: #17130a; background: var(--yellow); border-color: var(--yellow) !important; font-weight: 700; }
+.reject-order { color: var(--text-soft); background: transparent; }
+.execution-actions button:disabled { cursor: wait; opacity: 0.55; }
+.execution-card[data-status="EXECUTED"] { border-color: rgba(72, 185, 138, 0.45); }
+
 .evidence-card > summary {
   display: flex;
   min-height: 38px;

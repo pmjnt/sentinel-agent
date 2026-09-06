@@ -56,3 +56,20 @@ class DepthPayload(BaseModel):
 
     bids: list[tuple[Decimal, Decimal]]
     asks: list[tuple[Decimal, Decimal]]
+
+
+class SpotOrderPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    symbol: str
+    order_id: int = Field(alias="orderId")
+    client_order_id: str = Field(alias="clientOrderId")
+    status: str
+
+    @field_validator("symbol", "client_order_id", "status")
+    @classmethod
+    def normalize_required_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Order field must not be empty.")
+        return normalized

@@ -640,7 +640,7 @@
         <aside class="issue-card" aria-label="Tóm tắt phiên bản">
           <span class="number">v0.1</span>
           <p><strong>Runtime hiện tại</strong></p>
-          <p>Console + hai LLM có trách nhiệm hẹp + deterministic RiskEngine + Binance CLI read-only.</p>
+          <p>Console + LLM có trách nhiệm hẹp + deterministic RiskEngine + Binance CLI Demo capability allowlist.</p>
           <p class="utility">Python 3.12 · OpenAI Agents SDK · Pydantic · pytest</p>
         </aside>
       </div>
@@ -684,12 +684,12 @@
             <article class="card">
               <span class="status live">ĐÃ HOẠT ĐỘNG</span>
               <h3>Policy core</h3>
-              <p>Bảy controlled tools, policy/profile session RAM, allocation, violation, rebalance và RiskEngine đã nằm trong Agent loop.</p>
+              <p>Tám controlled tools đã nằm trong Agent loop; <code>propose_trade</code> chỉ tạo pending plan và không đặt lệnh.</p>
             </article>
             <article class="card">
               <span class="status live">ĐÃ HOẠT ĐỘNG</span>
               <h3>FastAPI + streaming UI</h3>
-              <p>UI chat-first gọi SSE thật, hiển thị Agent Pulse nhỏ dưới từng câu trả lời và map structured response. Approval, execution và verification vẫn chưa có.</p>
+              <p>UI chat-first gọi SSE thật, hiển thị Agent Pulse, map structured response và có Approve/Reject cho immutable Binance Demo plan.</p>
             </article>
           </div>
 
@@ -822,7 +822,7 @@
               <span class="rail-index">02</span>
               <div class="rail-body">
                 <h3>Sentinel Agent hiểu ý định và chọn tool</h3>
-                <p>LLM qua LiteLLM nhận current policy, investor profile cùng bảy tool schemas, rồi tự chọn capability an toàn cần gọi.</p>
+                <p>LLM qua LiteLLM nhận current policy, investor profile cùng tám tool schemas, rồi tự chọn capability an toàn cần gọi.</p>
                 <a class="path" href="../app/agent/tool_loop.py">app/agent/tool_loop.py</a>
               </div>
             </li>
@@ -846,7 +846,7 @@
               <span class="rail-index">05</span>
               <div class="rail-body">
                 <h3>Gateway và runner đọc Binance Demo</h3>
-                <p>Gateway chọn command read-only đã hard-code; runner dùng argument array, không mở shell, đặt timeout và cô lập credentials.</p>
+                <p>Gateway chọn command Demo đã hard-code; runner dùng argument array, không mở shell, đặt timeout và cô lập credentials. Lệnh write chỉ đi qua approval service.</p>
                 <span class="path">app/binance/gateway.py · app/binance/runner.py</span>
               </div>
             </li>
@@ -942,6 +942,7 @@ LLM explains in natural language</pre>
 │   ├── tools/              # ví dụ giáo dục cũ
 │   ├── gateways.py         # application-owned interface
 │   ├── binance/            # external adapter
+│   ├── execution/          # immutable plan state trong RAM
 │   ├── models/             # Pydantic domain contracts
 │   ├── services/           # deterministic business rules
 │   ├── sessions.py         # policy/profile state trong RAM
@@ -965,7 +966,7 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../app/api.py">app/api.py</a> · <a href="../app/bootstrap.py">app/bootstrap.py</a></h4>
-                <p><code>bootstrap.py</code> ghép dependencies dùng chung. <code>api.py</code> expose health/config/chat SSE và phục vụ web cùng origin.</p>
+                <p><code>bootstrap.py</code> ghép dependencies dùng chung. <code>api.py</code> expose health/config/chat SSE, approve/reject plan và phục vụ web cùng origin.</p>
                 <p class="relation"><strong>Output:</strong> activity, validated text delta và structured completed JSON. <strong>Không expose:</strong> API key, raw tool args/result hay chain-of-thought.</p>
               </article>
               <article class="file">
@@ -985,7 +986,7 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../app/gateways.py">app/gateways.py</a></h4>
-                <p>Protocol do application sở hữu, định nghĩa <code>get_portfolio()</code> và <code>get_market_data()</code>.</p>
+                <p>Protocol do application sở hữu, định nghĩa capability đọc cùng Spot Demo order/query hẹp.</p>
                 <p class="relation"><strong>Phụ thuộc:</strong> domain models. <strong>Được implement bởi:</strong> BinanceCliGateway. <strong>Dùng bởi:</strong> controlled tool handlers.</p>
               </article>
               <article class="file">
@@ -1021,12 +1022,12 @@ LLM explains in natural language</pre>
             <div class="file-list">
               <article class="file">
                 <h4><a href="../app/agent/tool_loop.py">app/agent/tool_loop.py</a></h4>
-                <p>Runtime chính: tạo Agent với đúng bảy controlled tools, tạo context mới và để SDK tiếp tục loop sau mỗi tool result.</p>
+                <p>Runtime chính: tạo Agent với đúng tám controlled tools, tạo context mới và để SDK tiếp tục loop sau mỗi tool result.</p>
                 <p class="relation"><strong>Input:</strong> message + policy + profile. <strong>Output:</strong> final text, safe activity, staged patches và validated analyses.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/controlled_tools.py">app/agent/controlled_tools.py</a></h4>
-                <p>Định nghĩa bảy tool: đọc portfolio/market, update/view policy, update/view investor profile và deterministic risk evaluation. Wire value đơn giản rồi Python parse; không có execution tool.</p>
+                <p>Định nghĩa tám tool: đọc portfolio/market, update/view policy, update/view investor profile, deterministic risk evaluation và tạo proposal. Không có execution tool.</p>
                 <p class="relation"><strong>Ủy quyền:</strong> gateway cho I/O, services cho tính toán. <strong>Không được:</strong> nhận CLI command tùy ý.</p>
               </article>
               <article class="file">
@@ -1047,7 +1048,7 @@ LLM explains in natural language</pre>
               <article class="file">
                 <h4><a href="../app/agent/prompts.py">app/agent/prompts.py</a></h4>
                 <p>Giữ instructions của controlled tool loop và các Agent legacy tách khỏi construction code.</p>
-                <p class="relation"><strong>Quy tắc:</strong> không bịa dữ liệu, không trade; analysis phải qua deterministic evaluation tool.</p>
+                <p class="relation"><strong>Quy tắc:</strong> không bịa dữ liệu, không tự trade; analysis phải qua deterministic evaluation và execution phải qua explicit approval riêng.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/agent/request_interpreter.py">app/agent/request_interpreter.py</a></h4>
@@ -1087,7 +1088,7 @@ LLM explains in natural language</pre>
               </article>
               <article class="file">
                 <h4><a href="../app/binance/gateway.py">app/binance/gateway.py</a></h4>
-                <p>Adapter chính: chọn bốn command read-only, validate symbol, map payload và tính volatility/slippage.</p>
+                <p>Adapter chính: chọn capability đọc và Spot order Demo cố định, validate symbol/order identity, map payload và tính volatility/slippage.</p>
                 <p class="relation"><strong>Phụ thuộc:</strong> runner, transport schemas, portfolio service. <strong>Implement:</strong> PortfolioMarketGateway.</p>
               </article>
               <article class="file">
@@ -1196,6 +1197,16 @@ LLM explains in natural language</pre>
                 <h4><a href="../app/services/portfolio_analysis_service.py">app/services/portfolio_analysis_service.py</a></h4>
                 <p>Chứa cả use case cũ và các hàm pure mà controlled evaluation tool dùng để tìm market cần thiết, tạo plan và chạy RiskEngine.</p>
                 <p class="relation"><strong>Fail closed:</strong> thiếu observation bắt buộc thì không tạo recommendation.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/services/trade_proposal_service.py">trade_proposal_service.py</a> · <a href="../app/services/execution_service.py">execution_service.py</a></h4>
+                <p>Proposal service áp hard limit, policy, balance, slippage và RiskEngine. Execution service xử lý approval, đọc dữ liệu mới, submit đúng một Demo order, query status rồi refresh portfolio.</p>
+                <p class="relation"><strong>Ranh giới:</strong> Agent chỉ gọi proposal; execution chỉ được gọi qua endpoint Approve cho đúng plan.</p>
+              </article>
+              <article class="file">
+                <h4><a href="../app/execution/store.py">app/execution/store.py</a> · <a href="../app/models/execution.py">app/models/execution.py</a></h4>
+                <p>Giữ immutable plan và state transition PENDING_APPROVAL → APPROVED → EXECUTING → EXECUTED/FAILED; hỗ trợ REJECTED và EXPIRED.</p>
+                <p class="relation"><strong>MVP:</strong> lưu RAM, mất khi process dừng; production cần persistent audit store.</p>
               </article>
               <article class="file">
                 <h4><a href="../app/services/__init__.py">app/services/__init__.py</a></h4>
@@ -1339,11 +1350,11 @@ usd_value ÷ total = weight</pre>
             </article>
             <article class="decision">
               <h3>Credential tối thiểu</h3>
-              <p>Public market commands không nhận key. Chỉ account command authenticated nhận Binance credentials qua child environment; LLM keys không đi theo.</p>
+              <p>Public market commands không nhận key. Account và order command authenticated nhận Binance credentials qua child environment; LLM và browser không nhận key.</p>
             </article>
             <article class="decision">
               <h3>Không expose CLI</h3>
-              <p>LLM không được truyền command hoặc URL. Không có generic <code>request</code>, order, cancel, transfer hay withdraw trong application path.</p>
+              <p>LLM không được truyền command hoặc URL. Không có generic <code>request</code>, cancel, transfer hay withdraw; order chỉ đi qua approval service với argument cố định.</p>
             </article>
             <article class="decision">
               <h3>Fail closed</h3>
@@ -1419,7 +1430,7 @@ usd_value ÷ total = weight</pre>
               <tbody>
                 <tr><td><code>tests/test_config.py</code></td><td>LLM route, active provider key, Binance Demo-only config.</td></tr>
                 <tr><td><code>tests/test_agent.py</code></td><td>Model settings, console behavior và application composition.</td></tr>
-                <tr><td><code>tests/unit/test_tool_loop.py</code></td><td>Đúng bảy tools, run context, text output và interpretation guard.</td></tr>
+                <tr><td><code>tests/unit/test_tool_loop.py</code></td><td>Đúng tám tools, run context, text output và interpretation guard.</td></tr>
                 <tr><td><code>tests/unit/test_controlled_tools.py</code></td><td>Trusted observations, staged policy và deterministic evaluation boundary.</td></tr>
                 <tr><td><code>tests/unit/test_tool_loop_application.py</code></td><td>Commit sau thành công, event order, authoritative output và fail-closed.</td></tr>
                 <tr><td><code>tests/unit/test_portfolio_analysis_service.py</code></td><td>Market discovery, deduplication, plan và risk status deterministic.</td></tr>
@@ -1455,7 +1466,7 @@ git diff --check</pre>
               <p class="eyebrow">Road ahead</p>
               <h2>Chưa có gì, nên làm gì tiếp?</h2>
             </div>
-            <p>Core policy analysis, FastAPI, SSE và UI chat đã chạy. Các bước dưới đây chưa có trong runtime hiện tại.</p>
+            <p>Core policy analysis, FastAPI, SSE, UI chat và controlled Binance Demo execution đã chạy. Các bước dưới đây là hardening tiếp theo.</p>
           </div>
 
           <ol class="journey">
@@ -1475,14 +1486,14 @@ git diff --check</pre>
               <p>Lưu policy, analysis snapshot và trạng thái plan thay cho session RAM.</p>
             </li>
             <li>
-              <span class="phase">NEXT 04</span>
-              <h3>Approval state</h3>
-              <p>Approve/Reject rõ ràng, không suy approval từ câu chat mơ hồ.</p>
+              <span class="phase">DONE 04</span>
+              <h3>Approval + Demo execution</h3>
+              <p>Approve/Reject rõ ràng, revalidation, idempotent Demo order và post-execution verification đã có; mặc định bị tắt bằng config.</p>
             </li>
             <li>
               <span class="phase">LATER</span>
-              <h3>Execution</h3>
-              <p>Chỉ cân nhắc sau risk validation, authorization, idempotency, audit và post-execution verification.</p>
+              <h3>Production hardening</h3>
+              <p>Authentication, persistent audit store và production deployment vẫn chưa thuộc phạm vi local hackathon MVP.</p>
             </li>
           </ol>
 
@@ -1496,7 +1507,7 @@ git diff --check</pre>
     <footer>
       <div class="footer-inner">
         <p><strong>Sentinel Project Guide</strong> · tài liệu phản ánh repository ngày 05/09/2026.</p>
-        <p>Documentation only · Demo data · No trading · No active MCP</p>
+        <p>Binance Demo only · Explicit approval · No transfer/withdrawal · No active MCP</p>
       </div>
     </footer>
 

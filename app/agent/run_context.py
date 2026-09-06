@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from app.gateways import PortfolioMarketGateway
 from app.models.analysis import PortfolioAnalysis
 from app.models.market import MarketData
+from app.models.execution import ExecutionPlan
 from app.models.profile import InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
@@ -35,12 +36,18 @@ class ProfileViewedEvent:
     profile: InvestorProfile
 
 
+@dataclass(frozen=True)
+class TradeProposedEvent:
+    plan: ExecutionPlan
+
+
 SentinelRunEvent = (
     PolicyUpdatedEvent
     | PolicyViewedEvent
     | ProfileUpdatedEvent
     | ProfileViewedEvent
     | AnalysisCompletedEvent
+    | TradeProposedEvent
 )
 
 
@@ -60,6 +67,8 @@ class SentinelRunContext:
     market_by_symbol: dict[str, MarketData] = field(default_factory=dict)
     data_errors: list[str] = field(default_factory=list)
     analyses: list[PortfolioAnalysis] = field(default_factory=list)
+    execution_plans: list[ExecutionPlan] = field(default_factory=list)
+    session_id: str = "default"
 
     @classmethod
     def create(
@@ -67,6 +76,7 @@ class SentinelRunContext:
         gateway: PortfolioMarketGateway,
         policy: PortfolioPolicy,
         profile: InvestorProfile | None = None,
+        session_id: str = "default",
     ) -> "SentinelRunContext":
         return cls(
             gateway=gateway,
@@ -74,4 +84,5 @@ class SentinelRunContext:
             working_policy=policy,
             starting_profile=profile or InvestorProfile(),
             working_profile=profile or InvestorProfile(),
+            session_id=session_id,
         )

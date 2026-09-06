@@ -36,8 +36,9 @@ app.models ← app.services ← app.gateways ← app.binance
 - `app.models`: Pydantic domain data.
 - `app.services`: business rules deterministic, không import Agents SDK.
 - `app.gateways`: port do ứng dụng sở hữu.
-- `app.binance`: adapter read-only cho Binance Skills Hub CLI.
-- `app.agent.controlled_tools`: bảy capability duy nhất LLM nhìn thấy.
+- `app.binance`: adapter capability allowlist cho Binance Skills Hub CLI Demo.
+- `app.agent.controlled_tools`: tám capability duy nhất LLM nhìn thấy; proposal
+  tool không có quyền execution.
 - `app.agent.tool_loop`: tạo Agent, context một lượt chạy và gọi SDK Runner.
 - `app.application`: commit policy sau thành công và render kết quả authoritative.
 - `app.api`: phát activity và kết quả typed qua SSE, không phát secret/raw tool data.
@@ -69,6 +70,12 @@ PortfolioAnalysis đã validate
 LLM viết nhận định định tính
   ↓
 Python render facts/status trước, rồi mới nối AI interpretation
+  ↓ optional
+propose_trade tạo immutable pending plan (không đặt lệnh)
+  ↓ user bấm Approve cho đúng PLAN-ID
+ExecutionService đọc lại data + validate policy/hard limit
+  ↓
+BinanceCliGateway đặt MARKET order trên Demo + query status + refresh portfolio
 ```
 
 Khi người dùng đổi policy, `update_policy` chỉ cập nhật `working_policy` trong
@@ -119,7 +126,7 @@ observation phân tích. Formal risk priority là `BLOCKED`, sau đó
 
 ## Security boundary
 
-Agent chỉ có bảy tool:
+Agent chỉ có tám tool:
 
 ```text
 get_portfolio
@@ -129,9 +136,12 @@ view_policy
 update_investor_profile
 view_investor_profile
 evaluate_portfolio_risk
+propose_trade
 ```
 
-Không có order, trade, transfer, withdrawal hoặc generic CLI tool.
+`propose_trade` chỉ tạo proposal. Không có execution, transfer, withdrawal hoặc
+generic CLI tool trong Agent. Execution nằm ngoài LLM loop, yêu cầu endpoint
+approval đúng session/PLAN-ID, luôn revalidate và chỉ hỗ trợ Demo.
 `BinanceCliRunner` dùng argument array, không mở shell. Credentials chỉ đi qua
 child environment của account command, không nằm trong prompt hay run context.
 `parallel_tool_calls=False` giữ thứ tự policy/observation rõ ràng.

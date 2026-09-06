@@ -35,6 +35,7 @@ class Settings(BaseModel):
     binance_cli_path: str = "binance-cli"
     binance_api_key: str | None = Field(default=None, repr=False)
     binance_secret_key: str | None = Field(default=None, repr=False)
+    demo_execution_enabled: bool = False
 
     @property
     def agents_model(self) -> str:
@@ -115,6 +116,9 @@ def load_settings() -> Settings:
         binance_cli_path=binance_cli_path,
         binance_api_key=os.getenv("BINANCE_API_KEY", "").strip() or None,
         binance_secret_key=os.getenv("BINANCE_SECRET_KEY", "").strip() or None,
+        demo_execution_enabled=os.getenv(
+            "SENTINEL_DEMO_EXECUTION_ENABLED", "false"
+        ),
     )
 
 

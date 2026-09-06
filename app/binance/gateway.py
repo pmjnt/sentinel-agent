@@ -8,12 +8,16 @@ from app.binance.schemas import (
     DepthPayload,
     PriceTickerPayload,
     SpotAccountPayload,
+    SpotOrderPayload,
     Ticker24hPayload,
 )
 from app.config import BinanceEnvironment
 from app.models.market import MarketData, MarketDataError, MarketDataResult, Volatility
 from app.models.portfolio import Portfolio, PortfolioAsset
 from app.models.source import DataSource
+from app.models.execution import OrderExecutionResult
+from app.models.trade import TradeSide
+from app.services.trade_proposal_service import HARD_ALLOWED_SYMBOLS
 from app.services.portfolio_service import calculate_portfolio
 
 
@@ -68,7 +72,7 @@ def estimate_sell_slippage(
 
 
 class BinanceCliGateway:
-    """Map fixed read-only Binance CLI responses into Sentinel domain models."""
+    """Map fixed Binance Demo CLI capabilities into Sentinel domain models."""
 
     def __init__(
         self,
@@ -189,3 +193,86 @@ class BinanceCliGateway:
             estimated_slippage_percent=slippage,
             data_source=self._data_source,
         )
+
+    async def submit_market_order(
+        self,
+        *,
+        symbol: str,
+        side: TradeSide,
+        quote_usd: Decimal,
+        client_order_id: str,
+    ) -> OrderExecutionResult:
+        normalized = symbol.strip().upper()
+        if normalized not in HARD_ALLOWED_SYMBOLS:
+            raise BinanceDataError("Trading symbol is not enabled for execution.")
+        arguments = [
+            "spot",
+            "new-order",
+            "--symbol",
+            normalized,
+            "--side",
+            side.value,
+            "--type",
+            "MARKET",
+            "--quote-order-qty",
+            format(quote_usd, "f"),
+            "--new-client-order-id",
+            client_order_id,
+            "--new-order-resp-type",
+            "RESULT",
+        ]
+        try:
+            raw = await self._runner.run(arguments, authenticated=True)
+            payload = SpotOrderPayload.model_validate(raw)
+            _require_order_identity(payload, normalized, client_order_id)
+        except ValidationError as error:
+            raise BinanceDataError("Binance returned invalid order data.") from error
+        except (BinanceCliError, ValueError) as error:
+            raise BinanceDataError("Binance Demo order could not be submitted.") from error
+        return _execution_result(payload)
+
+    async def get_order(
+        self,
+        symbol: str,
+        client_order_id: str,
+    ) -> OrderExecutionResult:
+        normalized = symbol.strip().upper()
+        if normalized not in HARD_ALLOWED_SYMBOLS:
+            raise BinanceDataError("Trading symbol is not enabled for execution.")
+        try:
+            raw = await self._runner.run(
+                [
+                    "spot",
+                    "get-order",
+                    "--symbol",
+                    normalized,
+                    "--orig-client-order-id",
+                    client_order_id,
+                ],
+                authenticated=True,
+            )
+            payload = SpotOrderPayload.model_validate(raw)
+            _require_order_identity(payload, normalized, client_order_id)
+        except ValidationError as error:
+            raise BinanceDataError("Binance returned invalid order data.") from error
+        except (BinanceCliError, ValueError) as error:
+            raise BinanceDataError("Binance Demo order could not be verified.") from error
+        return _execution_result(payload)
+
+
+def _execution_result(payload: SpotOrderPayload) -> OrderExecutionResult:
+    return OrderExecutionResult(
+        order_id=payload.order_id,
+        client_order_id=payload.client_order_id,
+        symbol=payload.symbol,
+        status=payload.status,
+    )
+
+
+def _require_order_identity(
+    payload: SpotOrderPayload,
+    symbol: str,
+    client_order_id: str,
+) -> None:
+    if payload.symbol != symbol or payload.client_order_id != client_order_id:
+        raise BinanceDataError("Binance order identity did not match the request.")

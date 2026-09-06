@@ -12,7 +12,9 @@ from app.agent.run_context import (
     ProfileUpdatedEvent,
     ProfileViewedEvent,
     SentinelRunContext,
+    TradeProposedEvent,
 )
+from app.models.execution import ExecutionPlan
 from app.models.analysis import PortfolioAnalysis
 from app.models.market import MarketData, MarketDataError
 from app.models.profile import (
@@ -25,6 +27,7 @@ from app.models.profile import (
 )
 from app.models.policy import PolicyChange, PolicyField, PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
+from app.models.trade import TradeSide
 from app.services.policy_service import apply_policy_patch
 from app.services.profile_service import apply_profile_patch
 from app.services.portfolio_analysis_service import (
@@ -32,6 +35,7 @@ from app.services.portfolio_analysis_service import (
     evaluate_portfolio_observations,
     required_market_symbols,
 )
+from app.services.trade_proposal_service import TradeProposalError, create_trade_plan
 
 
 MAX_MARKET_OBSERVATIONS = 20
@@ -137,6 +141,15 @@ def parse_policy_tool_changes(
                     "block_high_volatility must be true, false, or null."
                 )
             value = change.value == "true"
+        elif change.field is PolicyField.ALLOWED_TRADE_SYMBOLS:
+            symbols = tuple(
+                symbol.strip().upper()
+                for symbol in change.value.split(",")
+                if symbol.strip()
+            )
+            if not symbols:
+                raise ValueError("allowed_trade_symbols must list at least one symbol.")
+            value = symbols
         else:
             try:
                 value = Decimal(change.value)
@@ -287,6 +300,49 @@ def evaluate_cached_portfolio(
     return analysis
 
 
+def propose_trade_plan(
+    context: SentinelRunContext,
+    *,
+    symbol: str,
+    side: str,
+    quote_usd: str,
+    reason: str,
+) -> ExecutionPlan | MissingObservations | ToolDataError:
+    normalized_symbol = symbol.strip().upper()
+    missing_tools: list[str] = []
+    if context.portfolio is None:
+        missing_tools.append("get_portfolio")
+    if normalized_symbol not in context.market_by_symbol:
+        missing_tools.append("get_market_data")
+    if missing_tools:
+        return MissingObservations(
+            required_tools=missing_tools,
+            missing_symbols=(
+                [normalized_symbol]
+                if "get_market_data" in missing_tools and normalized_symbol
+                else []
+            ),
+        )
+
+    try:
+        plan = create_trade_plan(
+            session_id=context.session_id,
+            symbol=normalized_symbol,
+            side=TradeSide(side.strip().upper()),
+            quote_usd=Decimal(quote_usd.strip()),
+            reason=reason,
+            policy=context.working_policy,
+            portfolio=context.portfolio,
+            market=context.market_by_symbol[normalized_symbol],
+        )
+    except (InvalidOperation, ValueError, TradeProposalError) as error:
+        return ToolDataError(code="PROPOSAL_REJECTED", message=str(error))
+
+    context.execution_plans.append(plan)
+    context.ordered_events.append(TradeProposedEvent(plan))
+    return plan
+
+
 @function_tool
 async def get_portfolio(
     ctx: RunContextWrapper[SentinelRunContext],
@@ -350,6 +406,24 @@ async def evaluate_portfolio_risk(
     return evaluate_cached_portfolio(ctx.context, focus_symbols)
 
 
+@function_tool
+async def propose_trade(
+    ctx: RunContextWrapper[SentinelRunContext],
+    symbol: str,
+    side: Literal["BUY", "SELL"],
+    quote_usd: str,
+    reason: str,
+) -> ExecutionPlan | MissingObservations | ToolDataError:
+    """Create a Demo Spot proposal for explicit approval; never executes it."""
+    return propose_trade_plan(
+        ctx.context,
+        symbol=symbol,
+        side=side,
+        quote_usd=quote_usd,
+        reason=reason,
+    )
+
+
 CONTROLLED_TOOLS: list[FunctionTool] = [
     get_portfolio,
     get_market_data,
@@ -358,4 +432,5 @@ CONTROLLED_TOOLS: list[FunctionTool] = [
     update_investor_profile,
     view_investor_profile,
     evaluate_portfolio_risk,
+    propose_trade,
 ]

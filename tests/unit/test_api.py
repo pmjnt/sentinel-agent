@@ -41,6 +41,14 @@ class FakeStreamingApplication:
             activity=[activity],
         )
 
+    async def approve_plan(self, session_id: str, plan_id: str):
+        assert (session_id, plan_id) == ("user-1", "PLAN-ABC123")
+        return {"plan_id": plan_id, "status": "EXECUTED"}
+
+    def reject_plan(self, session_id: str, plan_id: str):
+        assert (session_id, plan_id) == ("user-1", "PLAN-ABC123")
+        return {"plan_id": plan_id, "status": "REJECTED"}
+
 
 def _settings() -> Settings:
     return Settings(
@@ -123,3 +131,21 @@ def test_config_and_static_ui_are_served() -> None:
     }
     assert page.status_code == 200
     assert "Sentinel" in page.text
+
+
+def test_plan_approval_and_rejection_use_dedicated_endpoints() -> None:
+    client = TestClient(create_api(FakeStreamingApplication(), _settings()))
+
+    approved = client.post(
+        "/api/plans/PLAN-ABC123/approve",
+        json={"session_id": "user-1"},
+    )
+    rejected = client.post(
+        "/api/plans/PLAN-ABC123/reject",
+        json={"session_id": "user-1"},
+    )
+
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "EXECUTED"
+    assert rejected.status_code == 200
+    assert rejected.json()["status"] == "REJECTED"

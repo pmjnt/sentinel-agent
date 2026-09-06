@@ -4,26 +4,28 @@ Sentinel is a policy-driven AI Agent that analyzes portfolio risk using Binance
 Demo Trading data. It is a Track A project for the Binance Agent OS Mini
 Hackathon and uses the official Binance Skills Hub `binance-cli` integration.
 
-Sentinel never places an order. Demo balances are simulated and every response
-must label them as Binance Demo data.
+Sentinel can optionally place a tightly constrained Binance Demo Spot order only
+after the user approves an immutable plan in the UI. Demo balances are simulated
+and every response must label them as Binance Demo data.
 
 ## Responsibility boundaries
 
 ```text
-The LLM decides which controlled read/policy/evaluation tool is needed next.
+The LLM decides which controlled read/policy/evaluation/proposal tool is needed next.
 Binance Skills Hub supplies Demo portfolio and market observations.
 Python calculates allocations, policy violations, proposals, and risk decisions.
-RiskEngine enforces deterministic safety rules.
+RiskEngine and the execution service enforce deterministic safety rules.
 Python renders authoritative facts; the same LLM adds qualitative interpretation.
 ```
 
-The LLM is not authoritative for arithmetic, thresholds, permissions, or trade
-execution.
+The LLM is not authoritative for arithmetic, thresholds, permissions, approval,
+or trade execution.
 
-The Agent can call exactly seven tools: `get_portfolio`, `get_market_data`,
+The Agent can call exactly eight tools: `get_portfolio`, `get_market_data`,
 `update_policy`, `view_policy`, `update_investor_profile`,
-`view_investor_profile`, and `evaluate_portfolio_risk`. There are no order,
-trade, transfer, withdrawal, or generic CLI tools.
+`view_investor_profile`, `evaluate_portfolio_risk`, and `propose_trade`. The last
+tool only creates a pending plan. There is no order-execution, transfer,
+withdrawal, or generic CLI tool available to the LLM.
 
 ## Policy-driven agent loop
 
@@ -47,6 +49,7 @@ Sentinel Agent / LLM
         ├── deterministic allocation and violation checks
         ├── deterministic rebalance proposal
         └── RiskEngine → BLOCKED / REQUIRES_APPROVAL / SAFE_TO_PROPOSE
+  └── propose_trade → validated immutable plan, never an order
   ↓
 Python renders facts/status → LLM interpretation is appended with a label
 ```
@@ -91,6 +94,7 @@ sentinel-agent/
 │   ├── application.py     # End-to-end conversational orchestration
 │   ├── bootstrap.py       # Runtime dependency composition
 │   ├── binance/           # Safe CLI runner, response schemas, gateway
+│   ├── execution/         # In-memory immutable plan lifecycle
 │   ├── models/            # Pydantic domain models
 │   ├── model_catalog.py   # Backend allowlist for selectable LLM routes
 │   ├── services/          # Deterministic policy/planning/risk logic
@@ -166,6 +170,7 @@ BINANCE_API_ENV=demo
 BINANCE_CLI_PATH=binance-cli
 BINANCE_API_KEY=your_demo_api_key
 BINANCE_SECRET_KEY=your_demo_secret_key
+SENTINEL_DEMO_EXECUTION_ENABLED=false
 ```
 
 OpenAI example:
@@ -211,7 +216,7 @@ after diagnosing the provider error.
 Never commit `.env`. Never paste Binance credentials into chat or frontend
 code. Use keys created in Binance Demo Trading, not production credentials.
 
-## Read-only Binance commands
+## Binance command boundary
 
 Sentinel's gateway contains a fixed allowlist:
 
@@ -222,8 +227,49 @@ spot ticker24hr --symbol <validated symbol>
 spot depth --symbol <validated symbol> --limit 100
 ```
 
-There is no generic `binance-cli request`, order, cancel, trade, transfer, or
-withdrawal code path.
+When Demo execution is explicitly enabled, the separate execution service may
+also use only:
+
+```text
+spot new-order --symbol <BTCUSDT|ETHUSDT> --side <BUY|SELL> --type MARKET ...
+spot get-order --symbol <validated symbol> --orig-client-order-id <plan client id>
+```
+
+There is no generic `binance-cli request`, cancel, transfer, withdrawal,
+derivatives, or production-Binance code path.
+
+## Controlled Demo execution
+
+Execution is disabled by default. To try it, create a Binance Demo API key with
+Spot trading permission and set:
+
+```dotenv
+SENTINEL_DEMO_EXECUTION_ENABLED=true
+```
+
+Hard application limits cannot be loosened in chat:
+
+- Binance Demo only;
+- `BTCUSDT` and `ETHUSDT` only;
+- MARKET BUY/SELL only;
+- 10–100 USDT per order;
+- explicit approval for every order;
+- plan expires after five minutes.
+
+Policy chat may make these limits stricter using maximum trade value, maximum
+estimated slippage, allowed symbols, allocation limits, stablecoin reserve, and
+high-volatility blocking. The flow is:
+
+```text
+LLM reads fresh data → Python validates → LLM proposes PLAN-ID
+→ user clicks Approve → Python reads fresh data and validates again
+→ gateway submits one Demo order → gateway queries order
+→ only FILLED becomes EXECUTED → portfolio is refreshed
+```
+
+The plan ID becomes Binance's client order ID, so retrying an already completed
+approval returns the saved result instead of submitting another order. Automated
+tests always use fake gateways and never send orders.
 
 ## Run
 
@@ -283,6 +329,10 @@ Each assistant response owns a small collapsible **Agent Pulse**. It shows only
 safe tool/activity status from the backend; it is not model reasoning or hidden
 chain-of-thought.
 
+When the Agent creates a valid proposal, the response also includes a compact
+Demo order card. **Approve Demo order** and **Reject** call dedicated endpoints;
+approval is not inferred from ordinary chat text.
+
 Try profile chat:
 
 ```text
@@ -304,7 +354,7 @@ Gemini, or a real CLI process.
 
 ## What gets replaced later?
 
-`BinanceCliGateway` is behind the application-owned
-`PortfolioMarketGateway` protocol. If Binance later supports Sentinel as a
-direct MCP client, a new MCP gateway can implement the same two methods without
-changing the application workflow, domain models, or deterministic services.
+`BinanceCliGateway` is behind application-owned read and Demo-execution
+protocols. If Binance later supports Sentinel as a direct MCP client, a new MCP
+gateway can implement those protocols without changing the Agent, domain models,
+or deterministic services.

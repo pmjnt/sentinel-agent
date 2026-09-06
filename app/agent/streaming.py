@@ -21,6 +21,10 @@ _TOOL_ACTIVITY: dict[str, tuple[ActivityKind, str]] = {
         ActivityKind.RISK_EVALUATION,
         "deterministic risk evaluation",
     ),
+    "propose_trade": (
+        ActivityKind.TRADE_PROPOSAL,
+        "Demo trade proposal",
+    ),
 }
 
 

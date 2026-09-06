@@ -7,10 +7,13 @@ from app.agent.run_context import (
     AnalysisCompletedEvent,
     PolicyUpdatedEvent,
     ProfileUpdatedEvent,
+    TradeProposedEvent,
 )
 from app.agent.tool_loop import ToolLoopResult
 from app.agent.tool_loop import ToolLoopStreamCompleted
 from app.application import SentinelApplication
+from app.execution.store import InMemoryExecutionPlanStore
+from app.models.execution import ExecutionPlan, ExecutionPlanStatus
 from app.models.api import (
     ActivityEvent,
     ActivityKind,
@@ -24,6 +27,8 @@ from app.models.policy import PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
 from app.models.risk import RiskDecision, RiskReasonCode, RiskStatus
 from app.models.trade import PlanStatus, RebalancePlan
+from app.models.trade import TradeSide
+from datetime import UTC, datetime, timedelta
 from app.model_catalog import ModelRoute
 from app.config import LLMProvider
 from app.sessions import InMemoryInvestorProfileSessionStore, InMemoryPolicySessionStore
@@ -93,6 +98,7 @@ def _result(
     data_errors: tuple[str, ...] = (),
     profile: InvestorProfile | None = None,
     profile_patches: tuple[InvestorProfilePatch, ...] = (),
+    execution_plans: tuple[ExecutionPlan, ...] = (),
 ) -> ToolLoopResult:
     return ToolLoopResult(
         final_text=final_text,
@@ -103,6 +109,23 @@ def _result(
         data_errors=data_errors,
         profile_patches=profile_patches,
         final_profile=profile or InvestorProfile(),
+        execution_plans=execution_plans,
+    )
+
+
+def _execution_plan() -> ExecutionPlan:
+    now = datetime.now(UTC)
+    return ExecutionPlan(
+        plan_id="PLAN-ABC123",
+        session_id="user-1",
+        symbol="BTCUSDT",
+        side=TradeSide.BUY,
+        quote_usd="50",
+        estimated_quantity="0.0005",
+        estimated_price="100000",
+        reason="Controlled growth exposure.",
+        created_at=now,
+        expires_at=now + timedelta(minutes=5),
     )
 
 
@@ -199,6 +222,30 @@ def test_application_stream_finishes_with_structured_snapshot() -> None:
     assert events[-1].execution_status.value == "NOT_EXECUTED"
     assert events[-1].provider == "openai"
     assert events[-1].model == "gpt-5.4-mini"
+
+
+def test_application_commits_pending_execution_plan_after_successful_agent_run() -> None:
+    plan = _execution_plan()
+    plans = InMemoryExecutionPlanStore()
+    application = SentinelApplication(
+        FakeToolLoop(
+            _result(
+                final_text="Approve the proposed plan.",
+                execution_plans=(plan,),
+                events=(TradeProposedEvent(plan),),
+            )
+        ),
+        InMemoryPolicySessionStore(),
+        execution_plans=plans,
+    )
+
+    response = asyncio.run(application.handle("user-1", "Buy $50 BTC."))
+
+    assert response.execution_plan == plan
+    assert plans.get("user-1", plan.plan_id) == plan
+    assert "Pending Binance Demo plan" in response.message
+    assert "PLAN-ABC123" in response.message
+    assert "No order has been sent" in response.message
 
 
 def test_analysis_without_safe_llm_prose_still_returns_verified_facts() -> None:

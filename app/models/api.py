@@ -3,6 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.analysis import PortfolioAnalysis
+from app.models.execution import ExecutionPlan
 from app.models.policy import PortfolioPolicy
 from app.models.profile import InvestorProfile
 
@@ -15,6 +16,7 @@ class ActivityKind(str, Enum):
     PROFILE_UPDATE = "PROFILE_UPDATE"
     PROFILE_VIEW = "PROFILE_VIEW"
     RISK_EVALUATION = "RISK_EVALUATION"
+    TRADE_PROPOSAL = "TRADE_PROPOSAL"
 
 
 class ActivityStatus(str, Enum):
@@ -25,6 +27,10 @@ class ActivityStatus(str, Enum):
 
 class ExecutionStatus(str, Enum):
     NOT_EXECUTED = "NOT_EXECUTED"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    EXECUTED = "EXECUTED"
+    REJECTED = "REJECTED"
+    FAILED = "FAILED"
 
 
 class ActivityEvent(BaseModel):
@@ -92,3 +98,18 @@ class StructuredSentinelResponse(BaseModel):
     activity: list[ActivityEvent] = Field(default_factory=list)
     ai_interpretation: str | None = None
     execution_status: ExecutionStatus = ExecutionStatus.NOT_EXECUTED
+    execution_plan: ExecutionPlan | None = None
+
+
+class PlanActionRequest(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    session_id: str = Field(max_length=128)
+
+    @field_validator("session_id")
+    @classmethod
+    def normalize_session_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Session ID must not be empty.")
+        return normalized

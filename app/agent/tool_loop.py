@@ -31,6 +31,7 @@ from app.models.analysis import PortfolioAnalysis
 from app.models.api import ActivityEvent
 from app.models.profile import InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
+from app.models.execution import ExecutionPlan
 from app.model_catalog import ModelCatalog, ModelRoute
 
 
@@ -61,6 +62,7 @@ class ToolLoopResult:
     final_profile: InvestorProfile
     analyses: tuple[PortfolioAnalysis, ...]
     data_errors: tuple[str, ...]
+    execution_plans: tuple[ExecutionPlan, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -136,6 +138,7 @@ class SentinelToolLoop:
             self._gateway,
             policy,
             current_profile,
+            session_id,
         )
         result = await self._run_agent(
             self._agent_for(model_route),
@@ -156,7 +159,9 @@ class SentinelToolLoop:
         model_route: ModelRoute | None = None,
     ) -> AsyncIterator[ActivityEvent | ToolLoopStreamCompleted]:
         current_profile = profile or InvestorProfile()
-        context = SentinelRunContext.create(self._gateway, policy, current_profile)
+        context = SentinelRunContext.create(
+            self._gateway, policy, current_profile, session_id
+        )
         result = self._run_streamed_agent(
             self._agent_for(model_route),
             build_tool_loop_input(message, policy, current_profile),
@@ -234,4 +239,5 @@ class SentinelToolLoop:
             final_profile=context.working_profile,
             analyses=tuple(context.analyses),
             data_errors=tuple(context.data_errors),
+            execution_plans=tuple(context.execution_plans),
         )
