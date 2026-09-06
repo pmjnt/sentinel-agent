@@ -128,7 +128,7 @@ git commit -m "feat: configure allowed LLM routes"
 - Create: `app/model_catalog.py`
 - Create: `tests/unit/test_model_catalog.py`
 
-- [ ] **Step 1: Write failing catalog tests**
+- [x] **Step 1: Write failing catalog tests**
 
 ```python
 import pytest
@@ -175,7 +175,7 @@ def test_catalog_rejects_unlisted_route() -> None:
         )
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_model_catalog.py -q
@@ -183,7 +183,7 @@ def test_catalog_rejects_unlisted_route() -> None:
 
 Expected: collection FAIL because `app.model_catalog` does not exist.
 
-- [ ] **Step 3: Implement `ModelRoute` and `ModelCatalog`**
+- [x] **Step 3: Implement `ModelRoute` and `ModelCatalog`**
 
 ```python
 from dataclasses import dataclass
@@ -240,7 +240,7 @@ class ModelCatalog:
             raise ValueError("The selected model route is not enabled.") from error
 ```
 
-- [ ] **Step 4: Run catalog tests and verify GREEN**
+- [x] **Step 4: Run catalog tests and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_model_catalog.py -q
@@ -248,7 +248,7 @@ class ModelCatalog:
 
 Expected: all catalog tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/model_catalog.py tests/unit/test_model_catalog.py
