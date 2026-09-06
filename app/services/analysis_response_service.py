@@ -1,4 +1,16 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from app.models.analysis import PortfolioAnalysis
+
+
+_DISPLAY_PERCENT_STEP = Decimal("0.0001")
+
+
+def _format_display_percent(value: Decimal) -> str:
+    if value != 0 and abs(value) < _DISPLAY_PERCENT_STEP:
+        return "~0.0000"
+    rounded = value.quantize(_DISPLAY_PERCENT_STEP, rounding=ROUND_HALF_UP)
+    return format(rounded, "f").rstrip("0").rstrip(".") or "0"
 
 
 def format_authoritative_analysis(analysis: PortfolioAnalysis) -> str:
@@ -20,7 +32,8 @@ def format_authoritative_analysis(analysis: PortfolioAnalysis) -> str:
                 f"  - {market.symbol}: ${market.price:,.2f}, "
                 f"24h {market.change_24h_percent}%, "
                 f"volatility {market.volatility.value}, "
-                f"estimated slippage {market.estimated_slippage_percent}%"
+                "estimated slippage "
+                f"{_format_display_percent(market.estimated_slippage_percent)}%"
             )
 
     if analysis.violations:
