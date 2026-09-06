@@ -135,6 +135,12 @@ class SentinelApplication:
                 yield TextDeltaEvent(text=chunk)
             yield StructuredSentinelResponse(
                 session_id=session_id,
+                provider=(
+                    model_route.provider.value
+                    if model_route is not None
+                    else None
+                ),
+                model=(model_route.model if model_route is not None else None),
                 message=response.message,
                 policy=response.policy,
                 profile=response.profile,

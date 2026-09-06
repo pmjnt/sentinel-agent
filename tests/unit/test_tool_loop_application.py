@@ -177,10 +177,16 @@ def test_application_stream_finishes_with_structured_snapshot() -> None:
     )
     application = SentinelApplication(loop, InMemoryPolicySessionStore())
 
+    route = ModelRoute(LLMProvider.OPENAI, "gpt-5.4-mini")
+
     async def collect():
         return [
             event
-            async for event in application.stream_handle("user-1", "Analyze.")
+            async for event in application.stream_handle(
+                "user-1",
+                "Analyze.",
+                model_route=route,
+            )
         ]
 
     events = asyncio.run(collect())
@@ -191,6 +197,8 @@ def test_application_stream_finishes_with_structured_snapshot() -> None:
     assert events[-1].analysis == analysis
     assert events[-1].activity == [events[0]]
     assert events[-1].execution_status.value == "NOT_EXECUTED"
+    assert events[-1].provider == "openai"
+    assert events[-1].model == "gpt-5.4-mini"
 
 
 def test_staged_policy_patch_commits_only_after_successful_run() -> None:

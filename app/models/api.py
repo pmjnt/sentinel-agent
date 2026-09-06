@@ -41,14 +41,36 @@ class ChatStreamRequest(BaseModel):
 
     session_id: str = Field(max_length=128)
     message: str = Field(max_length=8000)
+    provider: str = Field(max_length=32)
+    model: str = Field(max_length=200)
 
-    @field_validator("session_id", "message")
+    @field_validator("session_id", "message", "provider", "model")
     @classmethod
     def normalize_required_text(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
             raise ValueError("Value must not be empty.")
         return normalized
+
+    @field_validator("provider")
+    @classmethod
+    def normalize_provider(cls, value: str) -> str:
+        return value.lower()
+
+
+class ModelOption(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    provider: str
+    model: str
+    label: str
+
+
+class ModelCatalogResponse(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    default: ModelOption
+    models: list[ModelOption]
 
 
 class TextDeltaEvent(BaseModel):
@@ -61,6 +83,8 @@ class StructuredSentinelResponse(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     session_id: str
+    provider: str | None = None
+    model: str | None = None
     message: str
     policy: PortfolioPolicy
     profile: InvestorProfile

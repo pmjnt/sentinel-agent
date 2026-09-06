@@ -383,7 +383,7 @@ git commit -m "feat: route Sentinel across allowed models"
 - Modify: `tests/unit/test_api.py`
 - Modify: `tests/unit/test_tool_loop_application.py`
 
-- [ ] **Step 1: Write failing API tests**
+- [x] **Step 1: Write failing API tests**
 
 Update requests to include `provider` and `model`, then add:
 
@@ -417,7 +417,7 @@ def test_chat_rejects_route_outside_allowlist_before_streaming() -> None:
     assert response.status_code == 422
 ```
 
-- [ ] **Step 2: Run API tests and verify RED**
+- [x] **Step 2: Run API tests and verify RED**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_api.py tests/unit/test_api_models.py -q
@@ -425,7 +425,7 @@ def test_chat_rejects_route_outside_allowlist_before_streaming() -> None:
 
 Expected: FAIL because route fields and `/api/models` do not exist.
 
-- [ ] **Step 3: Add typed DTOs and endpoint validation**
+- [x] **Step 3: Add typed DTOs and endpoint validation**
 
 Add to `app/models/api.py`:
 
@@ -454,7 +454,7 @@ Resolve the route before returning `StreamingResponse`; translate `ValueError`
 to `HTTPException(status_code=422, detail="Selected model is not enabled.")`.
 Pass the resolved route into `application.stream_handle`.
 
-- [ ] **Step 4: Run API tests and verify GREEN**
+- [x] **Step 4: Run API tests and verify GREEN**
 
 ```bash
 .venv/bin/python -m pytest tests/unit/test_api.py tests/unit/test_api_models.py -q
@@ -462,7 +462,7 @@ Pass the resolved route into `application.stream_handle`.
 
 Expected: all API tests PASS and response bodies contain no configured key.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/models/api.py app/api.py tests/unit/test_api.py tests/unit/test_api_models.py

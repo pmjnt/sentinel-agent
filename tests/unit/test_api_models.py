@@ -14,17 +14,34 @@ from app.models.profile import InvestorProfile
 
 
 def test_chat_request_normalizes_required_values() -> None:
-    request = ChatStreamRequest(session_id=" user-1 ", message=" hello ")
+    request = ChatStreamRequest(
+        session_id=" user-1 ",
+        message=" hello ",
+        provider=" openai ",
+        model=" gpt-5.4-mini ",
+    )
 
     assert request.session_id == "user-1"
     assert request.message == "hello"
+    assert request.provider == "openai"
+    assert request.model == "gpt-5.4-mini"
 
 
 def test_chat_request_rejects_oversized_input() -> None:
     with pytest.raises(ValidationError):
-        ChatStreamRequest(session_id="x" * 129, message="Analyze.")
+        ChatStreamRequest(
+            session_id="x" * 129,
+            message="Analyze.",
+            provider="openai",
+            model="gpt-5.4-mini",
+        )
     with pytest.raises(ValidationError):
-        ChatStreamRequest(session_id="user-1", message="x" * 8001)
+        ChatStreamRequest(
+            session_id="user-1",
+            message="x" * 8001,
+            provider="openai",
+            model="gpt-5.4-mini",
+        )
 
 
 def test_structured_response_serializes_ui_fields() -> None:

@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Protocol
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -14,9 +14,12 @@ from app.config import Settings, load_settings
 from app.models.api import (
     ActivityEvent,
     ChatStreamRequest,
+    ModelCatalogResponse,
+    ModelOption,
     StructuredSentinelResponse,
     TextDeltaEvent,
 )
+from app.model_catalog import ModelCatalog, ModelRoute
 
 
 WEB_DIRECTORY = Path(__file__).resolve().parent.parent / "web"
@@ -27,6 +30,7 @@ class StreamingApplication(Protocol):
         self,
         session_id: str,
         message: str,
+        model_route: ModelRoute | None = None,
     ) -> AsyncIterator[
         ActivityEvent | TextDeltaEvent | StructuredSentinelResponse
     ]: ...
@@ -35,8 +39,10 @@ class StreamingApplication(Protocol):
 def create_api(
     application: StreamingApplication,
     settings: Settings,
+    catalog: ModelCatalog | None = None,
 ) -> FastAPI:
     api = FastAPI(title="Sentinel", version="1.0.0")
+    model_catalog = catalog or ModelCatalog.from_settings(settings)
 
     @api.get("/api/health")
     async def health() -> dict[str, str]:
@@ -49,10 +55,27 @@ def create_api(
             "model": settings.llm_model,
         }
 
+    @api.get("/api/models", response_model=ModelCatalogResponse)
+    async def models() -> ModelCatalogResponse:
+        return ModelCatalogResponse(
+            default=_model_option(model_catalog.default),
+            models=[_model_option(route) for route in model_catalog.routes],
+        )
+
     @api.post("/api/chat/stream")
     async def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
+        try:
+            model_route = model_catalog.resolve(
+                request.provider,
+                request.model,
+            )
+        except ValueError as error:
+            raise HTTPException(
+                status_code=422,
+                detail="Selected model is not enabled.",
+            ) from error
         return StreamingResponse(
-            _encode_application_stream(application, request),
+            _encode_application_stream(application, request, model_route),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -71,11 +94,13 @@ def create_api(
 async def _encode_application_stream(
     application: StreamingApplication,
     request: ChatStreamRequest,
+    model_route: ModelRoute,
 ) -> AsyncIterator[str]:
     try:
         async for item in application.stream_handle(
             request.session_id,
             request.message,
+            model_route=model_route,
         ):
             if isinstance(item, ActivityEvent):
                 yield _sse("activity", item)
@@ -98,9 +123,18 @@ def _sse_data(event: str, data: str) -> str:
     return f"event: {event}\ndata: {data}\n\n"
 
 
+def _model_option(route: ModelRoute) -> ModelOption:
+    return ModelOption(
+        provider=route.provider.value,
+        model=route.model,
+        label=route.model,
+    )
+
+
 def create_app() -> FastAPI:
     settings = load_settings()
+    catalog = ModelCatalog.from_settings(settings)
     runner = BinanceCliRunner(settings)
     gateway = BinanceCliGateway(runner, settings.binance_environment)
-    application = create_application(settings, gateway)
-    return create_api(application, settings)
+    application = create_application(settings, gateway, catalog)
+    return create_api(application, settings, catalog)

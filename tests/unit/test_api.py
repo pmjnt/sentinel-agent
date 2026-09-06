@@ -16,9 +16,15 @@ from app.models.profile import InvestorProfile
 
 
 class FakeStreamingApplication:
-    async def stream_handle(self, session_id: str, message: str):
+    async def stream_handle(
+        self,
+        session_id: str,
+        message: str,
+        model_route=None,
+    ):
         assert session_id == "user-1"
         assert message == "Analyze my portfolio."
+        assert model_route.key == "openai/gpt-5.4-mini"
         activity = ActivityEvent(
             sequence=1,
             kind=ActivityKind.PORTFOLIO_READ,
@@ -52,6 +58,8 @@ def test_chat_endpoint_returns_named_safe_sse_events() -> None:
         json={
             "session_id": "user-1",
             "message": "Analyze my portfolio.",
+            "provider": "openai",
+            "model": "gpt-5.4-mini",
         },
     )
 
@@ -61,6 +69,46 @@ def test_chat_endpoint_returns_named_safe_sse_events() -> None:
     assert "event: text_delta" in response.text
     assert "event: completed" in response.text
     assert "test-key" not in response.text
+
+
+def test_models_endpoint_returns_enabled_routes_without_keys() -> None:
+    client = TestClient(create_api(FakeStreamingApplication(), _settings()))
+
+    response = client.get("/api/models")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "default": {
+            "provider": "openai",
+            "model": "gpt-5.4-mini",
+            "label": "gpt-5.4-mini",
+        },
+        "models": [
+            {
+                "provider": "openai",
+                "model": "gpt-5.4-mini",
+                "label": "gpt-5.4-mini",
+            }
+        ],
+    }
+    assert "test-key" not in response.text
+
+
+def test_chat_rejects_route_outside_allowlist_before_streaming() -> None:
+    client = TestClient(create_api(FakeStreamingApplication(), _settings()))
+
+    response = client.post(
+        "/api/chat/stream",
+        json={
+            "session_id": "user-1",
+            "message": "Analyze.",
+            "provider": "gemini",
+            "model": "unknown",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Selected model is not enabled."
 
 
 def test_config_and_static_ui_are_served() -> None:
