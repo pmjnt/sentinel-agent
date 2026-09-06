@@ -71,6 +71,25 @@ function parseMarkdownBlocks(markdown) {
   return blocks;
 }
 
+function parseInlineMarkdown(text) {
+  const tokens = [];
+  const pattern = /\*\*([^*]+)\*\*/g;
+  let cursor = 0;
+  let match = pattern.exec(text);
+  while (match) {
+    if (match.index > cursor) {
+      tokens.push({ type: "text", text: text.slice(cursor, match.index) });
+    }
+    tokens.push({ type: "strong", text: match[1] });
+    cursor = match.index + match[0].length;
+    match = pattern.exec(text);
+  }
+  if (cursor < text.length) {
+    tokens.push({ type: "text", text: text.slice(cursor) });
+  }
+  return tokens.length ? tokens : [{ type: "text", text }];
+}
+
 function createSseParser(onEvent) {
   let buffer = "";
   return {
@@ -283,22 +302,33 @@ function initializeApp() {
 
   function renderMarkdown(container, markdown) {
     container.replaceChildren();
+    const appendInline = (element, text) => {
+      parseInlineMarkdown(text).forEach((token) => {
+        if (token.type === "strong") {
+          const strong = document.createElement("strong");
+          strong.textContent = token.text;
+          element.append(strong);
+        } else {
+          element.append(document.createTextNode(token.text));
+        }
+      });
+    };
     parseMarkdownBlocks(markdown).forEach((block) => {
       if (block.type === "heading") {
         const heading = document.createElement(block.level <= 2 ? "h2" : "h3");
-        heading.textContent = block.text;
+        appendInline(heading, block.text);
         container.append(heading);
       } else if (block.type === "list") {
         const list = document.createElement("ul");
         block.items.forEach((text) => {
           const item = document.createElement("li");
-          item.textContent = text;
+          appendInline(item, text);
           list.append(item);
         });
         container.append(list);
       } else {
         const paragraph = document.createElement("p");
-        paragraph.textContent = block.text;
+        appendInline(paragraph, block.text);
         container.append(paragraph);
       }
     });
@@ -306,11 +336,18 @@ function initializeApp() {
 
   function renderEvidence(turn, result) {
     const analysis = result.analysis;
-    const card = document.createElement("section");
+    const card = document.createElement("details");
     card.className = "evidence-card";
-    const title = document.createElement("h2");
+    const summary = document.createElement("summary");
+    const title = document.createElement("span");
     title.className = "evidence-title";
     title.textContent = "Verified tool facts";
+    const summaryHint = document.createElement("span");
+    summaryHint.className = "evidence-hint";
+    summaryHint.textContent = "Show";
+    summary.append(title, summaryHint);
+    const body = document.createElement("div");
+    body.className = "evidence-body";
     const source = document.createElement("p");
     source.className = "evidence-source";
     source.textContent = "Binance Demo data checked by deterministic Python rules.";
@@ -334,7 +371,11 @@ function initializeApp() {
       appendEvidence(list, "Risk Engine", analysis.risk_decision.status);
     }
     appendEvidence(list, "Execution", result.execution_status);
-    card.append(title, source, list);
+    body.append(source, list);
+    card.append(summary, body);
+    card.addEventListener("toggle", () => {
+      summaryHint.textContent = card.open ? "Hide" : "Show";
+    });
     turn.content.append(card);
   }
 
@@ -487,6 +528,7 @@ if (typeof module !== "undefined" && module.exports) {
     createSseParser,
     formatActivityLabel,
     isValidPrompt,
+    parseInlineMarkdown,
     parseMarkdownBlocks,
     reduceActivity,
   };

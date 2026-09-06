@@ -8,6 +8,7 @@ const {
   createSseParser,
   formatActivityLabel,
   isValidPrompt,
+  parseInlineMarkdown,
   parseMarkdownBlocks,
   reduceActivity,
 } = require("../web/app.js");
@@ -62,6 +63,14 @@ test("parses headings, bullet lists, and paragraphs for safe rendering", () => {
   );
 });
 
+test("parses inline bold markers without using HTML", () => {
+  assert.deepEqual(parseInlineMarkdown("Tổng: **9,999 USDT**."), [
+    { type: "text", text: "Tổng: " },
+    { type: "strong", text: "9,999 USDT" },
+    { type: "text", text: "." },
+  ]);
+});
+
 test("parses SSE events across network chunks", () => {
   const events = [];
   const parser = createSseParser((event, data) => events.push({ event, data }));
@@ -100,4 +109,5 @@ test("user turns do not render a redundant You label", () => {
   const script = readFileSync(join(__dirname, "../web/app.js"), "utf8");
   assert.doesNotMatch(script, /speaker\.textContent = "You"/);
   assert.match(script, /Verified tool facts/);
+  assert.match(script, /document\.createElement\("details"\)/);
 });
