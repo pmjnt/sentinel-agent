@@ -93,18 +93,14 @@ def test_report_rejects_non_text_model_output() -> None:
 @pytest.mark.parametrize(
     "unsafe_output",
     [
-        "Risk status is SAFE_TO_PROPOSE.",
-        "This trade requires approval.",
-        "The proposal is safe to propose.",
         "The BTC trade was executed.",
         "The order was filled.",
         "The sale completed successfully.",
         "Lệnh đã được thực hiện.",
-        "Giao dịch này cần được phê duyệt.",
         "Lệnh bán đã khớp.",
     ],
 )
-def test_report_rejects_authoritative_status_or_execution_claims(
+def test_report_rejects_positive_execution_claims(
     unsafe_output: str,
 ) -> None:
     async def fake_run(*args: Any, **kwargs: Any) -> SimpleNamespace:
@@ -116,10 +112,32 @@ def test_report_rejects_authoritative_status_or_execution_claims(
         asyncio.run(reporter.report("Phân tích.", _analysis()))
 
 
+def test_report_keeps_advice_when_it_mentions_validated_risk_status() -> None:
+    output = "Risk Engine returned SAFE_TO_PROPOSE. Keep the portfolio unchanged."
+
+    async def fake_run(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(final_output=output)
+
+    reporter = AgentAnalysisReporter(_settings(), run_agent=fake_run)
+
+    assert asyncio.run(reporter.report("Analyze.", _analysis())) == output
+
+
 def test_report_allows_explicit_statement_that_no_execution_occurred() -> None:
     safe_output = (
         "Limitations: This is analysis only; no execution capability is available."
     )
+
+    async def fake_run(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(final_output=safe_output)
+
+    reporter = AgentAnalysisReporter(_settings(), run_agent=fake_run)
+
+    assert asyncio.run(reporter.report("Analyze.", _analysis())) == safe_output
+
+
+def test_report_allows_negative_trade_execution_statement() -> None:
+    safe_output = "No trade was executed."
 
     async def fake_run(*args: Any, **kwargs: Any) -> SimpleNamespace:
         return SimpleNamespace(final_output=safe_output)

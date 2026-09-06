@@ -271,6 +271,29 @@ def test_analysis_suppresses_reserved_execution_claim_but_keeps_facts() -> None:
     assert result.final_text == ""
 
 
+def test_analysis_keeps_advice_that_mentions_validated_risk_status() -> None:
+    async def fake_run(agent: Any, prompt: str, **kwargs: Any):
+        context = kwargs["context"]
+        await read_portfolio(context)
+        await read_market_data(context, "BTCUSDT")
+        evaluate_cached_portfolio(context, ["BTC"])
+        return SimpleNamespace(
+            final_output=(
+                "Risk Engine returned SAFE_TO_PROPOSE. "
+                "Recommendation: keep monitoring concentration."
+            )
+        )
+
+    result = asyncio.run(
+        SentinelToolLoop(_settings(), FakeGateway(), run_agent=fake_run).run(
+            "Analyze BTC.",
+            PortfolioPolicy(max_asset_weight=Decimal("0.40")),
+        )
+    )
+
+    assert "Recommendation" in result.final_text
+
+
 def test_financial_request_cannot_finish_without_deterministic_analysis() -> None:
     async def fake_run(*args: Any, **kwargs: Any):
         return SimpleNamespace(final_output="Your BTC exposure is not risky.")
