@@ -114,3 +114,16 @@ def test_report_rejects_authoritative_status_or_execution_claims(
 
     with pytest.raises(ModelBehaviorError, match="reserved risk or execution"):
         asyncio.run(reporter.report("Phân tích.", _analysis()))
+
+
+def test_report_allows_explicit_statement_that_no_execution_occurred() -> None:
+    safe_output = (
+        "Limitations: This is analysis only; no execution capability is available."
+    )
+
+    async def fake_run(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(final_output=safe_output)
+
+    reporter = AgentAnalysisReporter(_settings(), run_agent=fake_run)
+
+    assert asyncio.run(reporter.report("Analyze.", _analysis())) == safe_output

@@ -271,6 +271,7 @@ def test_data_error_uses_safe_deterministic_message() -> None:
     response = asyncio.run(application.handle("user-1", "Analyze."))
 
     assert "Required Binance Demo data could not be verified" in response.message
+    assert "Portfolio data could not be verified." in response.message
     assert "Unverified recommendation" not in response.message
 
 

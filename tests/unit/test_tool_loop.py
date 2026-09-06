@@ -20,7 +20,7 @@ from app.agent.tool_loop import (
     create_tool_loop_agent,
 )
 from app.config import LLMProvider, Settings
-from app.models.market import MarketData, Volatility
+from app.models.market import MarketData, MarketDataError, Volatility
 from app.models.profile import InvestorProfile
 from app.models.policy import PolicyChange, PolicyField, PortfolioPolicy
 from app.models.portfolio import PortfolioAsset
@@ -251,6 +251,31 @@ def test_agent_cannot_stop_after_reading_financial_data() -> None:
                 PortfolioPolicy(),
             )
         )
+
+
+def test_tool_data_error_discards_model_financial_claim_instead_of_failing() -> None:
+    class MarketErrorGateway(FakeGateway):
+        async def get_market_data(self, symbol: str):
+            return MarketDataError(symbol=symbol, error="unavailable")
+
+    async def fake_run(*args: Any, **kwargs: Any):
+        context = kwargs["context"]
+        await read_portfolio(context)
+        await read_market_data(context, "BTCUSDT")
+        return SimpleNamespace(final_output="Risk status is BLOCKED.")
+
+    result = asyncio.run(
+        SentinelToolLoop(
+            _settings(),
+            MarketErrorGateway(),
+            run_agent=fake_run,
+        ).run("Analyze BTC.", PortfolioPolicy())
+    )
+
+    assert result.data_errors == (
+        "Market data could not be verified for BTCUSDT.",
+    )
+    assert result.analyses == ()
 
 
 def test_general_chat_rejects_positive_execution_claim() -> None:

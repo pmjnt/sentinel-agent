@@ -175,7 +175,11 @@ class SentinelToolLoop:
             raise ModelBehaviorError("Sentinel Agent must return text output.")
 
         final_text = output.strip()
-        if context.analyses:
+        if context.data_errors:
+            # Application renders a deterministic fail-closed message. Discard
+            # model prose because it is neither needed nor trusted on this path.
+            final_text = ""
+        elif context.analyses:
             final_text = validate_qualitative_output(final_text)
         else:
             final_text = validate_non_analysis_output(final_text)

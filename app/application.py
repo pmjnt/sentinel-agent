@@ -183,9 +183,13 @@ class SentinelApplication:
                 response_parts.append(format_authoritative_analysis(event.analysis))
 
         if loop_result.data_errors:
+            details = "\n".join(
+                f"- {error}" for error in dict.fromkeys(loop_result.data_errors)
+            )
             response_parts.append(
                 "Required Binance Demo data could not be verified. "
                 "Sentinel did not generate a recommendation or permit execution."
+                f"\n{details}"
             )
         elif loop_result.analyses:
             response_parts.append(f"AI interpretation:\n{loop_result.final_text}")
