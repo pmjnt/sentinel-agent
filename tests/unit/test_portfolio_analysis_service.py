@@ -188,6 +188,17 @@ def test_stablecoin_focus_does_not_invent_stablecoin_pair() -> None:
     assert result.market_data == []
 
 
+def test_usdc_focus_does_not_require_market_for_general_portfolio_advice() -> None:
+    portfolio = calculate_portfolio(
+        [
+            PortfolioAsset(symbol="USDT", amount="5000", usd_value="5000"),
+            PortfolioAsset(symbol="USDC", amount="5000", usd_value="5000"),
+        ]
+    )
+
+    assert required_market_symbols(portfolio, PortfolioPolicy(), ["USDC"]) == []
+
+
 def test_market_error_fails_closed_with_sanitized_error() -> None:
     gateway = FakeGateway(
         {

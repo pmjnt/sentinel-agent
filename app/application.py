@@ -183,6 +183,7 @@ class SentinelApplication:
         starting_profile: InvestorProfile,
         loop_result: ToolLoopResult,
     ) -> SentinelResponse:
+        has_data_errors = bool(loop_result.data_errors)
         expected_final_policy = starting_policy
         for patch in loop_result.policy_patches:
             expected_final_policy = apply_policy_patch(expected_final_policy, patch)
@@ -208,13 +209,21 @@ class SentinelApplication:
             expected_profile=starting_profile,
         )
 
-        for plan in loop_result.execution_plans:
-            if plan.session_id != session_id:
-                raise RuntimeError("Execution plan session did not match Agent run.")
-            self._execution_plans.create(plan)
+        if not has_data_errors:
+            for plan in loop_result.execution_plans:
+                if plan.session_id != session_id:
+                    raise RuntimeError(
+                        "Execution plan session did not match Agent run."
+                    )
+                self._execution_plans.create(plan)
 
         response_parts: list[str] = []
         for event in loop_result.events:
+            if has_data_errors and isinstance(
+                event,
+                (AnalysisCompletedEvent, TradeProposedEvent),
+            ):
+                continue
             if isinstance(event, PolicyUpdatedEvent):
                 response_parts.append(
                     format_policy_update(event.patch, event.policy)
@@ -237,7 +246,7 @@ class SentinelApplication:
             if isinstance(event, TradeProposedEvent):
                 response_parts.append(format_pending_execution_plan(event.plan))
 
-        if loop_result.data_errors:
+        if has_data_errors:
             details = "\n".join(
                 f"- {error}" for error in dict.fromkeys(loop_result.data_errors)
             )
@@ -255,15 +264,15 @@ class SentinelApplication:
             message=_join_messages(*response_parts),
             policy=committed_policy,
             profile=committed_profile,
-            analyses=loop_result.analyses,
+            analyses=() if has_data_errors else loop_result.analyses,
             ai_interpretation=(
                 loop_result.final_text or None
-                if loop_result.analyses
+                if loop_result.analyses and not has_data_errors
                 else None
             ),
             execution_plan=(
                 loop_result.execution_plans[-1]
-                if loop_result.execution_plans
+                if loop_result.execution_plans and not has_data_errors
                 else None
             ),
         )

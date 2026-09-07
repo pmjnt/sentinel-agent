@@ -129,6 +129,7 @@ test("user turns do not render a redundant You label", () => {
   assert.doesNotMatch(script, /speaker\.textContent = "You"/);
   assert.match(script, /Verified tool facts/);
   assert.match(script, /document\.createElement\("details"\)/);
+  assert.match(script, /if \(result\.analysis\) renderEvidence\(turn, result\)/);
   assert.match(script, /Approve Demo order/);
   assert.match(script, /Reject/);
 });

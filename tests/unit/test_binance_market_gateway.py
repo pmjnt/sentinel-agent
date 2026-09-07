@@ -104,7 +104,12 @@ def test_invalid_symbol_returns_error_without_calling_cli(symbol: str) -> None:
 
 
 def test_cli_failure_returns_market_error_without_fabricated_values() -> None:
-    runner = FakeRunner([BinanceCliError("unsafe provider details")])
+    runner = FakeRunner(
+        [
+            BinanceCliError("unsafe provider details"),
+            BinanceCliError("unsafe provider details"),
+        ]
+    )
     gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
 
     result = asyncio.run(gateway.get_market_data("BTCUSDT"))
@@ -112,6 +117,26 @@ def test_cli_failure_returns_market_error_without_fabricated_values() -> None:
     assert isinstance(result, MarketDataError)
     assert result.error == "Binance market data could not be retrieved."
     assert "unsafe" not in result.error
+
+
+def test_transient_public_market_failure_is_retried_once() -> None:
+    runner = FakeRunner(
+        [
+            BinanceCliError("temporary failure"),
+            TICKER_FIXTURE,
+            DEPTH_FIXTURE,
+        ]
+    )
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+
+    result = asyncio.run(gateway.get_market_data("BTCUSDT"))
+
+    assert isinstance(result, MarketData)
+    assert [call[0][1] for call in runner.calls] == [
+        "ticker24hr",
+        "ticker24hr",
+        "depth",
+    ]
 
 
 def test_invalid_market_schema_returns_clear_error() -> None:

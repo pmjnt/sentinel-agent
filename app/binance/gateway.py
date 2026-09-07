@@ -1,5 +1,7 @@
 from decimal import Decimal
+import logging
 import re
+from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -28,6 +30,7 @@ class BinanceDataError(RuntimeError):
 _PRICE_TICKERS = TypeAdapter(list[PriceTickerPayload])
 _MARKET_SYMBOL = re.compile(r"^[A-Z0-9]{5,20}$")
 _REFERENCE_TRADE_USD = Decimal("1000")
+LOGGER = logging.getLogger(__name__)
 
 
 class InsufficientDepthError(ValueError):
@@ -149,10 +152,11 @@ class BinanceCliGateway:
             )
 
         try:
-            ticker_raw = await self._runner.run(
-                ["spot", "ticker24hr", "--symbol", normalized_symbol]
+            ticker_raw = await self._run_public_market_read(
+                ["spot", "ticker24hr", "--symbol", normalized_symbol],
+                normalized_symbol,
             )
-            depth_raw = await self._runner.run(
+            depth_raw = await self._run_public_market_read(
                 [
                     "spot",
                     "depth",
@@ -160,7 +164,8 @@ class BinanceCliGateway:
                     normalized_symbol,
                     "--limit",
                     "100",
-                ]
+                ],
+                normalized_symbol,
             )
         except BinanceCliError:
             return MarketDataError(
@@ -193,6 +198,24 @@ class BinanceCliGateway:
             estimated_slippage_percent=slippage,
             data_source=self._data_source,
         )
+
+    async def _run_public_market_read(
+        self,
+        arguments: list[str],
+        symbol: str,
+    ) -> Any:
+        for attempt in range(2):
+            try:
+                return await self._runner.run(arguments)
+            except BinanceCliError:
+                if attempt == 1:
+                    LOGGER.warning(
+                        "Binance Demo %s failed after one retry for %s.",
+                        arguments[1],
+                        symbol,
+                    )
+                    raise
+        raise AssertionError("Unreachable market retry state.")
 
     async def submit_market_order(
         self,

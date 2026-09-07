@@ -464,7 +464,7 @@ function initializeApp() {
       : "";
     turn.pulseDot.classList.remove("active");
     turn.pulseDot.style.background = "var(--green)";
-    renderEvidence(turn, result);
+    if (result.analysis) renderEvidence(turn, result);
     renderExecutionPlan(turn, result);
   }
 

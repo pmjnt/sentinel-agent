@@ -95,6 +95,7 @@ def test_tool_loop_instructions_require_grounded_advice() -> None:
     assert "max_slippage_percent" in instructions
     assert "allowed_trade_symbols" in instructions
     assert "cannot loosen" in instructions
+    assert "Do not call get_market_data for USDT or USDC" in instructions
 
 
 def test_tool_loop_input_contains_current_validated_policy() -> None:

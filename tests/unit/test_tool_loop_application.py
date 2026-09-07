@@ -368,6 +368,51 @@ def test_data_error_uses_safe_deterministic_message() -> None:
     assert "Unverified recommendation" not in response.message
 
 
+def test_data_error_discards_earlier_analysis_and_verified_facts() -> None:
+    analysis = _analysis(PortfolioPolicy())
+    application = SentinelApplication(
+        FakeToolLoop(
+            _result(
+                final_text="",
+                events=(AnalysisCompletedEvent(analysis),),
+                analyses=(analysis,),
+                data_errors=("Market data could not be verified for BTCUSDT.",),
+            )
+        ),
+        InMemoryPolicySessionStore(),
+    )
+
+    response = asyncio.run(application.handle("user-1", "Give me advice."))
+
+    assert response.analysis is None
+    assert response.analyses == ()
+    assert "Verified facts" not in response.message
+    assert "Market data could not be verified" in response.message
+
+
+def test_data_error_does_not_commit_a_staged_execution_plan() -> None:
+    plan = _execution_plan()
+    plans = InMemoryExecutionPlanStore()
+    application = SentinelApplication(
+        FakeToolLoop(
+            _result(
+                final_text="",
+                events=(TradeProposedEvent(plan),),
+                execution_plans=(plan,),
+                data_errors=("Market data could not be verified.",),
+            )
+        ),
+        InMemoryPolicySessionStore(),
+        execution_plans=plans,
+    )
+
+    response = asyncio.run(application.handle("user-1", "Buy BTC."))
+
+    assert response.execution_plan is None
+    with pytest.raises(KeyError):
+        plans.get("user-1", plan.plan_id)
+
+
 def test_events_are_rendered_in_tool_call_order() -> None:
     old_policy = PortfolioPolicy(max_asset_weight=Decimal("0.50"))
     new_policy = PortfolioPolicy(max_asset_weight=Decimal("0.40"))

@@ -130,7 +130,7 @@ def _to_usdt_market(symbol: str) -> str | None:
     normalized = symbol.strip().upper()
     if not normalized:
         raise ValueError("Market focus symbol must not be empty.")
-    if normalized == "USDT":
+    if normalized in {"USDT", "USDC"}:
         return None
     if normalized.endswith("USDT"):
         return normalized
