@@ -6,6 +6,7 @@ const { join } = require("node:path");
 const {
   buildChatRequest,
   buildPlanActionRequest,
+  buildResearchEvidenceRows,
   createSseParser,
   formatActivityLabel,
   getPlanApprovalPresentation,
@@ -14,6 +15,48 @@ const {
   parseMarkdownBlocks,
   reduceActivity,
 } = require("../web/app.js");
+
+test("builds compact verified research rows without raw candles", () => {
+  const rows = buildResearchEvidenceRows({
+    plan: {
+      candidate_limit: 3,
+      timeframes: ["1h"],
+      lookback_days: 1,
+      priorities: ["MOMENTUM"],
+    },
+    scan: {
+      observed_at: "2026-09-07T00:00:00Z",
+      candidates: [
+        { symbol: "BTCUSDT", quote_volume: "1000000" },
+        { symbol: "ETHUSDT", quote_volume: "900000" },
+      ],
+    },
+    analyzed_candidates: [
+      {
+        candidate: { symbol: "BTCUSDT" },
+        timeframes: [{
+          timeframe: "1h",
+          return_percent: "5",
+          trend: "BULLISH",
+          realized_volatility_percent: "1.2",
+          max_drawdown_percent: "3",
+          volume_change_percent: "8",
+        }],
+      },
+    ],
+    failed_symbols: ["SOLUSDT"],
+  });
+
+  assert.deepEqual(rows.map((row) => row.label), [
+    "Research plan",
+    "Market scan",
+    "Top volume",
+    "BTCUSDT · 1h",
+    "Unavailable history",
+  ]);
+  assert.match(rows[3].value, /return 5% · trend BULLISH/);
+  assert.doesNotMatch(JSON.stringify(rows), /open_time|close_time|candles/);
+});
 
 test("plan actions use a dedicated endpoint and exact session", () => {
   assert.deepEqual(
@@ -175,7 +218,7 @@ test("user turns do not render a redundant You label", () => {
   assert.doesNotMatch(script, /speaker\.textContent = "You"/);
   assert.match(script, /Verified tool facts/);
   assert.match(script, /document\.createElement\("details"\)/);
-  assert.match(script, /if \(result\.analysis\) renderEvidence\(turn, result\)/);
+  assert.match(script, /if \(result\.analysis \|\| result\.market_research\) renderEvidence\(turn, result\)/);
   assert.match(script, /Approve Demo order/);
   assert.match(script, /Reject/);
 });

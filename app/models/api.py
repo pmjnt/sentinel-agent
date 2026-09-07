@@ -6,6 +6,7 @@ from app.models.analysis import PortfolioAnalysis
 from app.models.execution import ExecutionPlan
 from app.models.policy import PortfolioPolicy
 from app.models.profile import InvestorProfile
+from app.models.research import MarketResearchResult
 
 
 class ActivityKind(str, Enum):
@@ -17,6 +18,10 @@ class ActivityKind(str, Enum):
     PROFILE_VIEW = "PROFILE_VIEW"
     RISK_EVALUATION = "RISK_EVALUATION"
     TRADE_PROPOSAL = "TRADE_PROPOSAL"
+    RESEARCH_PLAN = "RESEARCH_PLAN"
+    MARKET_SCAN = "MARKET_SCAN"
+    MARKET_HISTORY = "MARKET_HISTORY"
+    MARKET_RESEARCH = "MARKET_RESEARCH"
 
 
 class ActivityStatus(str, Enum):
@@ -100,6 +105,7 @@ class StructuredSentinelResponse(BaseModel):
     ai_interpretation: str | None = None
     execution_status: ExecutionStatus = ExecutionStatus.NOT_EXECUTED
     execution_plan: ExecutionPlan | None = None
+    market_research: MarketResearchResult | None = None
 
 
 class PlanActionRequest(BaseModel):

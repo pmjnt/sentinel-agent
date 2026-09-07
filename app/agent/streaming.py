@@ -25,6 +25,22 @@ _TOOL_ACTIVITY: dict[str, tuple[ActivityKind, str]] = {
         ActivityKind.TRADE_PROPOSAL,
         "Demo trade proposal",
     ),
+    "set_market_research_plan": (
+        ActivityKind.RESEARCH_PLAN,
+        "market research plan",
+    ),
+    "scan_top_markets": (
+        ActivityKind.MARKET_SCAN,
+        "Binance market scan",
+    ),
+    "analyze_market_history": (
+        ActivityKind.MARKET_HISTORY,
+        "market history analysis",
+    ),
+    "finalize_market_research": (
+        ActivityKind.MARKET_RESEARCH,
+        "comparative market research",
+    ),
 }
 
 

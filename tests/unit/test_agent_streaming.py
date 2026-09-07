@@ -55,6 +55,27 @@ def test_tracker_ignores_unknown_tools() -> None:
     assert event is None
 
 
+def test_tracker_maps_market_research_tools_to_safe_activity_kinds() -> None:
+    expected = {
+        "set_market_research_plan": ActivityKind.RESEARCH_PLAN,
+        "scan_top_markets": ActivityKind.MARKET_SCAN,
+        "analyze_market_history": ActivityKind.MARKET_HISTORY,
+        "finalize_market_research": ActivityKind.MARKET_RESEARCH,
+    }
+
+    for index, (tool_name, kind) in enumerate(expected.items(), start=1):
+        tracker = ToolActivityTracker()
+        started = tracker.consume(
+            _event(
+                "tool_called",
+                SimpleNamespace(tool_name=tool_name, call_id=f"call-{index}"),
+            )
+        )
+
+        assert started.kind is kind
+        assert tool_name not in started.message
+
+
 def test_tool_loop_stream_emits_activity_and_validated_completion() -> None:
     class FakeStreamResult:
         final_output = "Hello from Sentinel."

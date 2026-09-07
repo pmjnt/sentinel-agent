@@ -10,6 +10,7 @@ from app.agent.run_context import (
     ProfileUpdatedEvent,
     ProfileViewedEvent,
     TradeProposedEvent,
+    MarketResearchCompletedEvent,
 )
 from app.agent.tool_loop import ToolLoopResult, ToolLoopStreamCompleted
 from app.execution.store import InMemoryExecutionPlanStore
@@ -24,9 +25,11 @@ from app.models.execution import ExecutionPlan, ExecutionPlanStatus
 from app.model_catalog import ModelRoute
 from app.models.profile import InvestorProfile
 from app.models.policy import PortfolioPolicy
+from app.models.research import MarketResearchResult
 from app.services.execution_response_service import format_pending_execution_plan
 from app.services.execution_service import DemoExecutionService
 from app.services.analysis_response_service import format_authoritative_analysis
+from app.services.research_response_service import format_market_research
 from app.services.policy_service import apply_policy_patch
 from app.services.profile_response_service import (
     format_current_profile,
@@ -60,11 +63,17 @@ class SentinelResponse(BaseModel):
     analyses: tuple[PortfolioAnalysis, ...] = ()
     ai_interpretation: str | None = None
     execution_plan: ExecutionPlan | None = None
+    market_research_results: tuple[MarketResearchResult, ...] = ()
 
     @property
     def analysis(self) -> PortfolioAnalysis | None:
         """Convenience access to the latest successful analysis, if any."""
         return self.analyses[-1] if self.analyses else None
+
+    @property
+    def market_research(self) -> MarketResearchResult | None:
+        """Convenience access to the latest finalized research, if any."""
+        return self.market_research_results[-1] if self.market_research_results else None
 
 
 class SentinelApplication:
@@ -181,6 +190,7 @@ class SentinelApplication:
                     else ExecutionStatus.NOT_EXECUTED
                 ),
                 execution_plan=response.execution_plan,
+                market_research=response.market_research,
             )
 
     def _commit_and_render(
@@ -228,7 +238,11 @@ class SentinelApplication:
         for event in loop_result.events:
             if has_data_errors and isinstance(
                 event,
-                (AnalysisCompletedEvent, TradeProposedEvent),
+                (
+                    AnalysisCompletedEvent,
+                    TradeProposedEvent,
+                    MarketResearchCompletedEvent,
+                ),
             ):
                 continue
             if isinstance(event, PolicyUpdatedEvent):
@@ -252,6 +266,9 @@ class SentinelApplication:
                 continue
             if isinstance(event, TradeProposedEvent):
                 response_parts.append(format_pending_execution_plan(event.plan))
+                continue
+            if isinstance(event, MarketResearchCompletedEvent):
+                response_parts.append(format_market_research(event.result))
 
         if has_data_errors:
             details = "\n".join(
@@ -262,7 +279,9 @@ class SentinelApplication:
                 "Sentinel did not generate a recommendation or permit execution."
                 f"\n{details}"
             )
-        elif loop_result.analyses and loop_result.final_text:
+        elif (
+            loop_result.analyses or loop_result.market_research_results
+        ) and loop_result.final_text:
             response_parts.append(f"AI interpretation:\n{loop_result.final_text}")
         elif not loop_result.events:
             response_parts.append(loop_result.final_text)
@@ -272,9 +291,14 @@ class SentinelApplication:
             policy=committed_policy,
             profile=committed_profile,
             analyses=() if has_data_errors else loop_result.analyses,
+            market_research_results=(
+                () if has_data_errors else loop_result.market_research_results
+            ),
             ai_interpretation=(
                 loop_result.final_text or None
-                if loop_result.analyses and not has_data_errors
+                if (
+                    loop_result.analyses or loop_result.market_research_results
+                ) and not has_data_errors
                 else None
             ),
             execution_plan=(

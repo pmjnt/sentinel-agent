@@ -8,6 +8,7 @@ from app.agent.run_context import (
     PolicyUpdatedEvent,
     ProfileUpdatedEvent,
     TradeProposedEvent,
+    MarketResearchCompletedEvent,
 )
 from app.agent.tool_loop import ToolLoopResult
 from app.agent.tool_loop import ToolLoopStreamCompleted
@@ -28,10 +29,12 @@ from app.models.portfolio import Portfolio
 from app.models.risk import RiskDecision, RiskReasonCode, RiskStatus
 from app.models.trade import PlanStatus, RebalancePlan
 from app.models.trade import TradeSide
+from app.models.research import MarketResearchResult
 from datetime import UTC, datetime, timedelta
 from app.model_catalog import ModelRoute
 from app.config import LLMProvider
 from app.sessions import InMemoryInvestorProfileSessionStore, InMemoryPolicySessionStore
+from tests.unit.test_tool_loop import _finalized_research
 
 
 def _analysis(policy: PortfolioPolicy) -> PortfolioAnalysis:
@@ -99,6 +102,7 @@ def _result(
     profile: InvestorProfile | None = None,
     profile_patches: tuple[InvestorProfilePatch, ...] = (),
     execution_plans: tuple[ExecutionPlan, ...] = (),
+    market_research_results: tuple[MarketResearchResult, ...] = (),
 ) -> ToolLoopResult:
     return ToolLoopResult(
         final_text=final_text,
@@ -110,6 +114,7 @@ def _result(
         profile_patches=profile_patches,
         final_profile=profile or InvestorProfile(),
         execution_plans=execution_plans,
+        market_research_results=market_research_results,
     )
 
 
@@ -222,6 +227,35 @@ def test_application_stream_finishes_with_structured_snapshot() -> None:
     assert events[-1].execution_status.value == "NOT_EXECUTED"
     assert events[-1].provider == "openai"
     assert events[-1].model == "gpt-5.4-mini"
+
+
+def test_application_stream_exposes_finalized_research_evidence() -> None:
+    research = _finalized_research()
+    loop = FakeToolLoop(
+        _result(
+            final_text="BTC is my preferred option.",
+            events=(MarketResearchCompletedEvent(research),),
+            market_research_results=(research,),
+        )
+    )
+    application = SentinelApplication(loop, InMemoryPolicySessionStore())
+
+    async def collect():
+        return [
+            event
+            async for event in application.stream_handle(
+                "user-1",
+                "Compare markets.",
+            )
+        ]
+
+    events = asyncio.run(collect())
+    completed = events[-1]
+
+    assert isinstance(completed, StructuredSentinelResponse)
+    assert completed.market_research == research
+    assert completed.ai_interpretation == "BTC is my preferred option."
+    assert "Verified Binance market research" in completed.message
 
 
 def test_application_commits_pending_execution_plan_after_successful_agent_run() -> None:
@@ -388,6 +422,27 @@ def test_data_error_discards_earlier_analysis_and_verified_facts() -> None:
     assert response.analyses == ()
     assert "Verified facts" not in response.message
     assert "Market data could not be verified" in response.message
+
+
+def test_data_error_discards_earlier_market_research_evidence() -> None:
+    research = _finalized_research()
+    application = SentinelApplication(
+        FakeToolLoop(
+            _result(
+                final_text="",
+                events=(MarketResearchCompletedEvent(research),),
+                market_research_results=(research,),
+                data_errors=("Market history could not be verified for SOLUSDT.",),
+            )
+        ),
+        InMemoryPolicySessionStore(),
+    )
+
+    response = asyncio.run(application.handle("user-1", "Compare markets."))
+
+    assert response.market_research is None
+    assert "Verified Binance market research" not in response.message
+    assert "Market history could not be verified" in response.message
 
 
 def test_data_error_does_not_commit_a_staged_execution_plan() -> None:

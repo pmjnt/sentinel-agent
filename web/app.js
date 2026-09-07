@@ -219,6 +219,45 @@ function formatPercent(value) {
   return `${(Number(value) * 100).toFixed(2)}%`;
 }
 
+function buildResearchEvidenceRows(research) {
+  if (!research) return [];
+  const plan = research.plan;
+  const rows = [
+    {
+      label: "Research plan",
+      value: `top ${plan.candidate_limit} · ${plan.lookback_days}d · ${plan.timeframes.join(", ")} · ${plan.priorities.join(", ")}`,
+    },
+    { label: "Market scan", value: research.scan.observed_at },
+    {
+      label: "Top volume",
+      value: research.scan.candidates
+        .map((candidate) => `${candidate.symbol} ${formatMoney(candidate.quote_volume)}`)
+        .join(" · "),
+    },
+  ];
+  research.analyzed_candidates.forEach((candidate) => {
+    candidate.timeframes.forEach((timeframe) => {
+      rows.push({
+        label: `${candidate.candidate.symbol} · ${timeframe.timeframe}`,
+        value: [
+          `return ${timeframe.return_percent}%`,
+          `trend ${timeframe.trend}`,
+          `volatility ${timeframe.realized_volatility_percent}%`,
+          `max drawdown ${timeframe.max_drawdown_percent}%`,
+          `volume change ${timeframe.volume_change_percent}%`,
+        ].join(" · "),
+      });
+    });
+  });
+  if (research.failed_symbols.length) {
+    rows.push({
+      label: "Unavailable history",
+      value: research.failed_symbols.join(", "),
+    });
+  }
+  return rows;
+}
+
 function initializeApp() {
   const modelTrigger = document.querySelector("#model-trigger");
   const activeModel = document.querySelector("#active-model");
@@ -428,6 +467,7 @@ function initializeApp() {
 
   function renderEvidence(turn, result) {
     const analysis = result.analysis;
+    const research = result.market_research;
     const card = document.createElement("details");
     card.className = "evidence-card";
     const summary = document.createElement("summary");
@@ -462,6 +502,9 @@ function initializeApp() {
       }
       appendEvidence(list, "Risk Engine", analysis.risk_decision.status);
     }
+    buildResearchEvidenceRows(research).forEach((row) => {
+      appendEvidence(list, row.label, row.value);
+    });
     appendEvidence(list, "Execution", result.execution_status);
     body.append(source, list);
     card.append(summary, body);
@@ -554,7 +597,7 @@ function initializeApp() {
       : "";
     turn.pulseDot.classList.remove("active");
     turn.pulseDot.style.background = "var(--green)";
-    if (result.analysis) renderEvidence(turn, result);
+    if (result.analysis || result.market_research) renderEvidence(turn, result);
     renderExecutionPlan(turn, result);
   }
 
@@ -691,6 +734,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     buildChatRequest,
     buildPlanActionRequest,
+    buildResearchEvidenceRows,
     createSseParser,
     formatActivityLabel,
     getPlanApprovalPresentation,

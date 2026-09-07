@@ -11,6 +11,7 @@ from app.models.api import (
 )
 from app.models.policy import PortfolioPolicy
 from app.models.profile import InvestorProfile
+from tests.unit.test_tool_loop import _finalized_research
 
 
 def test_chat_request_normalizes_required_values() -> None:
@@ -64,3 +65,18 @@ def test_structured_response_serializes_ui_fields() -> None:
 
     assert payload["activity"][0]["kind"] == "PORTFOLIO_READ"
     assert payload["execution_status"] == "NOT_EXECUTED"
+
+
+def test_structured_response_serializes_finalized_market_research() -> None:
+    response = StructuredSentinelResponse(
+        session_id="user-1",
+        message="Done.",
+        policy=PortfolioPolicy(),
+        profile=InvestorProfile(),
+        market_research=_finalized_research(),
+    )
+
+    payload = response.model_dump(mode="json")
+
+    assert payload["market_research"]["plan"]["priorities"] == ["MOMENTUM"]
+    assert payload["market_research"]["scan"]["candidates"][0]["symbol"] == "BTCUSDT"
