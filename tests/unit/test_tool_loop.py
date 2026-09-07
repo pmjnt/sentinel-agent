@@ -22,7 +22,7 @@ from app.agent.tool_loop import (
 from app.config import LLMProvider, Settings
 from app.model_catalog import ModelCatalog
 from app.models.market import MarketData, MarketDataError, Volatility
-from app.models.profile import InvestorProfile
+from app.models.profile import InvestmentObjective, InvestorProfile
 from app.models.policy import PolicyChange, PolicyField, PortfolioPolicy
 from app.models.portfolio import PortfolioAsset
 from app.services.portfolio_service import calculate_portfolio
@@ -96,6 +96,8 @@ def test_tool_loop_instructions_require_grounded_advice() -> None:
     assert "allowed_trade_symbols" in instructions
     assert "cannot loosen" in instructions
     assert "Do not call get_market_data for USDT or USDC" in instructions
+    assert "2 to 4" in instructions
+    assert "do not ask for optional profile fields" in instructions
 
 
 def test_tool_loop_input_contains_current_validated_policy() -> None:
@@ -106,6 +108,20 @@ def test_tool_loop_input_contains_current_validated_policy() -> None:
 
     assert "Phân tích BTC." in value
     assert '"max_asset_weight":"0.40"' in value
+
+
+def test_tool_loop_input_marks_complete_advice_profile_as_ready() -> None:
+    value = build_tool_loop_input(
+        "Give me advice.",
+        PortfolioPolicy(),
+        InvestorProfile(
+            objective=InvestmentObjective.GROWTH,
+            time_horizon_months=12,
+            acceptable_loss_percent=Decimal("20"),
+        ),
+    )
+
+    assert "Advice profile readiness:\nREADY" in value
 
 
 def test_general_chat_returns_text_without_events() -> None:

@@ -33,6 +33,7 @@ from app.models.profile import InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
 from app.models.execution import ExecutionPlan
 from app.model_catalog import ModelCatalog, ModelRoute
+from app.services.profile_service import is_advice_profile_ready
 
 
 RunAgent = Callable[..., Awaitable[Any]]
@@ -89,11 +90,17 @@ def build_tool_loop_input(
     normalized = message.strip()
     if not normalized:
         raise ValueError("Request message must not be empty.")
+    current_profile = profile or InvestorProfile()
+    advice_readiness = (
+        "READY" if is_advice_profile_ready(current_profile) else "INCOMPLETE"
+    )
     return (
         "Current validated portfolio policy:\n"
         f"{policy.model_dump_json()}\n\n"
         "Current validated investor profile:\n"
-        f"{(profile or InvestorProfile()).model_dump_json()}\n\n"
+        f"{current_profile.model_dump_json()}\n\n"
+        "Advice profile readiness:\n"
+        f"{advice_readiness}\n\n"
         "User message:\n"
         f"{normalized}"
     )

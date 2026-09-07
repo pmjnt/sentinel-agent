@@ -10,7 +10,7 @@ from app.models.profile import (
     LiquidityNeed,
     RiskTolerance,
 )
-from app.services.profile_service import apply_profile_patch
+from app.services.profile_service import apply_profile_patch, is_advice_profile_ready
 
 
 def test_investor_profile_validates_and_normalizes_assets() -> None:
@@ -51,3 +51,22 @@ def test_profile_patch_changes_only_explicit_fields_and_can_clear_value() -> Non
     assert updated.objective is InvestmentObjective.GROWTH
     assert updated.time_horizon_months == 60
     assert updated.excluded_assets == []
+
+
+def test_advice_profile_is_ready_with_objective_horizon_and_acceptable_loss() -> None:
+    profile = InvestorProfile(
+        objective=InvestmentObjective.GROWTH,
+        time_horizon_months=12,
+        acceptable_loss_percent=Decimal("20"),
+    )
+
+    assert is_advice_profile_ready(profile) is True
+
+
+def test_advice_profile_is_incomplete_without_risk_measure() -> None:
+    profile = InvestorProfile(
+        objective=InvestmentObjective.GROWTH,
+        time_horizon_months=12,
+    )
+
+    assert is_advice_profile_ready(profile) is False

@@ -1,6 +1,19 @@
 from app.models.profile import InvestorProfile, InvestorProfilePatch
 
 
+def is_advice_profile_ready(profile: InvestorProfile) -> bool:
+    """Return whether core preferences are sufficient for useful advice."""
+    has_risk_measure = (
+        profile.acceptable_loss_percent is not None
+        or profile.risk_tolerance is not None
+    )
+    return (
+        profile.objective is not None
+        and profile.time_horizon_months is not None
+        and has_risk_measure
+    )
+
+
 def apply_profile_patch(
     profile: InvestorProfile,
     patch: InvestorProfilePatch,
