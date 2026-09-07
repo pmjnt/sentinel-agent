@@ -5,3 +5,8 @@ __pycache__/
 .pytest_cache/
 .superpowers/
 .DS_Store
+
+# Locally rendered hackathon media
+artifacts/demo/*.mov
+artifacts/demo/*.mp4
+artifacts/demo/*.png
