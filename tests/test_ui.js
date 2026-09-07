@@ -8,6 +8,7 @@ const {
   buildPlanActionRequest,
   createSseParser,
   formatActivityLabel,
+  getPlanApprovalPresentation,
   isValidPrompt,
   parseInlineMarkdown,
   parseMarkdownBlocks,
@@ -30,6 +31,23 @@ test("plan actions use a dedicated endpoint and exact session", () => {
     () => buildPlanActionRequest("user-1", "PLAN-ABC123", "execute"),
     /Unsupported plan action/,
   );
+  assert.equal(
+    buildPlanActionRequest("user-1", "PLAN-ABC123", "approve-symbol").url,
+    "/api/plans/PLAN-ABC123/approve-symbol",
+  );
+});
+
+test("non-default symbols require token approval before order approval", () => {
+  assert.deepEqual(getPlanApprovalPresentation("PENDING_SYMBOL_APPROVAL"), {
+    eyebrow: "TOKEN OUTSIDE DEFAULT UNIVERSE",
+    button: "Approve token exception",
+    action: "approve-symbol",
+  });
+  assert.deepEqual(getPlanApprovalPresentation("PENDING_APPROVAL"), {
+    eyebrow: "BINANCE DEMO · EXPLICIT APPROVAL REQUIRED",
+    button: "Approve Demo order",
+    action: "approve",
+  });
 });
 
 test("accepts meaningful prompts and rejects whitespace", () => {

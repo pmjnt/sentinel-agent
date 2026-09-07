@@ -2,18 +2,19 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
-from app.models.execution import ExecutionPlan
+from app.models.execution import ExecutionPlan, ExecutionPlanStatus
 from app.models.market import MarketData
 from app.models.policy import PortfolioPolicy
 from app.models.portfolio import Portfolio, PortfolioAsset
 from app.models.risk import RiskStatus
 from app.models.trade import RebalancePlan, TradeAction, TradeSide
+from app.models.symbol import TradingSymbolInfo
 from app.services.policy_service import find_policy_violations
 from app.services.portfolio_service import calculate_portfolio
 from app.services.risk_service import evaluate_rebalance_risk
+from app.services.trade_universe_service import requires_symbol_override
 
 
-HARD_ALLOWED_SYMBOLS = frozenset({"BTCUSDT", "ETHUSDT"})
 HARD_MIN_TRADE_USD = Decimal("10")
 HARD_MAX_TRADE_USD = Decimal("100")
 PLAN_LIFETIME = timedelta(minutes=5)
@@ -33,10 +34,12 @@ def create_trade_plan(
     policy: PortfolioPolicy,
     portfolio: Portfolio,
     market: MarketData,
+    symbol_info: TradingSymbolInfo,
 ) -> ExecutionPlan:
     normalized = symbol.strip().upper()
-    if normalized not in HARD_ALLOWED_SYMBOLS:
-        raise TradeProposalError("Trading symbol is outside the hard allowlist.")
+    if symbol_info.symbol != normalized:
+        raise TradeProposalError("Verified symbol information does not match the proposal.")
+    override_required = requires_symbol_override(symbol_info)
     if market.symbol != normalized:
         raise TradeProposalError("Fresh market data does not match the proposal.")
     if quote_usd < HARD_MIN_TRADE_USD or quote_usd > HARD_MAX_TRADE_USD:
@@ -109,6 +112,12 @@ def create_trade_plan(
         reason=reason.strip(),
         created_at=now,
         expires_at=now + PLAN_LIFETIME,
+        status=(
+            ExecutionPlanStatus.PENDING_SYMBOL_APPROVAL
+            if override_required
+            else ExecutionPlanStatus.PENDING_APPROVAL
+        ),
+        requires_symbol_override=override_required,
     )
 
 

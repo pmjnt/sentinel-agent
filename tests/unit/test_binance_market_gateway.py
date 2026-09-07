@@ -14,6 +14,7 @@ from app.binance.runner import BinanceCliError
 from app.config import BinanceEnvironment
 from app.models.market import MarketData, MarketDataError, Volatility
 from app.models.source import DataSource
+from app.models.symbol import TradingSymbolInfo, TradingSymbolInfoError
 
 
 class FakeRunner:
@@ -45,6 +46,54 @@ DEPTH_FIXTURE = {
     "bids": [["109900", "0.005"], ["109800", "0.01"]],
     "asks": [["110100", "0.01"]],
 }
+
+EXCHANGE_INFO_FIXTURE = {
+    "symbols": [
+        {
+            "symbol": "SOLUSDT",
+            "status": "TRADING",
+            "baseAsset": "SOL",
+            "quoteAsset": "USDT",
+            "orderTypes": ["LIMIT", "MARKET"],
+            "isSpotTradingAllowed": True,
+            "quoteOrderQtyMarketAllowed": True,
+        }
+    ]
+}
+
+
+def test_maps_verified_spot_symbol_info() -> None:
+    runner = FakeRunner([EXCHANGE_INFO_FIXTURE])
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+
+    result = asyncio.run(gateway.get_symbol_info(" solusdt "))
+
+    assert runner.calls == [
+        (
+            (
+                "spot",
+                "exchange-info",
+                "--symbol",
+                "SOLUSDT",
+                "--show-permission-sets",
+                "false",
+            ),
+            False,
+        )
+    ]
+    assert isinstance(result, TradingSymbolInfo)
+    assert result.symbol == "SOLUSDT"
+    assert result.order_types == ("LIMIT", "MARKET")
+    assert result.is_spot_trading_allowed is True
+
+
+def test_empty_exchange_info_returns_safe_error() -> None:
+    gateway = BinanceCliGateway(FakeRunner([{"symbols": []}]), BinanceEnvironment.DEMO)
+
+    result = asyncio.run(gateway.get_symbol_info("LINKUSDT"))
+
+    assert isinstance(result, TradingSymbolInfoError)
+    assert result.symbol == "LINKUSDT"
 
 
 def test_maps_demo_market_data_and_uses_only_fixed_read_commands() -> None:

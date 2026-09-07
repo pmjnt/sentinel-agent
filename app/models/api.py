@@ -27,6 +27,7 @@ class ActivityStatus(str, Enum):
 
 class ExecutionStatus(str, Enum):
     NOT_EXECUTED = "NOT_EXECUTED"
+    PENDING_SYMBOL_APPROVAL = "PENDING_SYMBOL_APPROVAL"
     PENDING_APPROVAL = "PENDING_APPROVAL"
     EXECUTED = "EXECUTED"
     REJECTED = "REJECTED"

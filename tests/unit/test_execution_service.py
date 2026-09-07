@@ -8,6 +8,7 @@ from app.models.execution import ExecutionPlanStatus, OrderExecutionResult
 from app.models.market import MarketData, Volatility
 from app.models.policy import PortfolioPolicy
 from app.models.portfolio import PortfolioAsset
+from app.models.symbol import TradingSymbolInfo
 from app.models.trade import TradeSide
 from app.services.execution_service import DemoExecutionService, ExecutionBlockedError
 from app.services.portfolio_service import calculate_portfolio
@@ -25,6 +26,15 @@ class FakeGateway:
             volatility=Volatility.LOW,
             estimated_slippage_percent="0.05",
         )
+        self.symbol_info = TradingSymbolInfo(
+            symbol="BTCUSDT",
+            status="TRADING",
+            base_asset="BTC",
+            quote_asset="USDT",
+            order_types=("MARKET",),
+            is_spot_trading_allowed=True,
+            quote_order_qty_market_allowed=True,
+        )
 
     async def get_portfolio(self):
         self.portfolio_reads += 1
@@ -37,6 +47,9 @@ class FakeGateway:
 
     async def get_market_data(self, symbol):
         return self.market
+
+    async def get_symbol_info(self, symbol):
+        return self.symbol_info
 
     async def submit_market_order(self, **kwargs):
         self.submissions += 1
@@ -69,6 +82,7 @@ def _setup(policy: PortfolioPolicy | None = None):
         policy=policy or PortfolioPolicy(),
         portfolio=portfolio,
         market=gateway.market,
+        symbol_info=gateway.symbol_info,
     )
     store.create(plan)
     service = DemoExecutionService(
@@ -124,6 +138,17 @@ def test_changed_policy_blocks_before_order_submission() -> None:
     )
 
     with pytest.raises(ExecutionBlockedError, match="policy maximum"):
+        asyncio.run(service.approve_and_execute("session-1", plan.plan_id))
+
+    assert gateway.submissions == 0
+    assert store.get("session-1", plan.plan_id).status is ExecutionPlanStatus.FAILED
+
+
+def test_symbol_becoming_inactive_blocks_before_order_submission() -> None:
+    gateway, store, service, plan = _setup()
+    gateway.symbol_info = gateway.symbol_info.model_copy(update={"status": "BREAK"})
+
+    with pytest.raises(ExecutionBlockedError, match="not currently trading"):
         asyncio.run(service.approve_and_execute("session-1", plan.plan_id))
 
     assert gateway.submissions == 0

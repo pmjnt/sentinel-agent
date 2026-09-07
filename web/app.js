@@ -12,7 +12,7 @@ function buildChatRequest(sessionId, message, route) {
 }
 
 function buildPlanActionRequest(sessionId, planId, action) {
-  if (!['approve', 'reject'].includes(action)) {
+  if (!['approve', 'approve-symbol', 'reject'].includes(action)) {
     throw new Error(`Unsupported plan action: ${action}`);
   }
   return {
@@ -23,6 +23,24 @@ function buildPlanActionRequest(sessionId, planId, action) {
       body: JSON.stringify({ session_id: sessionId.trim() }),
     },
   };
+}
+
+function getPlanApprovalPresentation(status) {
+  if (status === "PENDING_SYMBOL_APPROVAL") {
+    return {
+      eyebrow: "TOKEN OUTSIDE DEFAULT UNIVERSE",
+      button: "Approve token exception",
+      action: "approve-symbol",
+    };
+  }
+  if (status === "PENDING_APPROVAL") {
+    return {
+      eyebrow: "BINANCE DEMO · EXPLICIT APPROVAL REQUIRED",
+      button: "Approve Demo order",
+      action: "approve",
+    };
+  }
+  return null;
 }
 
 function reduceActivity(current, event) {
@@ -395,13 +413,14 @@ function initializeApp() {
 
   function renderExecutionPlan(turn, result) {
     const plan = result.execution_plan;
-    if (!plan || plan.status !== "PENDING_APPROVAL") return;
+    let presentation = plan ? getPlanApprovalPresentation(plan.status) : null;
+    if (!plan || !presentation) return;
 
     const card = document.createElement("section");
     card.className = "execution-card";
     const eyebrow = document.createElement("p");
     eyebrow.className = "execution-eyebrow";
-    eyebrow.textContent = "BINANCE DEMO · EXPLICIT APPROVAL REQUIRED";
+    eyebrow.textContent = presentation.eyebrow;
     const title = document.createElement("h3");
     title.textContent = `${plan.side} ${plan.symbol}`;
     const detail = document.createElement("p");
@@ -417,7 +436,7 @@ function initializeApp() {
     const approve = document.createElement("button");
     approve.type = "button";
     approve.className = "approve-order";
-    approve.textContent = "Approve Demo order";
+    approve.textContent = presentation.button;
     const reject = document.createElement("button");
     reject.type = "button";
     reject.className = "reject-order";
@@ -426,17 +445,28 @@ function initializeApp() {
     async function perform(action) {
       approve.disabled = true;
       reject.disabled = true;
-      status.textContent = action === "approve"
-        ? "Revalidating before execution…"
-        : "Rejecting plan…";
+      status.textContent = action === "approve-symbol"
+        ? "Approving this token for this plan…"
+        : action === "approve"
+          ? "Revalidating before execution…"
+          : "Rejecting plan…";
       try {
         const request = buildPlanActionRequest(sessionId, plan.plan_id, action);
         const response = await window.fetch(request.url, request.options);
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "Plan action failed.");
-        status.textContent = payload.status === "EXECUTED"
-          ? `Demo order verified: ${payload.order_status} · order ${payload.order_id}`
-          : `Plan ${payload.status.toLowerCase()}.`;
+        if (payload.status === "PENDING_APPROVAL") {
+          presentation = getPlanApprovalPresentation(payload.status);
+          eyebrow.textContent = presentation.eyebrow;
+          approve.textContent = presentation.button;
+          status.textContent = "Token exception approved. No order has been sent.";
+          approve.disabled = false;
+          reject.disabled = false;
+        } else {
+          status.textContent = payload.status === "EXECUTED"
+            ? `Demo order verified: ${payload.order_status} · order ${payload.order_id}`
+            : `Plan ${payload.status.toLowerCase()}.`;
+        }
         card.dataset.status = payload.status;
       } catch (error) {
         status.textContent = error.message;
@@ -446,7 +476,7 @@ function initializeApp() {
       }
     }
 
-    approve.addEventListener("click", () => perform("approve"));
+    approve.addEventListener("click", () => perform(presentation.action));
     reject.addEventListener("click", () => perform("reject"));
     actions.append(approve, reject);
     card.append(eyebrow, title, detail, reason, status, actions);
@@ -603,6 +633,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildPlanActionRequest,
     createSseParser,
     formatActivityLabel,
+    getPlanApprovalPresentation,
     isValidPrompt,
     parseInlineMarkdown,
     parseMarkdownBlocks,

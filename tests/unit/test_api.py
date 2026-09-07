@@ -45,6 +45,10 @@ class FakeStreamingApplication:
         assert (session_id, plan_id) == ("user-1", "PLAN-ABC123")
         return {"plan_id": plan_id, "status": "EXECUTED"}
 
+    def approve_symbol_override(self, session_id: str, plan_id: str):
+        assert (session_id, plan_id) == ("user-1", "PLAN-ABC123")
+        return {"plan_id": plan_id, "status": "PENDING_APPROVAL"}
+
     def reject_plan(self, session_id: str, plan_id: str):
         assert (session_id, plan_id) == ("user-1", "PLAN-ABC123")
         return {"plan_id": plan_id, "status": "REJECTED"}
@@ -144,8 +148,14 @@ def test_plan_approval_and_rejection_use_dedicated_endpoints() -> None:
         "/api/plans/PLAN-ABC123/reject",
         json={"session_id": "user-1"},
     )
+    symbol_approved = client.post(
+        "/api/plans/PLAN-ABC123/approve-symbol",
+        json={"session_id": "user-1"},
+    )
 
     assert approved.status_code == 200
     assert approved.json()["status"] == "EXECUTED"
     assert rejected.status_code == 200
     assert rejected.json()["status"] == "REJECTED"
+    assert symbol_approved.status_code == 200
+    assert symbol_approved.json()["status"] == "PENDING_APPROVAL"

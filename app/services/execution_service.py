@@ -5,6 +5,7 @@ from app.gateways import DemoExecutionGateway
 from app.models.execution import ExecutionPlan, ExecutionPlanStatus
 from app.models.market import MarketData, MarketDataError
 from app.models.policy import PortfolioPolicy
+from app.models.symbol import TradingSymbolInfoError
 from app.services.trade_proposal_service import TradeProposalError, create_trade_plan
 
 
@@ -49,6 +50,11 @@ class DemoExecutionService:
             if isinstance(market_result, MarketDataError):
                 raise ExecutionBlockedError("Fresh market data could not be verified.")
             market: MarketData = market_result
+            symbol_info = await self._gateway.get_symbol_info(approved.symbol)
+            if isinstance(symbol_info, TradingSymbolInfoError):
+                raise ExecutionBlockedError(
+                    "Trading eligibility could not be verified."
+                )
             create_trade_plan(
                 session_id=session_id,
                 symbol=approved.symbol,
@@ -58,6 +64,7 @@ class DemoExecutionService:
                 policy=self._policy_loader(session_id),
                 portfolio=portfolio,
                 market=market,
+                symbol_info=symbol_info,
             )
             self._plans.start_execution(session_id, plan_id)
         except (TradeProposalError, ValueError, RuntimeError) as error:
@@ -104,6 +111,14 @@ class DemoExecutionService:
         )
         await self._gateway.get_portfolio()
         return executed
+
+    def approve_symbol_override(
+        self, session_id: str, plan_id: str
+    ) -> ExecutionPlan:
+        try:
+            return self._plans.approve_symbol_override(session_id, plan_id)
+        except PlanStateError as error:
+            raise ExecutionBlockedError(str(error)) from error
 
     def reject(self, session_id: str, plan_id: str) -> ExecutionPlan:
         try:

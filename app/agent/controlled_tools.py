@@ -27,6 +27,7 @@ from app.models.profile import (
 )
 from app.models.policy import PolicyChange, PolicyField, PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
+from app.models.symbol import TradingSymbolInfoError
 from app.models.trade import TradeSide
 from app.services.policy_service import apply_policy_patch
 from app.services.profile_service import apply_profile_patch
@@ -320,7 +321,7 @@ def evaluate_cached_portfolio(
     return analysis
 
 
-def propose_trade_plan(
+async def propose_trade_plan(
     context: SentinelRunContext,
     *,
     symbol: str,
@@ -344,6 +345,16 @@ def propose_trade_plan(
             ),
         )
 
+    symbol_info = await context.gateway.get_symbol_info(normalized_symbol)
+    if isinstance(symbol_info, TradingSymbolInfoError):
+        return ToolDataError(
+            code="SYMBOL_UNAVAILABLE",
+            message=(
+                f"Trading eligibility could not be verified for "
+                f"{normalized_symbol}."
+            ),
+        )
+
     try:
         plan = create_trade_plan(
             session_id=context.session_id,
@@ -354,6 +365,7 @@ def propose_trade_plan(
             policy=context.working_policy,
             portfolio=context.portfolio,
             market=context.market_by_symbol[normalized_symbol],
+            symbol_info=symbol_info,
         )
     except (InvalidOperation, ValueError, TradeProposalError) as error:
         return ToolDataError(code="PROPOSAL_REJECTED", message=str(error))
@@ -435,7 +447,7 @@ async def propose_trade(
     reason: str,
 ) -> ExecutionPlan | MissingObservations | ToolDataError:
     """Create a Demo Spot proposal for explicit approval; never executes it."""
-    return propose_trade_plan(
+    return await propose_trade_plan(
         ctx.context,
         symbol=symbol,
         side=side,

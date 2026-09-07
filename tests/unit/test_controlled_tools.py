@@ -39,6 +39,7 @@ from app.models.profile import (
 from app.models.policy import PolicyChange, PolicyField, PortfolioPolicy
 from app.models.portfolio import PortfolioAsset
 from app.models.risk import RiskStatus
+from app.models.symbol import TradingSymbolInfo, TradingSymbolInfoError
 from app.services.portfolio_service import calculate_portfolio
 
 
@@ -72,6 +73,17 @@ class FakeGateway:
     def __init__(self) -> None:
         self.portfolio = _portfolio()
         self.market_result: MarketData | MarketDataError = _market()
+        self.symbol_info_result: TradingSymbolInfo | TradingSymbolInfoError = (
+            TradingSymbolInfo(
+                symbol="BTCUSDT",
+                status="TRADING",
+                base_asset="BTC",
+                quote_asset="USDT",
+                order_types=("MARKET",),
+                is_spot_trading_allowed=True,
+                quote_order_qty_market_allowed=True,
+            )
+        )
 
     async def get_portfolio(self):
         return self.portfolio
@@ -79,6 +91,9 @@ class FakeGateway:
     async def get_market_data(self, symbol: str):
         assert symbol == "BTCUSDT"
         return self.market_result
+
+    async def get_symbol_info(self, symbol: str):
+        return self.symbol_info_result
 
 
 def _context(policy: PortfolioPolicy | None = None) -> SentinelRunContext:
@@ -324,12 +339,14 @@ def test_controlled_tool_allowlist_contains_no_execution_capability() -> None:
 def test_trade_proposal_requires_fresh_observations() -> None:
     context = _context()
 
-    result = propose_trade_plan(
-        context,
-        symbol="BTCUSDT",
-        side="BUY",
-        quote_usd="50",
-        reason="Limited growth exposure.",
+    result = asyncio.run(
+        propose_trade_plan(
+            context,
+            symbol="BTCUSDT",
+            side="BUY",
+            quote_usd="50",
+            reason="Limited growth exposure.",
+        )
     )
 
     assert isinstance(result, MissingObservations)
@@ -341,14 +358,40 @@ def test_trade_proposal_is_staged_but_not_executed() -> None:
     context.portfolio = _portfolio()
     context.market_by_symbol["BTCUSDT"] = _market()
 
-    result = propose_trade_plan(
-        context,
-        symbol="BTCUSDT",
-        side="BUY",
-        quote_usd="50",
-        reason="Limited growth exposure.",
+    result = asyncio.run(
+        propose_trade_plan(
+            context,
+            symbol="BTCUSDT",
+            side="BUY",
+            quote_usd="50",
+            reason="Limited growth exposure.",
+        )
     )
 
     assert isinstance(result, ExecutionPlan)
     assert context.execution_plans == [result]
     assert result.order_id is None
+
+
+def test_trade_proposal_rejects_unverified_symbol_information() -> None:
+    context = _context()
+    context.portfolio = _portfolio()
+    context.market_by_symbol["BTCUSDT"] = _market()
+    context.gateway.symbol_info_result = TradingSymbolInfoError(
+        symbol="BTCUSDT",
+        error="private provider output",
+    )
+
+    result = asyncio.run(
+        propose_trade_plan(
+            context,
+            symbol="BTCUSDT",
+            side="BUY",
+            quote_usd="50",
+            reason="Limited growth exposure.",
+        )
+    )
+
+    assert isinstance(result, ToolDataError)
+    assert result.code == "SYMBOL_UNAVAILABLE"
+    assert "private provider output" not in result.message

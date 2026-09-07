@@ -58,6 +58,26 @@ class DepthPayload(BaseModel):
     asks: list[tuple[Decimal, Decimal]]
 
 
+class ExchangeSymbolPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    symbol: str
+    status: str
+    base_asset: str = Field(alias="baseAsset")
+    quote_asset: str = Field(alias="quoteAsset")
+    order_types: tuple[str, ...] = Field(alias="orderTypes")
+    is_spot_trading_allowed: bool = Field(alias="isSpotTradingAllowed")
+    quote_order_qty_market_allowed: bool = Field(
+        alias="quoteOrderQtyMarketAllowed"
+    )
+
+
+class ExchangeInfoPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    symbols: list[ExchangeSymbolPayload]
+
+
 class SpotOrderPayload(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 

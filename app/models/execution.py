@@ -8,6 +8,7 @@ from app.models.trade import TradeSide
 
 
 class ExecutionPlanStatus(str, Enum):
+    PENDING_SYMBOL_APPROVAL = "PENDING_SYMBOL_APPROVAL"
     PENDING_APPROVAL = "PENDING_APPROVAL"
     APPROVED = "APPROVED"
     EXECUTING = "EXECUTING"
@@ -34,6 +35,7 @@ class ExecutionPlan(BaseModel):
     order_id: int | None = None
     order_status: str | None = None
     failure_reason: str | None = None
+    requires_symbol_override: bool = False
 
     @field_validator("plan_id", "session_id", "reason")
     @classmethod

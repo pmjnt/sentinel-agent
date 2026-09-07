@@ -89,6 +89,13 @@ class SentinelApplication:
             raise RuntimeError("Binance Demo execution is not configured.")
         return await self._execution_service.approve_and_execute(session_id, plan_id)
 
+    def approve_symbol_override(
+        self, session_id: str, plan_id: str
+    ) -> ExecutionPlan:
+        if self._execution_service is None:
+            return self._execution_plans.approve_symbol_override(session_id, plan_id)
+        return self._execution_service.approve_symbol_override(session_id, plan_id)
+
     def reject_plan(self, session_id: str, plan_id: str) -> ExecutionPlan:
         if self._execution_service is None:
             return self._execution_plans.reject(session_id, plan_id)

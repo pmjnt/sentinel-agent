@@ -8,6 +8,7 @@ from pydantic import TypeAdapter, ValidationError
 from app.binance.runner import BinanceCliError, JsonCommandRunner
 from app.binance.schemas import (
     DepthPayload,
+    ExchangeInfoPayload,
     PriceTickerPayload,
     SpotAccountPayload,
     SpotOrderPayload,
@@ -19,8 +20,16 @@ from app.models.portfolio import Portfolio, PortfolioAsset
 from app.models.source import DataSource
 from app.models.execution import OrderExecutionResult
 from app.models.trade import TradeSide
-from app.services.trade_proposal_service import HARD_ALLOWED_SYMBOLS
+from app.models.symbol import (
+    TradingSymbolInfo,
+    TradingSymbolInfoError,
+    TradingSymbolInfoResult,
+)
 from app.services.portfolio_service import calculate_portfolio
+from app.services.trade_universe_service import (
+    TradeUniverseError,
+    require_trade_eligibility,
+)
 
 
 class BinanceDataError(RuntimeError):
@@ -199,6 +208,48 @@ class BinanceCliGateway:
             data_source=self._data_source,
         )
 
+    async def get_symbol_info(self, symbol: str) -> TradingSymbolInfoResult:
+        normalized_symbol = symbol.strip().upper()
+        error_symbol = normalized_symbol or "UNKNOWN"
+        if _MARKET_SYMBOL.fullmatch(normalized_symbol) is None:
+            return TradingSymbolInfoError(
+                symbol=error_symbol,
+                error=f"Invalid market symbol: {error_symbol}",
+            )
+
+        try:
+            raw = await self._runner.run(
+                [
+                    "spot",
+                    "exchange-info",
+                    "--symbol",
+                    normalized_symbol,
+                    "--show-permission-sets",
+                    "false",
+                ]
+            )
+            payload = ExchangeInfoPayload.model_validate(raw)
+            if len(payload.symbols) != 1:
+                raise ValueError("Binance did not return exactly one symbol.")
+            info = payload.symbols[0]
+            if info.symbol.strip().upper() != normalized_symbol:
+                raise ValueError("Binance symbol did not match the request.")
+        except (BinanceCliError, ValidationError, ValueError):
+            return TradingSymbolInfoError(
+                symbol=normalized_symbol,
+                error="Binance symbol information could not be verified.",
+            )
+
+        return TradingSymbolInfo(
+            symbol=info.symbol,
+            status=info.status,
+            base_asset=info.base_asset,
+            quote_asset=info.quote_asset,
+            order_types=info.order_types,
+            is_spot_trading_allowed=info.is_spot_trading_allowed,
+            quote_order_qty_market_allowed=info.quote_order_qty_market_allowed,
+        )
+
     async def _run_public_market_read(
         self,
         arguments: list[str],
@@ -225,9 +276,7 @@ class BinanceCliGateway:
         quote_usd: Decimal,
         client_order_id: str,
     ) -> OrderExecutionResult:
-        normalized = symbol.strip().upper()
-        if normalized not in HARD_ALLOWED_SYMBOLS:
-            raise BinanceDataError("Trading symbol is not enabled for execution.")
+        normalized = await self._require_executable_symbol(symbol)
         arguments = [
             "spot",
             "new-order",
@@ -260,8 +309,8 @@ class BinanceCliGateway:
         client_order_id: str,
     ) -> OrderExecutionResult:
         normalized = symbol.strip().upper()
-        if normalized not in HARD_ALLOWED_SYMBOLS:
-            raise BinanceDataError("Trading symbol is not enabled for execution.")
+        if _MARKET_SYMBOL.fullmatch(normalized) is None:
+            raise BinanceDataError("Trading symbol format is invalid.")
         try:
             raw = await self._runner.run(
                 [
@@ -281,6 +330,20 @@ class BinanceCliGateway:
         except (BinanceCliError, ValueError) as error:
             raise BinanceDataError("Binance Demo order could not be verified.") from error
         return _execution_result(payload)
+
+    async def _require_executable_symbol(self, symbol: str) -> str:
+        normalized = symbol.strip().upper()
+        if _MARKET_SYMBOL.fullmatch(normalized) is None:
+            raise BinanceDataError("Trading symbol format is invalid.")
+
+        result = await self.get_symbol_info(normalized)
+        if isinstance(result, TradingSymbolInfoError):
+            raise BinanceDataError("Trading eligibility could not be verified.")
+        try:
+            require_trade_eligibility(result)
+        except TradeUniverseError as error:
+            raise BinanceDataError(str(error)) from error
+        return normalized
 
 
 def _execution_result(payload: SpotOrderPayload) -> OrderExecutionResult:

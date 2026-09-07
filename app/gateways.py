@@ -5,12 +5,15 @@ from app.models.market import MarketDataResult
 from app.models.portfolio import Portfolio
 from app.models.execution import OrderExecutionResult
 from app.models.trade import TradeSide
+from app.models.symbol import TradingSymbolInfoResult
 
 
 class PortfolioMarketGateway(Protocol):
     async def get_portfolio(self) -> Portfolio: ...
 
     async def get_market_data(self, symbol: str) -> MarketDataResult: ...
+
+    async def get_symbol_info(self, symbol: str) -> TradingSymbolInfoResult: ...
 
 
 class DemoExecutionGateway(PortfolioMarketGateway, Protocol):

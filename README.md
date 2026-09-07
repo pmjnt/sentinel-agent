@@ -225,13 +225,14 @@ spot get-account --omit-zero-balances true
 spot ticker-price
 spot ticker24hr --symbol <validated symbol>
 spot depth --symbol <validated symbol> --limit 100
+spot exchange-info --symbol <validated symbol> --show-permission-sets false
 ```
 
 When Demo execution is explicitly enabled, the separate execution service may
 also use only:
 
 ```text
-spot new-order --symbol <BTCUSDT|ETHUSDT> --side <BUY|SELL> --type MARKET ...
+spot new-order --symbol <Binance-verified Spot USDT symbol> --side <BUY|SELL> --type MARKET ...
 spot get-order --symbol <validated symbol> --orig-client-order-id <plan client id>
 ```
 
@@ -250,7 +251,10 @@ SENTINEL_DEMO_EXECUTION_ENABLED=true
 Hard application limits cannot be loosened in chat:
 
 - Binance Demo only;
-- `BTCUSDT` and `ETHUSDT` only;
+- normal approval for `BTCUSDT`, `ETHUSDT`, `BNBUSDT`, `SOLUSDT`, `XRPUSDT`,
+  `ADAUSDT`, and `DOGEUSDT`;
+- another token requires Binance `exchange-info` validation and a separate,
+  plan-scoped token-exception approval;
 - MARKET BUY/SELL only;
 - 10–100 USDT per order;
 - explicit approval for every order;
@@ -262,7 +266,8 @@ high-volatility blocking. The flow is:
 
 ```text
 LLM reads fresh data → Python validates → LLM proposes PLAN-ID
-→ user clicks Approve → Python reads fresh data and validates again
+→ for a non-default token, user first approves that token exception
+→ user separately approves the Demo order → Python reads fresh data and validates again
 → gateway submits one Demo order → gateway queries order
 → only FILLED becomes EXECUTED → portfolio is refreshed
 ```
@@ -332,6 +337,12 @@ chain-of-thought.
 When the Agent creates a valid proposal, the response also includes a compact
 Demo order card. **Approve Demo order** and **Reject** call dedicated endpoints;
 approval is not inferred from ordinary chat text.
+
+Default tokens use `POST /api/plans/{plan_id}/approve`. A valid token outside
+the default set first uses `POST /api/plans/{plan_id}/approve-symbol`; this only
+moves that exact, unexpired plan to `PENDING_APPROVAL`. It does not submit an
+order. The user must then click **Approve Demo order**, and all market, policy,
+balance, and Binance symbol checks run again before submission.
 
 Try profile chat:
 
