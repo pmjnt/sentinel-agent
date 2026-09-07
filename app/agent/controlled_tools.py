@@ -13,6 +13,10 @@ from app.agent.run_context import (
     ProfileViewedEvent,
     SentinelRunContext,
     TradeProposedEvent,
+    ResearchPlanSetEvent,
+    MarketScanCompletedEvent,
+    MarketCandidateAnalyzedEvent,
+    MarketResearchCompletedEvent,
 )
 from app.models.execution import ExecutionPlan
 from app.models.analysis import PortfolioAnalysis
@@ -28,6 +32,14 @@ from app.models.profile import (
 from app.models.policy import PolicyChange, PolicyField, PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
 from app.models.symbol import TradingSymbolInfoError
+from app.models.research import (
+    CandidateResearch,
+    MarketResearchPlan,
+    MarketResearchResult,
+    MarketScan,
+    ResearchPriority,
+    ResearchTimeframe,
+)
 from app.models.trade import TradeSide
 from app.services.policy_service import apply_policy_patch
 from app.services.profile_service import apply_profile_patch
@@ -37,9 +49,15 @@ from app.services.portfolio_analysis_service import (
     required_market_symbols,
 )
 from app.services.trade_proposal_service import TradeProposalError, create_trade_plan
+from app.services.market_research_service import (
+    analyze_candles,
+    candle_limit,
+    rank_market_candidates,
+)
 
 
 MAX_MARKET_OBSERVATIONS = 20
+MAX_DEEP_RESEARCH_CANDIDATES = 5
 
 
 class ToolDataError(BaseModel):
@@ -211,7 +229,7 @@ async def read_market_data(
     except asyncio.CancelledError:
         raise
     except (RuntimeError, ValueError):
-        result = MarketDataError(symbol=normalized, error="gateway failure")
+        result = MarketDataError(symbol=market_symbol, error="gateway failure")
 
     if isinstance(result, MarketDataError):
         message = f"Market data could not be verified for {market_symbol}."
@@ -375,6 +393,145 @@ async def propose_trade_plan(
     return plan
 
 
+def stage_market_research_plan(
+    context: SentinelRunContext,
+    plan: MarketResearchPlan,
+) -> MarketResearchPlan:
+    context.research_plan = plan
+    context.market_scan = None
+    context.research_by_symbol.clear()
+    context.research_failed_symbols.clear()
+    context.market_research_results.clear()
+    context.ordered_events.append(ResearchPlanSetEvent(plan))
+    return plan
+
+
+async def scan_market_candidates(
+    context: SentinelRunContext,
+) -> MarketScan | ToolDataError:
+    if context.research_plan is None:
+        return ToolDataError(
+            code="RESEARCH_PLAN_REQUIRED",
+            message="Create a validated market research plan before scanning.",
+        )
+    try:
+        universe = await context.gateway.get_market_universe()
+        candidates = rank_market_candidates(
+            universe,
+            limit=context.research_plan.candidate_limit,
+        )
+    except asyncio.CancelledError:
+        raise
+    except (RuntimeError, ValueError):
+        message = "Binance market universe could not be verified."
+        context.data_errors.append(message)
+        return ToolDataError(code="MARKET_SCAN_UNAVAILABLE", message=message)
+
+    if len(candidates) < 2:
+        message = "Fewer than two verified market candidates were available."
+        context.data_errors.append(message)
+        return ToolDataError(code="INSUFFICIENT_CANDIDATES", message=message)
+    scan = MarketScan(
+        candidates=candidates,
+        observed_at=max(candidate.observed_at for candidate in candidates),
+    )
+    context.market_scan = scan
+    context.ordered_events.append(MarketScanCompletedEvent(scan))
+    return scan
+
+
+async def analyze_market_candidate(
+    context: SentinelRunContext,
+    symbol: str,
+) -> CandidateResearch | ToolDataError:
+    normalized = symbol.strip().upper()
+    if context.research_plan is None or context.market_scan is None:
+        return ToolDataError(
+            code="MARKET_SCAN_REQUIRED",
+            message="Scan verified Binance markets before analyzing history.",
+        )
+    candidate = next(
+        (
+            item
+            for item in context.market_scan.candidates
+            if item.symbol == normalized
+        ),
+        None,
+    )
+    if candidate is None:
+        return ToolDataError(
+            code="CANDIDATE_NOT_SCANNED",
+            message=f"{normalized or 'UNKNOWN'} was not in the verified market scan.",
+        )
+    if normalized in context.research_by_symbol:
+        return context.research_by_symbol[normalized]
+    if len(context.research_by_symbol) >= MAX_DEEP_RESEARCH_CANDIDATES:
+        return ToolDataError(
+            code="RESEARCH_SCOPE_EXCEEDED",
+            message="Deep market research is limited to five candidates per run.",
+        )
+
+    try:
+        candle_sets = await asyncio.gather(
+            *(
+                context.gateway.get_market_candles(
+                    normalized,
+                    timeframe,
+                    candle_limit(context.research_plan, timeframe),
+                )
+                for timeframe in context.research_plan.timeframes
+            )
+        )
+        timeframe_results = tuple(
+            analyze_candles(candles, timeframe)
+            for timeframe, candles in zip(
+                context.research_plan.timeframes,
+                candle_sets,
+            )
+        )
+    except asyncio.CancelledError:
+        raise
+    except (RuntimeError, ValueError):
+        if normalized not in context.research_failed_symbols:
+            context.research_failed_symbols.append(normalized)
+        return ToolDataError(
+            code="MARKET_HISTORY_UNAVAILABLE",
+            message=f"Market history could not be verified for {normalized}.",
+        )
+
+    research = CandidateResearch(
+        candidate=candidate,
+        timeframes=timeframe_results,
+    )
+    context.research_by_symbol[normalized] = research
+    context.ordered_events.append(MarketCandidateAnalyzedEvent(research))
+    return research
+
+
+def finalize_market_research(
+    context: SentinelRunContext,
+) -> MarketResearchResult | ToolDataError:
+    if context.research_plan is None or context.market_scan is None:
+        return ToolDataError(
+            code="MARKET_SCAN_REQUIRED",
+            message="A verified market scan is required before finalization.",
+        )
+    if len(context.research_by_symbol) < 2:
+        return ToolDataError(
+            code="RESEARCH_INCOMPLETE",
+            message="Analyze at least two verified candidates before comparing them.",
+        )
+    result = MarketResearchResult(
+        plan=context.research_plan,
+        scan=context.market_scan,
+        analyzed_candidates=tuple(context.research_by_symbol.values()),
+        failed_symbols=tuple(context.research_failed_symbols),
+    )
+    context.market_research_results.append(result)
+    context.ordered_events.append(MarketResearchCompletedEvent(result))
+    return result
+
+
 @function_tool
 async def get_portfolio(
     ctx: RunContextWrapper[SentinelRunContext],
@@ -456,6 +613,51 @@ async def propose_trade(
     )
 
 
+@function_tool
+async def set_market_research_plan(
+    ctx: RunContextWrapper[SentinelRunContext],
+    candidate_limit: int,
+    timeframes: list[ResearchTimeframe],
+    lookback_days: int,
+    priorities: list[ResearchPriority],
+) -> MarketResearchPlan:
+    """Set a bounded Binance market-research recipe for this Agent run."""
+    return stage_market_research_plan(
+        ctx.context,
+        MarketResearchPlan(
+            candidate_limit=candidate_limit,
+            timeframes=timeframes,
+            lookback_days=lookback_days,
+            priorities=priorities,
+        ),
+    )
+
+
+@function_tool
+async def scan_top_markets(
+    ctx: RunContextWrapper[SentinelRunContext],
+) -> MarketScan | ToolDataError:
+    """Scan active Binance Spot USDT markets and rank them by quote volume."""
+    return await scan_market_candidates(ctx.context)
+
+
+@function_tool
+async def analyze_market_history(
+    ctx: RunContextWrapper[SentinelRunContext],
+    symbol: str,
+) -> CandidateResearch | ToolDataError:
+    """Calculate verified indicators for one candidate from the current scan."""
+    return await analyze_market_candidate(ctx.context, symbol)
+
+
+@function_tool(name_override="finalize_market_research")
+async def finalize_market_research_tool(
+    ctx: RunContextWrapper[SentinelRunContext],
+) -> MarketResearchResult | ToolDataError:
+    """Finalize at least two verified candidate analyses for LLM comparison."""
+    return finalize_market_research(ctx.context)
+
+
 CONTROLLED_TOOLS: list[FunctionTool] = [
     get_portfolio,
     get_market_data,
@@ -465,4 +667,8 @@ CONTROLLED_TOOLS: list[FunctionTool] = [
     view_investor_profile,
     evaluate_portfolio_risk,
     propose_trade,
+    set_market_research_plan,
+    scan_top_markets,
+    analyze_market_history,
+    finalize_market_research_tool,
 ]

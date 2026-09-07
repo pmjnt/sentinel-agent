@@ -7,6 +7,12 @@ from app.models.execution import ExecutionPlan
 from app.models.profile import InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
 from app.models.portfolio import Portfolio
+from app.models.research import (
+    CandidateResearch,
+    MarketResearchPlan,
+    MarketResearchResult,
+    MarketScan,
+)
 
 
 @dataclass(frozen=True)
@@ -41,6 +47,26 @@ class TradeProposedEvent:
     plan: ExecutionPlan
 
 
+@dataclass(frozen=True)
+class ResearchPlanSetEvent:
+    plan: MarketResearchPlan
+
+
+@dataclass(frozen=True)
+class MarketScanCompletedEvent:
+    scan: MarketScan
+
+
+@dataclass(frozen=True)
+class MarketCandidateAnalyzedEvent:
+    research: CandidateResearch
+
+
+@dataclass(frozen=True)
+class MarketResearchCompletedEvent:
+    result: MarketResearchResult
+
+
 SentinelRunEvent = (
     PolicyUpdatedEvent
     | PolicyViewedEvent
@@ -48,6 +74,10 @@ SentinelRunEvent = (
     | ProfileViewedEvent
     | AnalysisCompletedEvent
     | TradeProposedEvent
+    | ResearchPlanSetEvent
+    | MarketScanCompletedEvent
+    | MarketCandidateAnalyzedEvent
+    | MarketResearchCompletedEvent
 )
 
 
@@ -68,6 +98,11 @@ class SentinelRunContext:
     data_errors: list[str] = field(default_factory=list)
     analyses: list[PortfolioAnalysis] = field(default_factory=list)
     execution_plans: list[ExecutionPlan] = field(default_factory=list)
+    research_plan: MarketResearchPlan | None = None
+    market_scan: MarketScan | None = None
+    research_by_symbol: dict[str, CandidateResearch] = field(default_factory=dict)
+    research_failed_symbols: list[str] = field(default_factory=list)
+    market_research_results: list[MarketResearchResult] = field(default_factory=list)
     session_id: str = "default"
 
     @classmethod

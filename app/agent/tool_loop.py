@@ -32,6 +32,7 @@ from app.models.api import ActivityEvent
 from app.models.profile import InvestorProfile, InvestorProfilePatch
 from app.models.policy import PolicyPatch, PortfolioPolicy
 from app.models.execution import ExecutionPlan
+from app.models.research import MarketResearchResult
 from app.model_catalog import ModelCatalog, ModelRoute
 from app.services.profile_service import is_advice_profile_ready
 
@@ -64,6 +65,7 @@ class ToolLoopResult:
     analyses: tuple[PortfolioAnalysis, ...]
     data_errors: tuple[str, ...]
     execution_plans: tuple[ExecutionPlan, ...] = ()
+    market_research_results: tuple[MarketResearchResult, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -212,7 +214,7 @@ class SentinelToolLoop:
             # Application renders a deterministic fail-closed message. Discard
             # model prose because it is neither needed nor trusted on this path.
             final_text = ""
-        elif context.analyses:
+        elif context.analyses or context.market_research_results:
             try:
                 final_text = validate_qualitative_output(final_text)
             except ModelBehaviorError:
@@ -221,8 +223,15 @@ class SentinelToolLoop:
                 final_text = ""
         else:
             final_text = validate_non_analysis_output(final_text)
+            if context.research_plan is not None:
+                raise ModelBehaviorError(
+                    "Sentinel Agent stopped before market research finalization."
+                )
             observed_financial_data = (
-                context.portfolio is not None or bool(context.market_by_symbol)
+                context.portfolio is not None
+                or bool(context.market_by_symbol)
+                or context.market_scan is not None
+                or bool(context.research_by_symbol)
             )
             if observed_financial_data and not context.data_errors:
                 raise ModelBehaviorError(
@@ -247,4 +256,5 @@ class SentinelToolLoop:
             analyses=tuple(context.analyses),
             data_errors=tuple(context.data_errors),
             execution_plans=tuple(context.execution_plans),
+            market_research_results=tuple(context.market_research_results),
         )

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -17,6 +18,10 @@ from app.agent.controlled_tools import (
     read_portfolio,
     stage_policy_update,
     stage_profile_update,
+    stage_market_research_plan,
+    scan_market_candidates,
+    analyze_market_candidate,
+    finalize_market_research,
     view_working_profile,
     view_working_policy,
 )
@@ -40,6 +45,15 @@ from app.models.policy import PolicyChange, PolicyField, PortfolioPolicy
 from app.models.portfolio import PortfolioAsset
 from app.models.risk import RiskStatus
 from app.models.symbol import TradingSymbolInfo, TradingSymbolInfoError
+from app.models.research import (
+    CandidateResearch,
+    MarketCandle,
+    MarketResearchPlan,
+    MarketResearchResult,
+    MarketTicker,
+    ResearchPriority,
+    ResearchTimeframe,
+)
 from app.services.portfolio_service import calculate_portfolio
 
 
@@ -84,6 +98,25 @@ class FakeGateway:
                 quote_order_qty_market_allowed=True,
             )
         )
+        self.market_universe = tuple(
+            MarketTicker(
+                symbol=symbol,
+                price="100",
+                change_24h_percent="1",
+                quote_volume=str(1000 - index),
+                observed_at=datetime(2026, 9, 7, tzinfo=UTC),
+            )
+            for index, symbol in enumerate(
+                [
+                    "BTCUSDT",
+                    "ETHUSDT",
+                    "SOLUSDT",
+                    "BNBUSDT",
+                    "XRPUSDT",
+                    "ADAUSDT",
+                ]
+            )
+        )
 
     async def get_portfolio(self):
         return self.portfolio
@@ -94,6 +127,25 @@ class FakeGateway:
 
     async def get_symbol_info(self, symbol: str):
         return self.symbol_info_result
+
+    async def get_market_universe(self):
+        return self.market_universe
+
+    async def get_market_candles(self, symbol, timeframe, limit):
+        start = datetime(2026, 9, 1, tzinfo=UTC)
+        return tuple(
+            MarketCandle(
+                open_time=start + timedelta(hours=index),
+                close_time=start + timedelta(hours=index + 1),
+                open=str(100 + index),
+                high=str(101 + index),
+                low=str(99 + index),
+                close=str(100 + index),
+                volume="10",
+                quote_volume="1000",
+            )
+            for index in range(limit)
+        )
 
 
 def _context(policy: PortfolioPolicy | None = None) -> SentinelRunContext:
@@ -140,6 +192,20 @@ def test_market_reader_sanitizes_gateway_error() -> None:
     assert isinstance(result, ToolDataError)
     assert "private CLI output" not in result.message
     assert context.market_by_symbol == {}
+
+
+def test_market_reader_sanitizes_gateway_exception() -> None:
+    class RaisingGateway(FakeGateway):
+        async def get_market_data(self, symbol: str):
+            raise RuntimeError("private CLI output")
+
+    context = SentinelRunContext.create(RaisingGateway(), PortfolioPolicy())
+
+    result = asyncio.run(read_market_data(context, "BTCUSDT"))
+
+    assert isinstance(result, ToolDataError)
+    assert result.code == "MARKET_UNAVAILABLE"
+    assert "private CLI output" not in result.message
 
 
 def test_market_reader_skips_usdt_self_pair_without_failing_the_run() -> None:
@@ -328,12 +394,90 @@ def test_controlled_tool_allowlist_contains_no_execution_capability() -> None:
         "view_investor_profile",
         "evaluate_portfolio_risk",
         "propose_trade",
+        "set_market_research_plan",
+        "scan_top_markets",
+        "analyze_market_history",
+        "finalize_market_research",
     ]
     assert not any(
         forbidden in name
         for name in names
         for forbidden in ("order", "execute", "transfer", "withdraw", "cli")
     )
+
+
+def _research_plan(candidate_limit: int = 5) -> MarketResearchPlan:
+    return MarketResearchPlan(
+        candidate_limit=candidate_limit,
+        timeframes=[ResearchTimeframe.H1],
+        lookback_days=1,
+        priorities=[ResearchPriority.MOMENTUM],
+    )
+
+
+def test_market_scan_requires_a_validated_research_plan() -> None:
+    result = asyncio.run(scan_market_candidates(_context()))
+
+    assert isinstance(result, ToolDataError)
+    assert result.code == "RESEARCH_PLAN_REQUIRED"
+
+
+def test_research_flow_only_analyzes_scanned_candidates_and_finalizes_two() -> None:
+    context = _context()
+    stage_market_research_plan(context, _research_plan())
+    scan = asyncio.run(scan_market_candidates(context))
+
+    assert [candidate.symbol for candidate in scan.candidates] == [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "BNBUSDT",
+        "XRPUSDT",
+    ]
+    rejected = asyncio.run(analyze_market_candidate(context, "LINKUSDT"))
+    assert isinstance(rejected, ToolDataError)
+    assert rejected.code == "CANDIDATE_NOT_SCANNED"
+
+    first = asyncio.run(analyze_market_candidate(context, "BTCUSDT"))
+    assert isinstance(first, CandidateResearch)
+
+    second = asyncio.run(analyze_market_candidate(context, "ETHUSDT"))
+    result = finalize_market_research(context)
+
+    assert isinstance(second, CandidateResearch)
+    assert isinstance(result, MarketResearchResult)
+    assert [item.candidate.symbol for item in result.analyzed_candidates] == [
+        "BTCUSDT",
+        "ETHUSDT",
+    ]
+
+
+def test_research_deep_analysis_is_limited_to_five_candidates() -> None:
+    context = _context()
+    stage_market_research_plan(context, _research_plan(candidate_limit=6))
+    asyncio.run(scan_market_candidates(context))
+    for symbol in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]:
+        assert isinstance(
+            asyncio.run(analyze_market_candidate(context, symbol)),
+            CandidateResearch,
+        )
+
+    result = asyncio.run(analyze_market_candidate(context, "ADAUSDT"))
+
+    assert isinstance(result, ToolDataError)
+    assert result.code == "RESEARCH_SCOPE_EXCEEDED"
+
+
+def test_research_finalization_requires_two_verified_candidates() -> None:
+    context = _context()
+    stage_market_research_plan(context, _research_plan())
+    asyncio.run(scan_market_candidates(context))
+    asyncio.run(analyze_market_candidate(context, "BTCUSDT"))
+
+    result = finalize_market_research(context)
+
+    assert isinstance(result, ToolDataError)
+    assert result.code == "RESEARCH_INCOMPLETE"
 
 
 def test_trade_proposal_requires_fresh_observations() -> None:

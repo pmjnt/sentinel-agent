@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
@@ -25,6 +26,17 @@ from app.models.market import MarketData, MarketDataError, Volatility
 from app.models.profile import InvestmentObjective, InvestorProfile
 from app.models.policy import PolicyChange, PolicyField, PortfolioPolicy
 from app.models.portfolio import PortfolioAsset
+from app.models.research import (
+    CandidateResearch,
+    MarketResearchPlan,
+    MarketResearchResult,
+    MarketScan,
+    MarketTicker,
+    ResearchPriority,
+    ResearchTimeframe,
+    TimeframeResearch,
+    TrendDirection,
+)
 from app.services.portfolio_service import calculate_portfolio
 
 
@@ -63,6 +75,49 @@ def _settings() -> Settings:
     )
 
 
+def _research_candidate(symbol: str) -> MarketTicker:
+    return MarketTicker(
+        symbol=symbol,
+        price="100",
+        change_24h_percent="2",
+        quote_volume="1000000",
+        observed_at=datetime(2026, 9, 7, tzinfo=UTC),
+    )
+
+
+def _finalized_research() -> MarketResearchResult:
+    candidates = (_research_candidate("BTCUSDT"), _research_candidate("ETHUSDT"))
+    return MarketResearchResult(
+        plan=MarketResearchPlan(
+            candidate_limit=3,
+            timeframes=[ResearchTimeframe.H1],
+            lookback_days=1,
+            priorities=[ResearchPriority.MOMENTUM],
+        ),
+        scan=MarketScan(
+            candidates=candidates,
+            observed_at=datetime(2026, 9, 7, tzinfo=UTC),
+        ),
+        analyzed_candidates=tuple(
+            CandidateResearch(
+                candidate=candidate,
+                timeframes=(
+                    TimeframeResearch(
+                        timeframe=ResearchTimeframe.H1,
+                        sample_size=24,
+                        return_percent="5",
+                        trend=TrendDirection.BULLISH,
+                        realized_volatility_percent="1.2",
+                        max_drawdown_percent="3",
+                        volume_change_percent="8",
+                    ),
+                ),
+            )
+            for candidate in candidates
+        ),
+    )
+
+
 def test_tool_loop_agent_exposes_only_controlled_tools() -> None:
     agent = create_tool_loop_agent(_settings())
 
@@ -75,6 +130,10 @@ def test_tool_loop_agent_exposes_only_controlled_tools() -> None:
         "view_investor_profile",
         "evaluate_portfolio_risk",
         "propose_trade",
+        "set_market_research_plan",
+        "scan_top_markets",
+        "analyze_market_history",
+        "finalize_market_research",
     ]
     assert agent.output_type is None
     assert agent.model_settings.parallel_tool_calls is False
@@ -97,6 +156,10 @@ def test_tool_loop_instructions_require_grounded_advice() -> None:
     assert "Do not call get_market_data for USDT or USDC" in instructions
     assert "2 to 4" in instructions
     assert "do not ask for optional profile fields" in instructions
+    assert "calm, direct, and evidence-driven" in instructions
+    assert "set_market_research_plan" in instructions
+    assert "finalize_market_research" in instructions
+    assert "willing to disagree" in instructions
 
 
 def test_tool_loop_input_contains_current_validated_policy() -> None:
@@ -354,6 +417,48 @@ def test_agent_cannot_stop_after_reading_financial_data() -> None:
                 PortfolioPolicy(),
             )
         )
+
+
+def test_market_comparison_requires_finalized_research() -> None:
+    async def fake_run(*args: Any, **kwargs: Any):
+        context = kwargs["context"]
+        context.research_plan = MarketResearchPlan(
+            candidate_limit=3,
+            timeframes=[ResearchTimeframe.H1],
+            lookback_days=1,
+            priorities=[ResearchPriority.MOMENTUM],
+        )
+        context.market_scan = MarketScan(
+            candidates=(_research_candidate("BTCUSDT"), _research_candidate("ETHUSDT")),
+            observed_at=datetime(2026, 9, 7, tzinfo=UTC),
+        )
+        return SimpleNamespace(final_output="BTC is my preferred option.")
+
+    with pytest.raises(ModelBehaviorError, match="before market research finalization"):
+        asyncio.run(
+            SentinelToolLoop(_settings(), FakeGateway(), run_agent=fake_run).run(
+                "Compare the strongest Binance markets.",
+                PortfolioPolicy(),
+            )
+        )
+
+
+def test_finalized_market_research_allows_qualitative_judgment() -> None:
+    research = _finalized_research()
+
+    async def fake_run(*args: Any, **kwargs: Any):
+        kwargs["context"].market_research_results.append(research)
+        return SimpleNamespace(final_output="BTC is my preferred option based on momentum.")
+
+    result = asyncio.run(
+        SentinelToolLoop(_settings(), FakeGateway(), run_agent=fake_run).run(
+            "Compare the strongest Binance markets.",
+            PortfolioPolicy(),
+        )
+    )
+
+    assert result.final_text.startswith("BTC is my preferred option")
+    assert result.market_research_results == (research,)
 
 
 def test_tool_data_error_discards_model_financial_claim_instead_of_failing() -> None:
