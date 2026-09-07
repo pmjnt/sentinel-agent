@@ -1,167 +1,135 @@
-# Sentinel Agent
+# Sentinel
 
-Sentinel is a policy-driven AI Agent that analyzes portfolio risk using Binance
-Demo Trading data. It is a Track A project for the Binance Agent OS Mini
-Hackathon and uses the official Binance Skills Hub `binance-cli` integration.
+**A policy-driven AI portfolio agent for safer crypto decision workflows.**
 
-Sentinel can optionally place a tightly constrained Binance Demo Spot order only
-after the user approves an immutable plan in the UI. Demo balances are simulated
-and every response must label them as Binance Demo data.
+Sentinel lets a user describe portfolio goals and safety rules in natural
+language. The Agent reads Binance Demo portfolio and market data, detects policy
+violations, researches liquid Spot markets, explains its judgment, and can
+prepare a tightly controlled Demo trade plan.
 
-## Responsibility boundaries
+The LLM never receives unrestricted trading or shell access. Financial
+calculations, policy checks, approval rules, and execution guards remain in
+deterministic Python.
 
-```text
-The LLM decides which controlled read/policy/evaluation/proposal tool is needed next.
-Binance Skills Hub supplies Demo portfolio and market observations.
-Python calculates allocations, policy violations, proposals, and risk decisions.
-RiskEngine and the execution service enforce deterministic safety rules.
-Python renders authoritative facts; the same LLM adds qualitative interpretation.
-```
+> Built as a Binance Agent OS Mini Hackathon Track A project using the official
+> Binance Skills Hub `binance-cli` integration.
 
-The LLM is not authoritative for arithmetic, thresholds, permissions, approval,
-or trade execution.
+## Why this is an AI Agent
 
-The Agent can call exactly twelve controlled tools. Eight cover portfolio,
-policy, profile, risk evaluation, and proposal; four cover adaptive market
-research: `set_market_research_plan`, `scan_top_markets`,
-`analyze_market_history`, and `finalize_market_research`. `propose_trade` only
-creates a pending plan. There is no order-execution, transfer, withdrawal,
-generic CLI, URL, or arbitrary-code tool available to the LLM.
-
-## Policy-driven agent loop
-
-For:
+A normal chatbot generates a response in one step. Sentinel runs a controlled
+loop:
 
 ```text
-Analyze my BTC exposure and tell me whether it currently looks risky.
+User intent
+    ↓
+LLM chooses the next allowed tool
+    ↓
+Python validates the request and runs the tool
+    ↓
+Verified result returns to the LLM
+    ↓
+LLM chooses another tool or produces a grounded judgment
 ```
 
-Sentinel executes this sequence:
+The LLM provides language understanding, adaptive tool selection, qualitative
+comparison, and user-facing judgment. Python remains authoritative for numbers,
+business rules, formal risk status, approval, and execution.
+
+## Current capabilities
+
+- Conversational portfolio-risk analysis from Binance Demo holdings.
+- Natural-language portfolio policy updates and policy review.
+- Process-local investor preferences such as objective, horizon, acceptable
+  loss, risk tolerance, liquidity need, and excluded assets.
+- Deterministic allocation calculations and policy-violation detection.
+- Deterministic rebalance proposals and Risk Engine decisions.
+- Adaptive Binance Spot USDT research using quote volume and kline history.
+- Deterministic return, trend, realized volatility, maximum drawdown, and volume
+  change calculations.
+- Evidence-grounded recommendations with a clear Sentinel preference.
+- OpenAI and Gemini model routing through LiteLLM with a backend allowlist.
+- Console chat and a chat-first web UI.
+- Server-Sent Events for live, collapsible Agent activity.
+- Structured verified facts separated from LLM interpretation.
+- Immutable Binance Demo trade proposals with a dedicated approval action.
+- Optional, tightly bounded Binance Demo Spot execution and post-order
+  verification.
+
+For the complete current-state reference, read
+[Current Capabilities (Vietnamese)](docs/current-capabilities.md).
+
+## Architecture
 
 ```text
-User
-  ↓
-Sentinel Agent / LLM
-  ├── get_portfolio → trusted Binance Demo holdings
-  ├── get_market_data → trusted Binance Demo market observations
-  ├── update_policy / view_policy → validated working policy
-  ├── update_investor_profile / view_investor_profile → saved preferences
-  └── evaluate_portfolio_risk
-        ├── deterministic allocation and violation checks
-        ├── deterministic rebalance proposal
-        └── RiskEngine → BLOCKED / REQUIRES_APPROVAL / SAFE_TO_PROPOSE
-  └── propose_trade → validated immutable plan, never an order
-  ↓
-Python renders facts/status → LLM interpretation is appended with a label
+Browser / Console
+       │
+       v
+Sentinel Agent (LLM + OpenAI Agents SDK)
+       │ chooses from 12 controlled tools
+       v
+Application orchestration
+       ├── Policy and investor-profile state
+       ├── Portfolio analysis and rebalance services
+       ├── Adaptive market-research service
+       └── Deterministic Risk Engine
+                    │
+                    v
+          Safe Binance CLI Gateway
+                    │
+                    v
+             Binance Demo Trading
 ```
 
-The SDK returns every tool result to the LLM, so it can inspect the observation
-and choose the next safe tool. The LLM may judge whether concentration or market
-conditions deserve attention, but only Python can produce formal calculations,
-plans, and risk status. The LLM cannot select CLI subcommands or URLs.
+The Agent can use only these tool groups:
 
-Policy updates are staged inside one Agent run and committed to the in-memory
-session only after the run succeeds. The earlier `request_interpreter.py`,
-`analysis_reporter.py`, `policy_conversation_service.py`, `sentinel.py`, and
-`app/tools/` paths remain as tested legacy/educational code; `tool_loop.py` and
-`controlled_tools.py` are the active console runtime.
+- Portfolio and market reads.
+- Policy and investor-profile updates/views.
+- Deterministic portfolio evaluation.
+- Demo trade proposal creation.
+- Bounded market-research planning, scanning, history analysis, and
+  finalization.
 
-Recent conversation is also kept in a process-local Agents SDK session so
-follow-ups such as `More growth` can refer to the preceding exchange. Before a
-new run, Sentinel keeps at most 16 user/assistant messages and removes old
-tool calls and tool results. A fresh `SentinelRunContext` and fresh Binance reads
-remain mandatory for current financial analysis. Conversation, policy, and
-investor-profile state are lost when the process stops.
+There is no generic CLI, arbitrary URL, arbitrary code, transfer, withdrawal,
+or direct order-execution tool available to the LLM.
 
-The investor profile stores only preferences explicitly stated in chat:
-objective, time horizon, risk tolerance, acceptable loss, liquidity need, and
-excluded assets. It is neither portfolio data nor permission to trade.
-
-After successful analysis, the LLM chooses a natural response structure in the
-user's language. It may use short paragraphs, headings, bullets, or numbered
-choices; fixed headings are not required. Concrete asset or percentage
-allocations require the user's objective, time horizon, and risk
-tolerance/acceptable loss.
-
-## Adaptive Binance market research
-
-For opportunity, allocation-candidate, or market-comparison requests, the LLM
-chooses a bounded research recipe based on the user's goal: candidate count,
-one or two timeframes, lookback, and priorities such as momentum, liquidity,
-downside control, or volatility opportunity. Pydantic rejects recipes outside
-these limits:
-
-- 3–10 candidates in the volume scan;
-- 1–2 timeframes from `15m`, `1h`, `4h`, and `1d`;
-- 1–90 lookback days and 20–1,000 candles per timeframe;
-- no more than five candidates receive deep historical analysis;
-- at least two successful analyses are required before comparison.
-
-Only one research plan may be created in an Agent run. Failed candidates and
-retries count toward the five-candidate cap, and a finalized result is immutable.
-
-Python retrieves the eligible Binance Spot USDT universe, ranks it by verified
-quote volume, and calculates return, trend, realized volatility, maximum
-drawdown, and volume change from klines. The LLM reads those summaries, chooses
-which scanned candidates deserve deeper inspection, compares the evidence, and
-states Sentinel's preferred option. It may disagree with the user's initial
-idea, but it cannot fabricate indicators or analyze an unscanned token.
-
-Research is fresh run-scoped evidence, not permanent truth. The scan carries a
-Binance observation timestamp. Raw candles stay on the backend and are never
-shown in activity events or sent to the browser.
-
-The gateway rejects ticker snapshots older than 15 minutes and kline responses
-that are incomplete, duplicated, non-contiguous, on the wrong interval, or too
-old for the selected timeframe. This prevents a nominal 90-day plan from being
-presented using only a small or stale sample.
-
-To keep sequential tool use bounded, one request may inspect at most 20 market
-symbols. Larger scopes fail closed and should be split into smaller requests.
-
-## Project structure
+## Safety model
 
 ```text
-sentinel-agent/
-├── app/
-│   ├── agent/             # Active tool loop, controlled tools, prompts/context
-│   ├── api.py             # FastAPI routes, SSE encoding, static UI
-│   ├── application.py     # End-to-end conversational orchestration
-│   ├── bootstrap.py       # Runtime dependency composition
-│   ├── binance/           # Safe CLI runner, response schemas, gateway
-│   ├── execution/         # In-memory immutable plan lifecycle
-│   ├── models/            # Pydantic domain models
-│   ├── model_catalog.py   # Backend allowlist for selectable LLM routes
-│   ├── services/          # Deterministic policy/planning/risk logic
-│   ├── tools/             # Legacy two-tool educational example
-│   ├── config.py
-│   ├── gateways.py
-│   └── sessions.py
-├── tests/                 # Offline tests; no Binance or LLM calls
-├── web/                   # Chat-first UI with per-response Agent Pulse
-├── docs/
-├── main.py
-└── requirements.txt
+AI understands and recommends.
+Python calculates and validates.
+Risk Engine blocks unsafe plans.
+The user explicitly approves.
+The execution service revalidates.
+Binance Demo executes and confirms.
 ```
 
-More detail:
+Important hard limits:
 
-- [Sổ tay kiến trúc và mã nguồn hiện tại](docs/sentinel-project-guide.html)
-- [Architecture](docs/architecture.md)
-- [Development guidelines](docs/development-guidelines.md)
-- [Agent guidelines](docs/agent-guidelines.md)
-- [Testing guidelines](docs/testing.md)
-- [Binance Skills Hub setup](docs/binance-skills-hub.md)
-- [Vietnamese SRD guide — historical MCP design](docs/sentinel-srd-guide.html)
+- Binance Demo only; production Binance is rejected.
+- Demo execution is disabled by default.
+- MARKET BUY/SELL only.
+- Every order requires a dedicated explicit approval action, separate from chat.
+- Hard order value range: 10–100 USDT.
+- Plans expire after five minutes.
+- BTC, ETH, BNB, SOL, XRP, ADA, and DOGE USDT pairs use normal approval.
+- Another valid Spot USDT token requires a separate plan-scoped token approval
+  before order approval.
+- Policy rules may make execution stricter, never weaker than hard limits.
+- No response claims success until Binance returns and confirms `FILLED`.
+
+A recommendation is not approval, and a trade proposal is not an executed
+order.
 
 ## Requirements
 
 - Python 3.12
-- Official `binance-cli` 2.1.1 (the version validated by this project)
-- A Binance Demo Trading API key for portfolio reads
-- An OpenAI or Gemini API key for the LLM
+- Official `binance-cli` 2.1.1
+- A Binance Demo Trading API key
+- An OpenAI API key, a Gemini API key, or both
 
-## Python setup
+## Quick start
+
+### 1. Create a virtual environment
 
 ```bash
 python3.12 -m venv .venv
@@ -169,10 +137,9 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-## Install the official Binance CLI
+### 2. Install the official Binance CLI
 
-For security, download and inspect the official installer instead of piping
-network output directly into a shell:
+Download and inspect the installer before running it:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -L \
@@ -183,10 +150,7 @@ sh /tmp/binance-cli-installer.sh
 binance-cli --version
 ```
 
-The source and releases belong to the official
-[binance/binance-cli](https://github.com/binance/binance-cli) repository.
-
-## Configure `.env`
+### 3. Configure environment variables
 
 ```bash
 cp .env.example .env
@@ -197,164 +161,35 @@ Gemini example:
 ```dotenv
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash-lite
-LLM_ALLOWED_MODELS=gemini/gemini-3.5-flash-lite,openai/gpt-5.6-luna
+LLM_ALLOWED_MODELS=gemini/gemini-3.5-flash-lite,openai/gpt-5.4-mini
 LLM_MAX_TOKENS=4096
-GEMINI_API_KEY=your_gemini_api_key
+GEMINI_API_KEY=your_gemini_api_key_here
 
 BINANCE_API_ENV=demo
 BINANCE_CLI_PATH=binance-cli
-BINANCE_API_KEY=your_demo_api_key
-BINANCE_SECRET_KEY=your_demo_secret_key
+BINANCE_API_KEY=your_demo_api_key_here
+BINANCE_SECRET_KEY=your_demo_secret_key_here
 SENTINEL_DEMO_EXECUTION_ENABLED=false
 ```
 
-OpenAI example:
-
-```dotenv
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-5.6-luna
-LLM_ALLOWED_MODELS=openai/gpt-5.6-luna,gemini/gemini-3.5-flash-lite
-LLM_MAX_TOKENS=4096
-OPENAI_API_KEY=your_openai_api_key
-```
-
-`LLM_MODEL` contains the provider model ID. Sentinel constructs the LiteLLM
-route, for example:
+For OpenAI, set `LLM_PROVIDER=openai`, choose an allowed OpenAI model, and set
+`OPENAI_API_KEY`. LiteLLM builds routes such as:
 
 ```text
 gemini + gemini-3.5-flash-lite
 → litellm/gemini/gemini-3.5-flash-lite
 ```
 
-`LLM_MAX_TOKENS` is the maximum model output budget used by every Agent.
-Sentinel omits provider-specific reasoning options. For GPT-5.4 Mini, `none` is
-already the OpenAI default; omitting the redundant parameter also keeps
-LiteLLM on its stable tool-calling path.
+Never commit `.env`. API keys are used only by the backend and are never
+returned to the browser.
 
-`LLM_ALLOWED_MODELS` is a backend allowlist, not a live provider-model fetch.
-Only routes whose provider key is configured are returned by `GET /api/models`;
-the endpoint never returns credentials. The browser includes the chosen
-`provider` and `model` in `POST /api/chat/stream`, and the backend rejects any
-route outside the allowlist.
-
-For short-lived local troubleshooting only, enable verbose LiteLLM logs:
-
-```dotenv
-LITELLM_DEBUG=true
-```
-
-Restart `python main.py` after changing the flag. Debug output can include the
-prompt, current policy, portfolio context, and request body. Do not commit the
-flag as enabled and do not share debug logs publicly. Set it back to `false`
-after diagnosing the provider error.
-
-Never commit `.env`. Never paste Binance credentials into chat or frontend
-code. Use keys created in Binance Demo Trading, not production credentials.
-
-## Binance command boundary
-
-Sentinel's gateway contains a fixed allowlist:
-
-```text
-spot get-account --omit-zero-balances true
-spot ticker-price
-spot ticker24hr --symbol <validated symbol>
-spot depth --symbol <validated symbol> --limit 100
-spot exchange-info --symbol <validated symbol> --show-permission-sets false
-spot exchange-info --symbol-status TRADING --show-permission-sets false
-spot ticker24hr --symbols <validated JSON batch, at most 100> --type FULL
-spot klines --symbol <scanned symbol> --interval <validated timeframe> --limit <1..1000>
-```
-
-When Demo execution is explicitly enabled, the separate execution service may
-also use only:
-
-```text
-spot new-order --symbol <Binance-verified Spot USDT symbol> --side <BUY|SELL> --type MARKET ...
-spot get-order --symbol <validated symbol> --orig-client-order-id <plan client id>
-```
-
-There is no generic `binance-cli request`, cancel, transfer, withdrawal,
-derivatives, or production-Binance code path.
-
-## Controlled Demo execution
-
-Execution is disabled by default. To try it, create a Binance Demo API key with
-Spot trading permission and set:
-
-```dotenv
-SENTINEL_DEMO_EXECUTION_ENABLED=true
-```
-
-Hard application limits cannot be loosened in chat:
-
-- Binance Demo only;
-- normal approval for `BTCUSDT`, `ETHUSDT`, `BNBUSDT`, `SOLUSDT`, `XRPUSDT`,
-  `ADAUSDT`, and `DOGEUSDT`;
-- another token requires Binance `exchange-info` validation and a separate,
-  plan-scoped token-exception approval;
-- MARKET BUY/SELL only;
-- 10–100 USDT per order;
-- explicit approval for every order;
-- plan expires after five minutes.
-
-Policy chat may make these limits stricter using maximum trade value, maximum
-estimated slippage, allowed symbols, allocation limits, stablecoin reserve, and
-high-volatility blocking. The flow is:
-
-```text
-LLM reads fresh data → Python validates → LLM proposes PLAN-ID
-→ for a non-default token, user first approves that token exception
-→ user separately approves the Demo order → Python reads fresh data and validates again
-→ gateway submits one Demo order → gateway queries order
-→ only FILLED becomes EXECUTED → portfolio is refreshed
-```
-
-The plan ID becomes Binance's client order ID, so retrying an already completed
-approval returns the saved result instead of submitting another order. Automated
-tests always use fake gateways and never send orders.
-
-A recommendation is not approval. Research may recommend an asset and
-`propose_trade` may create a plan, but neither sends an order. Approval must come
-from the dedicated UI action. Execution then re-reads and re-validates market,
-balance, symbol, policy, expiry, and risk conditions before the separate
-execution gateway can submit one Binance Demo order.
-
-## Run
+## Run the console
 
 ```bash
 python main.py
 ```
 
-Try analysis:
-
-```text
-Sentinel > Analyze my BTC exposure and tell me whether it currently looks risky.
-```
-
-Try policy chat:
-
-```text
-Sentinel > Giữ ít nhất 30% USDT, không asset nào trên 40%, chặn rebalance khi volatility HIGH, rồi phân tích portfolio.
-Sentinel > Xem policy hiện tại.
-```
-
-Try general chat:
-
-```text
-Sentinel > Xin chào.
-```
-
-Try adaptive research:
-
-```text
-Sentinel > Scan the strongest Binance markets for 1-month growth and compare the best options.
-```
-
-Policy and short conversation history are kept per console session in memory
-and are lost when the process stops.
-
-Type `exit` to close the console.
+Type `exit` to close the application.
 
 ## Run the web UI
 
@@ -362,64 +197,106 @@ Type `exit` to close the console.
 uvicorn app.api:create_app --factory --reload
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The browser sends chat to
-`POST /api/chat/stream`. The compact header picker shows routes returned by
-`GET /api/models`; API keys never reach the browser. Changing the model keeps
-the same `session_id`, so conversation, policy, and investor profile continue.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-The endpoint emits named SSE events:
+The UI provides a compact model selector, streaming Agent activity, structured
+verified facts, natural-language responses, and dedicated approval/rejection
+buttons for Demo plans.
 
-```text
-activity   → safe STARTED/COMPLETED tool progress
-text_delta → validated AI interpretation chunks
-completed  → typed JSON with policy, profile, analysis, market research, activity, execution state
-error      → generic safe failure message
-```
-
-Tool arguments, raw results, chain-of-thought, and credentials are not placed in
-activity events. Model prose is buffered until safety validation passes, so
-activity appears live while answer chunks begin after validation.
-
-Each assistant response owns a small collapsible **Agent Pulse**. It shows only
-safe tool/activity status from the backend; it is not model reasoning or hidden
-chain-of-thought.
-
-Completed research also appears in the collapsible **Verified tool facts** panel:
-plan, scan time, quote-volume candidates, deterministic indicators, and failed
-symbols. The UI maps this typed data directly and never parses LLM prose as facts.
-
-When the Agent creates a valid proposal, the response also includes a compact
-Demo order card. **Approve Demo order** and **Reject** call dedicated endpoints;
-approval is not inferred from ordinary chat text.
-
-Default tokens use `POST /api/plans/{plan_id}/approve`. A valid token outside
-the default set first uses `POST /api/plans/{plan_id}/approve-symbol`; this only
-moves that exact, unexpired plan to `PENDING_APPROVAL`. It does not submit an
-order. The user must then click **Approve Demo order**, and all market, policy,
-balance, and Binance symbol checks run again before submission.
-
-Try profile chat:
+## Example prompts
 
 ```text
-My objective is growth, my horizon is 3 years, and I accept a 20% decline.
-Show my investor profile.
-Analyze my portfolio and suggest a direction consistent with my profile.
+Analyze my BTC exposure and tell me whether it currently looks risky.
+
+Keep at least 30% in USDT, no asset above 40%, and block rebalancing during high volatility. Then analyze my portfolio.
+
+My goal is growth for 12 months and I accept a 20% decline. Give me several options.
+
+Scan the strongest Binance markets for one-month growth and compare the best candidates.
+
+Propose a 50 USDT BTC Demo purchase.
 ```
 
-## Test
+## API and streaming
+
+Main endpoints:
+
+```text
+GET  /api/models
+POST /api/chat/stream
+POST /api/plans/{plan_id}/approve-symbol
+POST /api/plans/{plan_id}/approve
+POST /api/plans/{plan_id}/reject
+```
+
+The chat endpoint emits safe SSE events:
+
+```text
+activity   → STARTED / COMPLETED / FAILED tool progress
+text_delta → validated LLM interpretation chunks
+completed  → typed policy, profile, analysis, research, activity, and execution data
+error      → sanitized failure message
+```
+
+Raw prompts, secrets, tool arguments, raw Binance responses, raw candles, and
+hidden chain-of-thought are not exposed in the activity timeline.
+
+## Testing
 
 ```bash
 python -m pytest -q
 node --test tests/test_ui.js
 python -m compileall -q app main.py tests
+git diff --check
 ```
 
-Tests use fake gateways and fake subprocesses. They never call Binance, OpenAI,
-Gemini, or a real CLI process.
+Tests use fake gateways and fake subprocesses. The automated suite does not call
+OpenAI, Gemini, Binance, or a real CLI process, and it never places an order.
 
-## What gets replaced later?
+## Project structure
 
-`BinanceCliGateway` is behind application-owned read and Demo-execution
-protocols. If Binance later supports Sentinel as a direct MCP client, a new MCP
-gateway can implement those protocols without changing the Agent, domain models,
-or deterministic services.
+```text
+sentinel-agent/
+├── app/
+│   ├── agent/       # Active Agent loop, prompts, tools, context, memory, streaming
+│   ├── binance/     # Fixed-command CLI runner, schemas, and Demo gateway
+│   ├── execution/   # Immutable plan store and lifecycle
+│   ├── models/      # Pydantic domain and API models
+│   ├── services/    # Deterministic policy, analysis, research, risk, and execution
+│   ├── api.py       # FastAPI, SSE, plan endpoints, static UI hosting
+│   ├── application.py
+│   ├── bootstrap.py
+│   ├── config.py
+│   └── sessions.py
+├── docs/
+├── tests/
+├── web/
+├── main.py
+└── requirements.txt
+```
+
+## Documentation
+
+- [Current capabilities — Vietnamese](docs/current-capabilities.md)
+- [Agent guidelines](docs/agent-guidelines.md)
+- [Development guidelines](docs/development-guidelines.md)
+- [Testing guidelines](docs/testing.md)
+
+## Current limitations
+
+- Portfolio, policy, profile, and execution features use Binance Demo only.
+- Conversation, policy, investor profile, and pending plans are stored in memory
+  and are lost when the process stops.
+- Binance MCP is not connected; Sentinel currently uses the official Binance CLI.
+- Market research uses Binance market/volume/kline data only; it does not yet use
+  news, on-chain data, sentiment feeds, or predictive ML models.
+- Execution requires the dedicated approval endpoint/action used by the UI; chat
+  text alone never grants approval.
+- Sentinel does not support withdrawals, transfers, derivatives, autonomous
+  continuous monitoring, or unrestricted autonomous trading.
+
+## Disclaimer
+
+Sentinel is an educational and hackathon project. It uses simulated Binance Demo
+Trading data and does not provide guaranteed financial outcomes. Nothing in this
+project is an offer, solicitation, or promise of investment performance.
