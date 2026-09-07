@@ -72,6 +72,10 @@ candle/timeframe và tối đa 5 deep analyses. LLM không được phân tích 
 scan, gọi CLI tùy ý hoặc tự tính authoritative indicator. High volume chỉ là bộ
 lọc thanh khoản, không tự động có nghĩa là cơ hội tốt.
 
+Mỗi run chỉ được set một plan. Candidate thất bại/retry vẫn tính vào cap 5.
+Sau finalize, snapshot bị khóa và không được thêm candidate. Gateway yêu cầu đủ
+số candle, đúng interval, liên tục và còn mới; ticker scan quá 15 phút bị từ chối.
+
 Runtime từ chối final answer nếu Agent đã bắt đầu research nhưng chưa
 `finalize_market_research`. Ít nhất hai candidate thành công mới được so sánh.
 Lỗi một candidate được ghi nhận; lỗi scan bắt buộc làm request fail-closed.

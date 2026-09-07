@@ -76,6 +76,29 @@ def test_tracker_maps_market_research_tools_to_safe_activity_kinds() -> None:
         assert tool_name not in started.message
 
 
+def test_tracker_marks_serialized_tool_error_as_failed() -> None:
+    tracker = ToolActivityTracker()
+    tracker.consume(
+        _event(
+            "tool_called",
+            SimpleNamespace(tool_name="scan_top_markets", call_id="call-error"),
+        )
+    )
+
+    completed = tracker.consume(
+        _event(
+            "tool_output",
+            SimpleNamespace(
+                call_id="call-error",
+                output='{"status":"ERROR","message":"private details"}',
+            ),
+        )
+    )
+
+    assert completed.status is ActivityStatus.FAILED
+    assert "private details" not in completed.message
+
+
 def test_tool_loop_stream_emits_activity_and_validated_completion() -> None:
     class FakeStreamResult:
         final_output = "Hello from Sentinel."

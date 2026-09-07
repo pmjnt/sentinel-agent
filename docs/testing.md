@@ -133,6 +133,8 @@ Không copy credential, account ID hoặc Binance response chưa làm sạch và
 Research fixtures phải dùng timestamp cố định, ít nhất 20 candles và `Decimal`
 từ string. Gateway tests chỉ fake kết quả CLI; chúng phải xác nhận batching tối
 đa 100 symbol, kline limit tối đa 1.000 và không thực thi process/network thật.
+Các regression test phải bao phủ incomplete/stale/duplicate kline, retry thất bại
+vẫn tính vào cap và finalized research không thể bị thay đổi.
 
 Không test bằng lệnh order thật. Luồng approval/execution luôn dùng fake gateway;
 pytest không được phụ thuộc vào Binance Demo balance hoặc trạng thái thị trường.

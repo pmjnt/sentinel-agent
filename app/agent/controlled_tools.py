@@ -396,12 +396,13 @@ async def propose_trade_plan(
 def stage_market_research_plan(
     context: SentinelRunContext,
     plan: MarketResearchPlan,
-) -> MarketResearchPlan:
+) -> MarketResearchPlan | ToolDataError:
+    if context.research_plan is not None:
+        return ToolDataError(
+            code="RESEARCH_PLAN_ALREADY_SET",
+            message="The market research plan is fixed for this Agent run.",
+        )
     context.research_plan = plan
-    context.market_scan = None
-    context.research_by_symbol.clear()
-    context.research_failed_symbols.clear()
-    context.market_research_results.clear()
     context.ordered_events.append(ResearchPlanSetEvent(plan))
     return plan
 
@@ -450,6 +451,11 @@ async def analyze_market_candidate(
             code="MARKET_SCAN_REQUIRED",
             message="Scan verified Binance markets before analyzing history.",
         )
+    if context.market_research_results:
+        return ToolDataError(
+            code="RESEARCH_FINALIZED",
+            message="Market research is already finalized for this Agent run.",
+        )
     candidate = next(
         (
             item
@@ -465,11 +471,17 @@ async def analyze_market_candidate(
         )
     if normalized in context.research_by_symbol:
         return context.research_by_symbol[normalized]
-    if len(context.research_by_symbol) >= MAX_DEEP_RESEARCH_CANDIDATES:
+    if normalized in context.research_failed_symbols:
+        return ToolDataError(
+            code="MARKET_HISTORY_UNAVAILABLE",
+            message=f"Market history could not be verified for {normalized}.",
+        )
+    if len(context.research_attempted_symbols) >= MAX_DEEP_RESEARCH_CANDIDATES:
         return ToolDataError(
             code="RESEARCH_SCOPE_EXCEEDED",
             message="Deep market research is limited to five candidates per run.",
         )
+    context.research_attempted_symbols.add(normalized)
 
     try:
         candle_sets = await asyncio.gather(
@@ -511,6 +523,8 @@ async def analyze_market_candidate(
 def finalize_market_research(
     context: SentinelRunContext,
 ) -> MarketResearchResult | ToolDataError:
+    if context.market_research_results:
+        return context.market_research_results[-1]
     if context.research_plan is None or context.market_scan is None:
         return ToolDataError(
             code="MARKET_SCAN_REQUIRED",
@@ -620,7 +634,7 @@ async def set_market_research_plan(
     timeframes: list[ResearchTimeframe],
     lookback_days: int,
     priorities: list[ResearchPriority],
-) -> MarketResearchPlan:
+) -> MarketResearchPlan | ToolDataError:
     """Set a bounded Binance market-research recipe for this Agent run."""
     return stage_market_research_plan(
         ctx.context,

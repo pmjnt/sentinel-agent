@@ -97,6 +97,9 @@ these limits:
 - no more than five candidates receive deep historical analysis;
 - at least two successful analyses are required before comparison.
 
+Only one research plan may be created in an Agent run. Failed candidates and
+retries count toward the five-candidate cap, and a finalized result is immutable.
+
 Python retrieves the eligible Binance Spot USDT universe, ranks it by verified
 quote volume, and calculates return, trend, realized volatility, maximum
 drawdown, and volume change from klines. The LLM reads those summaries, chooses
@@ -107,6 +110,11 @@ idea, but it cannot fabricate indicators or analyze an unscanned token.
 Research is fresh run-scoped evidence, not permanent truth. The scan carries a
 Binance observation timestamp. Raw candles stay on the backend and are never
 shown in activity events or sent to the browser.
+
+The gateway rejects ticker snapshots older than 15 minutes and kline responses
+that are incomplete, duplicated, non-contiguous, on the wrong interval, or too
+old for the selected timeframe. This prevents a nominal 90-day plan from being
+presented using only a small or stale sample.
 
 To keep sequential tool use bounded, one request may inspect at most 20 market
 symbols. Larger scopes fail closed and should be split into smaller requests.

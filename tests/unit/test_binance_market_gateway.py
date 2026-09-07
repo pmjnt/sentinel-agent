@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 import json
 from typing import Any
@@ -19,6 +19,9 @@ from app.models.market import MarketData, MarketDataError, Volatility
 from app.models.source import DataSource
 from app.models.symbol import TradingSymbolInfo, TradingSymbolInfoError
 from app.models.research import ResearchTimeframe
+
+
+NOW = datetime(2026, 9, 7, 11, 0, tzinfo=UTC)
 
 
 class FakeRunner:
@@ -89,6 +92,29 @@ def _bulk_ticker(symbol: str, volume: str, close_time: int = 1788778799999):
     }
 
 
+def _kline_series(count: int, interval: timedelta = timedelta(hours=1)):
+    interval_ms = int(interval.total_seconds() * 1000)
+    last_open = int((NOW - interval).timestamp() * 1000)
+    first_open = last_open - (count - 1) * interval_ms
+    return [
+        [
+            first_open + index * interval_ms,
+            "100",
+            "110",
+            "90",
+            "105",
+            "12",
+            first_open + (index + 1) * interval_ms - 1,
+            "1250",
+            100,
+            "6",
+            "625",
+            "0",
+        ]
+        for index in range(count)
+    ]
+
+
 def test_market_universe_uses_verified_spot_usdt_symbols_and_bulk_tickers() -> None:
     exchange = {
         "symbols": [
@@ -101,7 +127,7 @@ def test_market_universe_uses_verified_spot_usdt_symbols_and_bulk_tickers() -> N
     runner = FakeRunner(
         [exchange, [_bulk_ticker("BTCUSDT", "500"), _bulk_ticker("ETHUSDT", "300")]]
     )
-    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO, clock=lambda: NOW)
 
     result = asyncio.run(gateway.get_market_universe())
 
@@ -141,7 +167,7 @@ def test_market_universe_batches_at_most_one_hundred_symbols() -> None:
             [_bulk_ticker(symbols[100], "1")],
         ]
     )
-    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO, clock=lambda: NOW)
 
     result = asyncio.run(gateway.get_market_universe())
 
@@ -153,33 +179,14 @@ def test_market_universe_batches_at_most_one_hundred_symbols() -> None:
 
 
 def test_maps_binance_kline_array_to_market_candle() -> None:
-    runner = FakeRunner(
-        [
-            [
-                [
-                    1788771600000,
-                    "100",
-                    "110",
-                    "90",
-                    "105",
-                    "12",
-                    1788775199999,
-                    "1250",
-                    100,
-                    "6",
-                    "625",
-                    "0",
-                ]
-            ]
-        ]
-    )
-    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+    runner = FakeRunner([_kline_series(20, timedelta(hours=4))])
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO, clock=lambda: NOW)
 
     result = asyncio.run(
-        gateway.get_market_candles("BTCUSDT", ResearchTimeframe.H4, 180)
+        gateway.get_market_candles("BTCUSDT", ResearchTimeframe.H4, 20)
     )
 
-    assert len(result) == 1
+    assert len(result) == 20
     assert result[0].close == Decimal("105")
     assert result[0].quote_volume == Decimal("1250")
     assert runner.calls == [
@@ -192,11 +199,73 @@ def test_maps_binance_kline_array_to_market_candle() -> None:
                 "--interval",
                 "4h",
                 "--limit",
-                "180",
+                "20",
             ),
             False,
         )
     ]
+
+
+def test_market_universe_rejects_stale_ticker_snapshot() -> None:
+    stale = int((NOW - timedelta(hours=1)).timestamp() * 1000)
+    runner = FakeRunner(
+        [
+            {"symbols": [_exchange_symbol("BTCUSDT")]},
+            [_bulk_ticker("BTCUSDT", "500", close_time=stale)],
+        ]
+    )
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO, clock=lambda: NOW)
+
+    with pytest.raises(BinanceDataError, match="market universe"):
+        asyncio.run(gateway.get_market_universe())
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        _kline_series(19),
+        [*_kline_series(19), _kline_series(19)[-1]],
+        [
+            [
+                *row[:6],
+                row[6] - 3 * 24 * 60 * 60 * 1000,
+                *row[7:],
+            ]
+            for row in _kline_series(20)
+        ],
+    ],
+    ids=["incomplete", "duplicate", "invalid-close-spacing"],
+)
+def test_market_candles_reject_incomplete_or_malformed_coverage(payload) -> None:
+    gateway = BinanceCliGateway(
+        FakeRunner([payload]),
+        BinanceEnvironment.DEMO,
+        clock=lambda: NOW,
+    )
+
+    with pytest.raises(BinanceDataError, match="candles could not be verified"):
+        asyncio.run(
+            gateway.get_market_candles("BTCUSDT", ResearchTimeframe.H1, 20)
+        )
+
+
+def test_market_candles_reject_stale_history() -> None:
+    stale = _kline_series(20)
+    offset = 7 * 24 * 60 * 60 * 1000
+    stale = [
+        [row[0] - offset, *row[1:6], row[6] - offset, *row[7:]]
+        for row in stale
+    ]
+    gateway = BinanceCliGateway(
+        FakeRunner([stale]),
+        BinanceEnvironment.DEMO,
+        clock=lambda: NOW,
+    )
+
+    with pytest.raises(BinanceDataError, match="candles could not be verified"):
+        asyncio.run(
+            gateway.get_market_candles("BTCUSDT", ResearchTimeframe.H1, 20)
+        )
 
 
 @pytest.mark.parametrize("limit", [0, 1001])

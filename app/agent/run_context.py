@@ -102,6 +102,7 @@ class SentinelRunContext:
     market_scan: MarketScan | None = None
     research_by_symbol: dict[str, CandidateResearch] = field(default_factory=dict)
     research_failed_symbols: list[str] = field(default_factory=list)
+    research_attempted_symbols: set[str] = field(default_factory=set)
     market_research_results: list[MarketResearchResult] = field(default_factory=list)
     session_id: str = "default"
 

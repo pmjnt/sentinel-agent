@@ -1,5 +1,6 @@
 from decimal import Decimal
-from datetime import UTC, datetime
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 import json
 import logging
 import re
@@ -47,6 +48,14 @@ _KLINES = TypeAdapter(list[KlinePayload])
 _MARKET_SYMBOL = re.compile(r"^[A-Z0-9]{5,20}$")
 _REFERENCE_TRADE_USD = Decimal("1000")
 LOGGER = logging.getLogger(__name__)
+_TICKER_MAX_AGE = timedelta(minutes=15)
+_FUTURE_TOLERANCE = timedelta(minutes=1)
+_TIMEFRAME_DELTA = {
+    ResearchTimeframe.M15: timedelta(minutes=15),
+    ResearchTimeframe.H1: timedelta(hours=1),
+    ResearchTimeframe.H4: timedelta(hours=4),
+    ResearchTimeframe.D1: timedelta(days=1),
+}
 
 
 class InsufficientDepthError(ValueError):
@@ -97,11 +106,13 @@ class BinanceCliGateway:
         self,
         runner: JsonCommandRunner,
         environment: BinanceEnvironment,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._runner = runner
         if environment is not BinanceEnvironment.DEMO:
             raise ValueError("Sentinel currently supports Binance Demo only.")
         self._data_source = DataSource.BINANCE_DEMO
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     async def get_portfolio(self) -> Portfolio:
         try:
@@ -296,6 +307,13 @@ class BinanceCliGateway:
                 payloads = _BULK_TICKERS.validate_python(ticker_raw)
                 if {payload.symbol for payload in payloads} != set(batch):
                     raise ValueError("Binance ticker batch did not match the request.")
+                observed_now = self._clock()
+                for payload in payloads:
+                    _require_fresh_timestamp(
+                        datetime.fromtimestamp(payload.close_time / 1000, tz=UTC),
+                        observed_now,
+                        _TICKER_MAX_AGE,
+                    )
                 tickers.extend(
                     MarketTicker(
                         symbol=payload.symbol,
@@ -344,9 +362,14 @@ class BinanceCliGateway:
                 normalized,
             )
             payloads = _KLINES.validate_python(raw)
-            if not payloads:
-                raise ValueError("Binance returned no market candles.")
-            return tuple(_market_candle(payload) for payload in payloads)
+            candles = tuple(_market_candle(payload) for payload in payloads)
+            _require_complete_candle_coverage(
+                candles,
+                timeframe=timeframe,
+                requested_limit=limit,
+                observed_now=self._clock(),
+            )
+            return candles
         except (BinanceCliError, ValidationError, ValueError) as error:
             raise BinanceDataError(
                 f"Binance market candles could not be verified for {normalized}."
@@ -499,6 +522,42 @@ def _market_candle(payload: KlinePayload) -> MarketCandle:
         close=close,
         volume=volume,
         quote_volume=quote_volume,
+    )
+
+
+def _require_fresh_timestamp(
+    observed_at: datetime,
+    observed_now: datetime,
+    max_age: timedelta,
+) -> None:
+    if observed_at.tzinfo is None or observed_now.tzinfo is None:
+        raise ValueError("Market timestamps must include a timezone.")
+    age = observed_now - observed_at
+    if age > max_age or age < -_FUTURE_TOLERANCE:
+        raise ValueError("Binance market timestamp is outside the freshness window.")
+
+
+def _require_complete_candle_coverage(
+    candles: tuple[MarketCandle, ...],
+    *,
+    timeframe: ResearchTimeframe,
+    requested_limit: int,
+    observed_now: datetime,
+) -> None:
+    if len(candles) != requested_limit:
+        raise ValueError("Binance candle coverage did not match the request.")
+    interval = _TIMEFRAME_DELTA[timeframe]
+    expected_duration = interval - timedelta(milliseconds=1)
+    for candle in candles:
+        if candle.close_time - candle.open_time != expected_duration:
+            raise ValueError("Binance candle duration did not match the timeframe.")
+    for previous, current in zip(candles, candles[1:]):
+        if current.open_time - previous.open_time != interval:
+            raise ValueError("Binance candle sequence was not contiguous.")
+    _require_fresh_timestamp(
+        candles[-1].open_time,
+        observed_now,
+        interval * 2,
     )
 
 

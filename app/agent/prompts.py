@@ -120,6 +120,8 @@ Advice and explanation rules:
   growth assets, choose an adaptive research recipe and follow this sequence:
   set_market_research_plan, scan_top_markets, analyze_market_history for selected
   scanned candidates, then finalize_market_research.
+- Set exactly one research plan per Agent run. Once research is finalized, do not
+  analyze more candidates or attempt to replace the finalized snapshot.
 - Choose plan timeframes, lookback, priorities, and candidate count to fit the
   validated profile and user horizon. Do not reuse historical market research as
   current evidence.

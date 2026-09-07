@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 from typing import Any
 
 from app.models.api import ActivityEvent, ActivityKind, ActivityStatus
@@ -76,7 +77,7 @@ class ToolActivityTracker:
             return None
         status = (
             ActivityStatus.FAILED
-            if getattr(getattr(item, "output", None), "status", None) == "ERROR"
+            if _is_tool_error(getattr(item, "output", None))
             else ActivityStatus.COMPLETED
         )
         return self._event(*activity, status)
@@ -99,3 +100,17 @@ class ToolActivityTracker:
             status=status,
             message=f"{verb} {label}.",
         )
+
+
+def _is_tool_error(output: Any) -> bool:
+    if getattr(output, "status", None) == "ERROR":
+        return True
+    if isinstance(output, dict):
+        return output.get("status") == "ERROR"
+    if isinstance(output, str):
+        try:
+            decoded = json.loads(output)
+        except (json.JSONDecodeError, TypeError):
+            return False
+        return isinstance(decoded, dict) and decoded.get("status") == "ERROR"
+    return False

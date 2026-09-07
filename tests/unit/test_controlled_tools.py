@@ -468,6 +468,50 @@ def test_research_deep_analysis_is_limited_to_five_candidates() -> None:
     assert result.code == "RESEARCH_SCOPE_EXCEEDED"
 
 
+def test_failed_deep_analysis_attempts_still_count_toward_run_limit() -> None:
+    class FailingHistoryGateway(FakeGateway):
+        def __init__(self) -> None:
+            super().__init__()
+            self.history_calls: list[str] = []
+
+        async def get_market_candles(self, symbol, timeframe, limit):
+            self.history_calls.append(symbol)
+            raise RuntimeError("unavailable")
+
+    gateway = FailingHistoryGateway()
+    context = SentinelRunContext.create(gateway, PortfolioPolicy())
+    stage_market_research_plan(context, _research_plan(candidate_limit=6))
+    asyncio.run(scan_market_candidates(context))
+    for symbol in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]:
+        result = asyncio.run(analyze_market_candidate(context, symbol))
+        assert isinstance(result, ToolDataError)
+        assert result.code == "MARKET_HISTORY_UNAVAILABLE"
+
+    sixth = asyncio.run(analyze_market_candidate(context, "ADAUSDT"))
+    retry = asyncio.run(analyze_market_candidate(context, "BTCUSDT"))
+
+    assert sixth.code == "RESEARCH_SCOPE_EXCEEDED"
+    assert retry.code == "MARKET_HISTORY_UNAVAILABLE"
+    assert gateway.history_calls == [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "BNBUSDT",
+        "XRPUSDT",
+    ]
+
+
+def test_research_plan_cannot_be_replaced_during_one_run() -> None:
+    context = _context()
+    first = stage_market_research_plan(context, _research_plan())
+    second = stage_market_research_plan(context, _research_plan(candidate_limit=6))
+
+    assert isinstance(first, MarketResearchPlan)
+    assert isinstance(second, ToolDataError)
+    assert second.code == "RESEARCH_PLAN_ALREADY_SET"
+    assert context.research_plan == first
+
+
 def test_research_finalization_requires_two_verified_candidates() -> None:
     context = _context()
     stage_market_research_plan(context, _research_plan())
@@ -478,6 +522,24 @@ def test_research_finalization_requires_two_verified_candidates() -> None:
 
     assert isinstance(result, ToolDataError)
     assert result.code == "RESEARCH_INCOMPLETE"
+
+
+def test_finalized_research_cannot_be_mutated_and_refinalization_is_idempotent() -> None:
+    context = _context()
+    stage_market_research_plan(context, _research_plan())
+    asyncio.run(scan_market_candidates(context))
+    asyncio.run(analyze_market_candidate(context, "BTCUSDT"))
+    asyncio.run(analyze_market_candidate(context, "ETHUSDT"))
+    first = finalize_market_research(context)
+
+    late = asyncio.run(analyze_market_candidate(context, "SOLUSDT"))
+    second = finalize_market_research(context)
+
+    assert isinstance(first, MarketResearchResult)
+    assert isinstance(late, ToolDataError)
+    assert late.code == "RESEARCH_FINALIZED"
+    assert second is first
+    assert context.market_research_results == [first]
 
 
 def test_trade_proposal_requires_fresh_observations() -> None:
