@@ -103,6 +103,16 @@ def test_market_reader_stores_only_successful_normalized_observation() -> None:
     assert context.market_by_symbol == {"BTCUSDT": result}
 
 
+def test_market_reader_converts_asset_to_usdt_pair() -> None:
+    context = _context()
+
+    result = asyncio.run(read_market_data(context, "BTC"))
+
+    assert isinstance(result, MarketData)
+    assert result.symbol == "BTCUSDT"
+    assert context.market_by_symbol == {"BTCUSDT": result}
+
+
 def test_market_reader_sanitizes_gateway_error() -> None:
     context = _context()
     context.gateway.market_result = MarketDataError(
@@ -115,6 +125,16 @@ def test_market_reader_sanitizes_gateway_error() -> None:
     assert isinstance(result, ToolDataError)
     assert "private CLI output" not in result.message
     assert context.market_by_symbol == {}
+
+
+def test_market_reader_skips_usdt_self_pair_without_failing_the_run() -> None:
+    context = _context()
+
+    result = asyncio.run(read_market_data(context, "USDTUSDT"))
+
+    assert result.status == "NOT_REQUIRED"
+    assert context.market_by_symbol == {}
+    assert context.data_errors == []
 
 
 def test_policy_update_is_staged_without_external_store() -> None:

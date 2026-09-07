@@ -49,6 +49,13 @@ class ToolDataError(BaseModel):
     message: str
 
 
+class ToolDataNotRequired(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    status: Literal["NOT_REQUIRED"] = "NOT_REQUIRED"
+    message: str
+
+
 class MissingObservations(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -177,23 +184,36 @@ async def read_portfolio(
     return portfolio
 
 
-async def read_market_data(
-    context: SentinelRunContext,
-    symbol: str,
-) -> MarketData | ToolDataError:
+def normalize_usdt_market(symbol: str) -> str | None:
     normalized = symbol.strip().upper()
     if not normalized:
         raise ValueError("Market symbol must not be empty.")
+    if normalized in {"USDT", "USDTUSDT"}:
+        return None
+    if normalized.endswith("USDT"):
+        return normalized
+    return f"{normalized}USDT"
+
+
+async def read_market_data(
+    context: SentinelRunContext,
+    symbol: str,
+) -> MarketData | ToolDataError | ToolDataNotRequired:
+    market_symbol = normalize_usdt_market(symbol)
+    if market_symbol is None:
+        return ToolDataNotRequired(
+            message="USDT is the quote currency; no USDT/USDT market exists or is required."
+        )
 
     try:
-        result = await context.gateway.get_market_data(normalized)
+        result = await context.gateway.get_market_data(market_symbol)
     except asyncio.CancelledError:
         raise
     except (RuntimeError, ValueError):
         result = MarketDataError(symbol=normalized, error="gateway failure")
 
     if isinstance(result, MarketDataError):
-        message = f"Market data could not be verified for {normalized}."
+        message = f"Market data could not be verified for {market_symbol}."
         context.data_errors.append(message)
         return ToolDataError(code="MARKET_UNAVAILABLE", message=message)
 
@@ -355,7 +375,7 @@ async def get_portfolio(
 async def get_market_data(
     ctx: RunContextWrapper[SentinelRunContext],
     symbol: str,
-) -> MarketData | ToolDataError:
+) -> MarketData | ToolDataError | ToolDataNotRequired:
     """Read trusted Binance Demo market data for a pair such as BTCUSDT."""
     return await read_market_data(ctx.context, symbol)
 
