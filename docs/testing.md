@@ -16,6 +16,9 @@ Kiểm tra model và pure service:
 - policy violations;
 - rebalance arithmetic;
 - RiskEngine priority.
+- research-plan bounds và candidate filtering;
+- deterministic kline indicators;
+- Agent không được kết luận khi research chưa finalize.
 
 Unit test không được:
 
@@ -38,6 +41,8 @@ Khi FastAPI được thêm, integration test kiểm tra:
 - Binance CLI payload mapping bằng fixture đã loại dữ liệu nhạy cảm;
 - read-only allow-list;
 - error path không fallback sang mock.
+- SSE research activity và typed `market_research` response;
+- UI evidence không chứa raw candles hoặc secrets.
 
 Fake chỉ mô phỏng boundary, không mô phỏng lại business logic.
 
@@ -124,3 +129,10 @@ estimated slippage 0.05%
 ```
 
 Không copy credential, account ID hoặc Binance response chưa làm sạch vào fixture.
+
+Research fixtures phải dùng timestamp cố định, ít nhất 20 candles và `Decimal`
+từ string. Gateway tests chỉ fake kết quả CLI; chúng phải xác nhận batching tối
+đa 100 symbol, kline limit tối đa 1.000 và không thực thi process/network thật.
+
+Không test bằng lệnh order thật. Luồng approval/execution luôn dùng fake gateway;
+pytest không được phụ thuộc vào Binance Demo balance hoặc trạng thái thị trường.

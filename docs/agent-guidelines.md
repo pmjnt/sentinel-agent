@@ -23,11 +23,16 @@ view_policy()
 update_investor_profile(changes)
 view_investor_profile()
 evaluate_portfolio_risk(focus_symbols)
+propose_trade(symbol, side, quote_usd, reason)
+set_market_research_plan(candidate_limit, timeframes, lookback_days, priorities)
+scan_top_markets()
+analyze_market_history(symbol)
+finalize_market_research()
 ```
 
-Không thêm `place_order`, `trade`, `transfer`, `withdraw`, generic CLI hoặc URL
-tool vào Agent. Nếu sau này có execution, một workflow riêng phải kiểm tra plan,
-RiskEngine và explicit user approval trước khi gọi execution adapter.
+Không thêm `place_order`, `execute`, `transfer`, `withdraw`, generic CLI hoặc URL
+tool vào Agent. `propose_trade` chỉ tạo plan. Execution adapter nằm ngoài LLM,
+chỉ chạy sau RiskEngine, explicit UI approval và revalidation.
 
 ## Vòng lặp bắt buộc cho phân tích
 
@@ -50,6 +55,26 @@ Agent đọc dữ liệu hoặc nhận yêu cầu tài chính nhưng dừng trư
 OpenAI Agents SDK thực hiện loop: gửi prompt và tool schemas cho model, chạy tool
 mà model chọn, trả result vào conversation, rồi gọi model lại. Vì vậy LLM thật
 sự quan sát dữ liệu giữa các bước; nó không chỉ biến JSON thành văn bản.
+
+## Vòng nghiên cứu thị trường thích ứng
+
+```text
+1. LLM chọn recipe bằng set_market_research_plan
+2. scan_top_markets xếp hạng Spot USDT theo quote volume đã xác minh
+3. LLM chọn ít nhất 2 candidate trong scan để analyze_market_history
+4. Python tính indicator cho từng timeframe
+5. finalize_market_research đóng gói evidence so sánh
+6. LLM đưa ra nhận định và lựa chọn ưu tiên của riêng Sentinel
+```
+
+Recipe bị giới hạn: 3–10 candidate, 1–2 timeframe, 1–90 ngày, 20–1.000
+candle/timeframe và tối đa 5 deep analyses. LLM không được phân tích symbol ngoài
+scan, gọi CLI tùy ý hoặc tự tính authoritative indicator. High volume chỉ là bộ
+lọc thanh khoản, không tự động có nghĩa là cơ hội tốt.
+
+Runtime từ chối final answer nếu Agent đã bắt đầu research nhưng chưa
+`finalize_market_research`. Ít nhất hai candidate thành công mới được so sánh.
+Lỗi một candidate được ghi nhận; lỗi scan bắt buộc làm request fail-closed.
 
 ## Policy qua chat
 
@@ -79,8 +104,8 @@ Agent phải biết tối thiểu mục tiêu, thời hạn và risk tolerance/a
 - Chỉ map semantic tool event nằm trong allowlist sang timeline.
 - Không gửi raw tool args/result, prompt, chain-of-thought hoặc secret.
 - Text của model được buffer đến khi safety validation thành công.
-- SSE `completed` trả policy, profile, analysis, activity và
-  `execution_status=NOT_EXECUTED` dưới dạng JSON typed.
+- SSE `completed` trả policy, profile, analysis, market research, activity và
+  execution state dưới dạng JSON typed.
 - Agent Pulse chỉ hiển thị các activity trên; đây không phải chain-of-thought.
 
 ## Chọn model an toàn
@@ -109,6 +134,10 @@ Python render trước:
 LLM chỉ viết phần có nhãn `AI interpretation`. Output định tính không được tự
 tuyên bố formal status hoặc đã thực thi. Những từ reserved đó bị validator chặn.
 
+Response không bắt buộc `Assessment / Rationale / Recommendation / Limitations`.
+LLM chọn cấu trúc tự nhiên phù hợp, nhưng mọi nhận định tài chính phải dựa trên
+analysis hoặc finalized research đã xác minh.
+
 ## Model và độ ổn định
 
 - Mọi Agent dùng `build_agent_model_settings()`.
@@ -126,3 +155,5 @@ tuyên bố formal status hoặc đã thực thi. Những từ reserved đó b�
 - Error có fail-closed và không rò secret không?
 - Policy update có chỉ commit sau lượt chạy thành công không?
 - Behavior mới có unit/integration test không gọi mạng không?
+- Research có được finalize và giữ raw candles ở backend không?
+- Recommendation có bị nhầm thành approval hoặc execution không?

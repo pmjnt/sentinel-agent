@@ -21,11 +21,12 @@ Python renders authoritative facts; the same LLM adds qualitative interpretation
 The LLM is not authoritative for arithmetic, thresholds, permissions, approval,
 or trade execution.
 
-The Agent can call exactly eight tools: `get_portfolio`, `get_market_data`,
-`update_policy`, `view_policy`, `update_investor_profile`,
-`view_investor_profile`, `evaluate_portfolio_risk`, and `propose_trade`. The last
-tool only creates a pending plan. There is no order-execution, transfer,
-withdrawal, or generic CLI tool available to the LLM.
+The Agent can call exactly twelve controlled tools. Eight cover portfolio,
+policy, profile, risk evaluation, and proposal; four cover adaptive market
+research: `set_market_research_plan`, `scan_top_markets`,
+`analyze_market_history`, and `finalize_market_research`. `propose_trade` only
+creates a pending plan. There is no order-execution, transfer, withdrawal,
+generic CLI, URL, or arbitrary-code tool available to the LLM.
 
 ## Policy-driven agent loop
 
@@ -76,10 +77,36 @@ The investor profile stores only preferences explicitly stated in chat:
 objective, time horizon, risk tolerance, acceptable loss, liquidity need, and
 excluded assets. It is neither portfolio data nor permission to trade.
 
-After a successful analysis, the LLM presents Assessment, Rationale,
-Recommendation, and Limitations in the user's language. Concrete asset or
-percentage allocations require the user's objective, time horizon, and risk
-tolerance; otherwise Sentinel asks a focused clarification question.
+After successful analysis, the LLM chooses a natural response structure in the
+user's language. It may use short paragraphs, headings, bullets, or numbered
+choices; fixed headings are not required. Concrete asset or percentage
+allocations require the user's objective, time horizon, and risk
+tolerance/acceptable loss.
+
+## Adaptive Binance market research
+
+For opportunity, allocation-candidate, or market-comparison requests, the LLM
+chooses a bounded research recipe based on the user's goal: candidate count,
+one or two timeframes, lookback, and priorities such as momentum, liquidity,
+downside control, or volatility opportunity. Pydantic rejects recipes outside
+these limits:
+
+- 3–10 candidates in the volume scan;
+- 1–2 timeframes from `15m`, `1h`, `4h`, and `1d`;
+- 1–90 lookback days and 20–1,000 candles per timeframe;
+- no more than five candidates receive deep historical analysis;
+- at least two successful analyses are required before comparison.
+
+Python retrieves the eligible Binance Spot USDT universe, ranks it by verified
+quote volume, and calculates return, trend, realized volatility, maximum
+drawdown, and volume change from klines. The LLM reads those summaries, chooses
+which scanned candidates deserve deeper inspection, compares the evidence, and
+states Sentinel's preferred option. It may disagree with the user's initial
+idea, but it cannot fabricate indicators or analyze an unscanned token.
+
+Research is fresh run-scoped evidence, not permanent truth. The scan carries a
+Binance observation timestamp. Raw candles stay on the backend and are never
+shown in activity events or sent to the browser.
 
 To keep sequential tool use bounded, one request may inspect at most 20 market
 symbols. Larger scopes fail closed and should be split into smaller requests.
@@ -226,6 +253,9 @@ spot ticker-price
 spot ticker24hr --symbol <validated symbol>
 spot depth --symbol <validated symbol> --limit 100
 spot exchange-info --symbol <validated symbol> --show-permission-sets false
+spot exchange-info --symbol-status TRADING --show-permission-sets false
+spot ticker24hr --symbols <validated JSON batch, at most 100> --type FULL
+spot klines --symbol <scanned symbol> --interval <validated timeframe> --limit <1..1000>
 ```
 
 When Demo execution is explicitly enabled, the separate execution service may
@@ -276,6 +306,12 @@ The plan ID becomes Binance's client order ID, so retrying an already completed
 approval returns the saved result instead of submitting another order. Automated
 tests always use fake gateways and never send orders.
 
+A recommendation is not approval. Research may recommend an asset and
+`propose_trade` may create a plan, but neither sends an order. Approval must come
+from the dedicated UI action. Execution then re-reads and re-validates market,
+balance, symbol, policy, expiry, and risk conditions before the separate
+execution gateway can submit one Binance Demo order.
+
 ## Run
 
 ```bash
@@ -301,6 +337,12 @@ Try general chat:
 Sentinel > Xin chào.
 ```
 
+Try adaptive research:
+
+```text
+Sentinel > Scan the strongest Binance markets for 1-month growth and compare the best options.
+```
+
 Policy and short conversation history are kept per console session in memory
 and are lost when the process stops.
 
@@ -322,7 +364,7 @@ The endpoint emits named SSE events:
 ```text
 activity   → safe STARTED/COMPLETED tool progress
 text_delta → validated AI interpretation chunks
-completed  → typed JSON with policy, profile, analysis, activity, execution state
+completed  → typed JSON with policy, profile, analysis, market research, activity, execution state
 error      → generic safe failure message
 ```
 
@@ -333,6 +375,10 @@ activity appears live while answer chunks begin after validation.
 Each assistant response owns a small collapsible **Agent Pulse**. It shows only
 safe tool/activity status from the backend; it is not model reasoning or hidden
 chain-of-thought.
+
+Completed research also appears in the collapsible **Verified tool facts** panel:
+plan, scan time, quote-volume candidates, deterministic indicators, and failed
+symbols. The UI maps this typed data directly and never parses LLM prose as facts.
 
 When the Agent creates a valid proposal, the response also includes a compact
 Demo order card. **Approve Demo order** and **Reject** call dedicated endpoints;
