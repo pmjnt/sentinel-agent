@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 
 
 class SpotBalancePayload(BaseModel):
@@ -49,6 +49,45 @@ class Ticker24hPayload(BaseModel):
     @classmethod
     def normalize_symbol(cls, value: str) -> str:
         return value.strip().upper()
+
+
+class BulkTicker24hPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    symbol: str
+    last_price: Decimal = Field(alias="lastPrice", gt=0)
+    price_change_percent: Decimal = Field(alias="priceChangePercent")
+    quote_volume: Decimal = Field(alias="quoteVolume", ge=0)
+    close_time: int = Field(alias="closeTime", ge=0)
+
+    @field_validator("symbol")
+    @classmethod
+    def normalize_symbol(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not normalized:
+            raise ValueError("Ticker symbol must not be empty.")
+        return normalized
+
+
+class KlinePayload(
+    RootModel[
+        tuple[
+            int,
+            Decimal,
+            Decimal,
+            Decimal,
+            Decimal,
+            Decimal,
+            int,
+            Decimal,
+            int,
+            Decimal,
+            Decimal,
+            str,
+        ]
+    ]
+):
+    pass
 
 
 class DepthPayload(BaseModel):

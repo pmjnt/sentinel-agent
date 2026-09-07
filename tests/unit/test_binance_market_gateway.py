@@ -1,12 +1,15 @@
 import asyncio
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from decimal import Decimal
+import json
 from typing import Any
 
 import pytest
 
 from app.binance.gateway import (
     BinanceCliGateway,
+    BinanceDataError,
     classify_volatility,
     estimate_sell_slippage,
 )
@@ -15,6 +18,7 @@ from app.config import BinanceEnvironment
 from app.models.market import MarketData, MarketDataError, Volatility
 from app.models.source import DataSource
 from app.models.symbol import TradingSymbolInfo, TradingSymbolInfoError
+from app.models.research import ResearchTimeframe
 
 
 class FakeRunner:
@@ -60,6 +64,152 @@ EXCHANGE_INFO_FIXTURE = {
         }
     ]
 }
+
+
+def _exchange_symbol(symbol: str, *, quote: str = "USDT", status: str = "TRADING"):
+    base = symbol.removesuffix(quote)
+    return {
+        "symbol": symbol,
+        "status": status,
+        "baseAsset": base,
+        "quoteAsset": quote,
+        "orderTypes": ["LIMIT", "MARKET"],
+        "isSpotTradingAllowed": True,
+        "quoteOrderQtyMarketAllowed": True,
+    }
+
+
+def _bulk_ticker(symbol: str, volume: str, close_time: int = 1788778799999):
+    return {
+        "symbol": symbol,
+        "lastPrice": "100",
+        "priceChangePercent": "2.5",
+        "quoteVolume": volume,
+        "closeTime": close_time,
+    }
+
+
+def test_market_universe_uses_verified_spot_usdt_symbols_and_bulk_tickers() -> None:
+    exchange = {
+        "symbols": [
+            _exchange_symbol("BTCUSDT"),
+            _exchange_symbol("ETHUSDT"),
+            _exchange_symbol("BNBBTC", quote="BTC"),
+            _exchange_symbol("SOLUSDT", status="BREAK"),
+        ]
+    }
+    runner = FakeRunner(
+        [exchange, [_bulk_ticker("BTCUSDT", "500"), _bulk_ticker("ETHUSDT", "300")]]
+    )
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+
+    result = asyncio.run(gateway.get_market_universe())
+
+    assert [ticker.symbol for ticker in result] == ["BTCUSDT", "ETHUSDT"]
+    assert result[0].quote_volume == Decimal("500")
+    assert result[0].observed_at == datetime.fromtimestamp(
+        1788778799999 / 1000, tz=UTC
+    )
+    assert runner.calls[0] == (
+        (
+            "spot",
+            "exchange-info",
+            "--symbol-status",
+            "TRADING",
+            "--show-permission-sets",
+            "false",
+        ),
+        False,
+    )
+    assert runner.calls[1][0] == (
+        "spot",
+        "ticker24hr",
+        "--symbols",
+        json.dumps(["BTCUSDT", "ETHUSDT"], separators=(",", ":")),
+        "--type",
+        "FULL",
+    )
+
+
+def test_market_universe_batches_at_most_one_hundred_symbols() -> None:
+    symbols = [f"A{index:03}USDT" for index in range(101)]
+    exchange = {"symbols": [_exchange_symbol(symbol) for symbol in symbols]}
+    runner = FakeRunner(
+        [
+            exchange,
+            [_bulk_ticker(symbol, "1") for symbol in symbols[:100]],
+            [_bulk_ticker(symbols[100], "1")],
+        ]
+    )
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+
+    result = asyncio.run(gateway.get_market_universe())
+
+    ticker_calls = [call for call in runner.calls if call[0][1] == "ticker24hr"]
+    assert len(result) == 101
+    assert len(ticker_calls) == 2
+    assert len(json.loads(ticker_calls[0][0][3])) == 100
+    assert len(json.loads(ticker_calls[1][0][3])) == 1
+
+
+def test_maps_binance_kline_array_to_market_candle() -> None:
+    runner = FakeRunner(
+        [
+            [
+                [
+                    1788771600000,
+                    "100",
+                    "110",
+                    "90",
+                    "105",
+                    "12",
+                    1788775199999,
+                    "1250",
+                    100,
+                    "6",
+                    "625",
+                    "0",
+                ]
+            ]
+        ]
+    )
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+
+    result = asyncio.run(
+        gateway.get_market_candles("BTCUSDT", ResearchTimeframe.H4, 180)
+    )
+
+    assert len(result) == 1
+    assert result[0].close == Decimal("105")
+    assert result[0].quote_volume == Decimal("1250")
+    assert runner.calls == [
+        (
+            (
+                "spot",
+                "klines",
+                "--symbol",
+                "BTCUSDT",
+                "--interval",
+                "4h",
+                "--limit",
+                "180",
+            ),
+            False,
+        )
+    ]
+
+
+@pytest.mark.parametrize("limit", [0, 1001])
+def test_kline_limit_is_rejected_before_cli(limit: int) -> None:
+    runner = FakeRunner([])
+    gateway = BinanceCliGateway(runner, BinanceEnvironment.DEMO)
+
+    with pytest.raises(BinanceDataError, match="limit"):
+        asyncio.run(
+            gateway.get_market_candles("BTCUSDT", ResearchTimeframe.H1, limit)
+        )
+
+    assert runner.calls == []
 
 
 def test_maps_verified_spot_symbol_info() -> None:

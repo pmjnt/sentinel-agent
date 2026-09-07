@@ -1,4 +1,6 @@
 from decimal import Decimal
+from datetime import UTC, datetime
+import json
 import logging
 import re
 from typing import Any
@@ -7,8 +9,10 @@ from pydantic import TypeAdapter, ValidationError
 
 from app.binance.runner import BinanceCliError, JsonCommandRunner
 from app.binance.schemas import (
+    BulkTicker24hPayload,
     DepthPayload,
     ExchangeInfoPayload,
+    KlinePayload,
     PriceTickerPayload,
     SpotAccountPayload,
     SpotOrderPayload,
@@ -25,6 +29,7 @@ from app.models.symbol import (
     TradingSymbolInfoError,
     TradingSymbolInfoResult,
 )
+from app.models.research import MarketCandle, MarketTicker, ResearchTimeframe
 from app.services.portfolio_service import calculate_portfolio
 from app.services.trade_universe_service import (
     TradeUniverseError,
@@ -37,6 +42,8 @@ class BinanceDataError(RuntimeError):
 
 
 _PRICE_TICKERS = TypeAdapter(list[PriceTickerPayload])
+_BULK_TICKERS = TypeAdapter(list[BulkTicker24hPayload])
+_KLINES = TypeAdapter(list[KlinePayload])
 _MARKET_SYMBOL = re.compile(r"^[A-Z0-9]{5,20}$")
 _REFERENCE_TRADE_USD = Decimal("1000")
 LOGGER = logging.getLogger(__name__)
@@ -250,6 +257,101 @@ class BinanceCliGateway:
             quote_order_qty_market_allowed=info.quote_order_qty_market_allowed,
         )
 
+    async def get_market_universe(self) -> tuple[MarketTicker, ...]:
+        try:
+            exchange_raw = await self._run_public_market_read(
+                [
+                    "spot",
+                    "exchange-info",
+                    "--symbol-status",
+                    "TRADING",
+                    "--show-permission-sets",
+                    "false",
+                ],
+                "MARKET_UNIVERSE",
+            )
+            exchange = ExchangeInfoPayload.model_validate(exchange_raw)
+            symbols = sorted(
+                info.symbol
+                for info in exchange.symbols
+                if _is_eligible_spot_usdt_symbol(info)
+            )
+            if not symbols:
+                raise ValueError("Binance returned no eligible Spot USDT symbols.")
+
+            tickers: list[MarketTicker] = []
+            for start in range(0, len(symbols), 100):
+                batch = symbols[start:start + 100]
+                ticker_raw = await self._run_public_market_read(
+                    [
+                        "spot",
+                        "ticker24hr",
+                        "--symbols",
+                        json.dumps(batch, separators=(",", ":")),
+                        "--type",
+                        "FULL",
+                    ],
+                    "MARKET_UNIVERSE",
+                )
+                payloads = _BULK_TICKERS.validate_python(ticker_raw)
+                if {payload.symbol for payload in payloads} != set(batch):
+                    raise ValueError("Binance ticker batch did not match the request.")
+                tickers.extend(
+                    MarketTicker(
+                        symbol=payload.symbol,
+                        price=payload.last_price,
+                        change_24h_percent=payload.price_change_percent,
+                        quote_volume=payload.quote_volume,
+                        observed_at=datetime.fromtimestamp(
+                            payload.close_time / 1000,
+                            tz=UTC,
+                        ),
+                    )
+                    for payload in payloads
+                )
+            return tuple(tickers)
+        except (BinanceCliError, ValidationError, ValueError) as error:
+            raise BinanceDataError(
+                "Binance market universe could not be verified."
+            ) from error
+
+    async def get_market_candles(
+        self,
+        symbol: str,
+        timeframe: ResearchTimeframe,
+        limit: int,
+    ) -> tuple[MarketCandle, ...]:
+        normalized = symbol.strip().upper()
+        if _MARKET_SYMBOL.fullmatch(normalized) is None:
+            raise BinanceDataError("Market candle symbol format is invalid.")
+        if not isinstance(timeframe, ResearchTimeframe):
+            raise BinanceDataError("Market candle timeframe is invalid.")
+        if limit < 1 or limit > 1000:
+            raise BinanceDataError("Market candle limit must be between 1 and 1,000.")
+
+        try:
+            raw = await self._run_public_market_read(
+                [
+                    "spot",
+                    "klines",
+                    "--symbol",
+                    normalized,
+                    "--interval",
+                    timeframe.value,
+                    "--limit",
+                    str(limit),
+                ],
+                normalized,
+            )
+            payloads = _KLINES.validate_python(raw)
+            if not payloads:
+                raise ValueError("Binance returned no market candles.")
+            return tuple(_market_candle(payload) for payload in payloads)
+        except (BinanceCliError, ValidationError, ValueError) as error:
+            raise BinanceDataError(
+                f"Binance market candles could not be verified for {normalized}."
+            ) from error
+
     async def _run_public_market_read(
         self,
         arguments: list[str],
@@ -352,6 +454,51 @@ def _execution_result(payload: SpotOrderPayload) -> OrderExecutionResult:
         client_order_id=payload.client_order_id,
         symbol=payload.symbol,
         status=payload.status,
+    )
+
+
+def _is_eligible_spot_usdt_symbol(info: Any) -> bool:
+    try:
+        require_trade_eligibility(
+            TradingSymbolInfo(
+                symbol=info.symbol,
+                status=info.status,
+                base_asset=info.base_asset,
+                quote_asset=info.quote_asset,
+                order_types=info.order_types,
+                is_spot_trading_allowed=info.is_spot_trading_allowed,
+                quote_order_qty_market_allowed=info.quote_order_qty_market_allowed,
+            )
+        )
+    except (TradeUniverseError, ValidationError):
+        return False
+    return True
+
+
+def _market_candle(payload: KlinePayload) -> MarketCandle:
+    (
+        open_time,
+        open_price,
+        high,
+        low,
+        close,
+        volume,
+        close_time,
+        quote_volume,
+        _trade_count,
+        _taker_buy_volume,
+        _taker_buy_quote_volume,
+        _unused,
+    ) = payload.root
+    return MarketCandle(
+        open_time=datetime.fromtimestamp(open_time / 1000, tz=UTC),
+        close_time=datetime.fromtimestamp(close_time / 1000, tz=UTC),
+        open=open_price,
+        high=high,
+        low=low,
+        close=close,
+        volume=volume,
+        quote_volume=quote_volume,
     )
 
 

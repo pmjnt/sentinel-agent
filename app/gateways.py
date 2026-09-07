@@ -6,6 +6,7 @@ from app.models.portfolio import Portfolio
 from app.models.execution import OrderExecutionResult
 from app.models.trade import TradeSide
 from app.models.symbol import TradingSymbolInfoResult
+from app.models.research import MarketCandle, MarketTicker, ResearchTimeframe
 
 
 class PortfolioMarketGateway(Protocol):
@@ -14,6 +15,15 @@ class PortfolioMarketGateway(Protocol):
     async def get_market_data(self, symbol: str) -> MarketDataResult: ...
 
     async def get_symbol_info(self, symbol: str) -> TradingSymbolInfoResult: ...
+
+    async def get_market_universe(self) -> tuple[MarketTicker, ...]: ...
+
+    async def get_market_candles(
+        self,
+        symbol: str,
+        timeframe: ResearchTimeframe,
+        limit: int,
+    ) -> tuple[MarketCandle, ...]: ...
 
 
 class DemoExecutionGateway(PortfolioMarketGateway, Protocol):
