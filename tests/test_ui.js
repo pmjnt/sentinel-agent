@@ -100,6 +100,32 @@ test("parses headings, bullet lists, and paragraphs for safe rendering", () => {
   );
 });
 
+test("splits inline numbered choices into an ordered list", () => {
+  assert.deepEqual(
+    parseMarkdownBlocks(
+      "So sánh nhanh: 1. ETH: cân bằng 2. BTC: an toàn 3. SOL: biến động",
+    ),
+    [
+      { type: "paragraph", text: "So sánh nhanh:" },
+      {
+        type: "ordered-list",
+        items: [
+          "ETH: cân bằng",
+          "BTC: an toàn",
+          "SOL: biến động",
+        ],
+      },
+    ],
+  );
+});
+
+test("keeps decimal values as paragraph text", () => {
+  assert.deepEqual(
+    parseMarkdownBlocks("Lợi nhuận 1.5% trong 2.5 năm."),
+    [{ type: "paragraph", text: "Lợi nhuận 1.5% trong 2.5 năm." }],
+  );
+});
+
 test("parses inline bold markers without using HTML", () => {
   assert.deepEqual(parseInlineMarkdown("Tổng: **9,999 USDT**."), [
     { type: "text", text: "Tổng: " },
@@ -134,12 +160,14 @@ test("formats backend activity without exposing implementation data", () => {
 
 test("page uses the chat-first Agent Pulse shell", () => {
   const html = readFileSync(join(__dirname, "../web/index.html"), "utf8");
+  const styles = readFileSync(join(__dirname, "../web/styles.css"), "utf8");
 
   assert.match(html, /id="model-trigger"/);
   assert.match(html, /id="model-menu"/);
   assert.match(html, /id="chat-thread"/);
   assert.match(html, /id="chat-composer"/);
   assert.doesNotMatch(html, /desk-grid|Analysis Request|Tool Evidence/);
+  assert.match(styles, /\.response-body ul,\s*\.response-body ol/);
 });
 
 test("user turns do not render a redundant You label", () => {

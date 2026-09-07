@@ -84,10 +84,9 @@ def test_tool_loop_instructions_require_grounded_advice() -> None:
     instructions = create_tool_loop_agent(_settings()).instructions
 
     assert isinstance(instructions, str)
-    assert "Assessment" in instructions
-    assert "Rationale" in instructions
-    assert "Recommendation" in instructions
-    assert "Limitations" in instructions
+    assert "Choose a natural response structure" in instructions
+    assert "organize your response with localized headings" not in instructions
+    assert "Disclose material uncertainty" in instructions
     assert "objective, time horizon, and acceptable loss" in instructions
     assert "ask one concise clarification question" in instructions
     assert "Never expose hidden chain-of-thought" in instructions

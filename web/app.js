@@ -56,10 +56,36 @@ function reduceActivity(current, event) {
   return [...next, { ...event }];
 }
 
+function splitInlineOrderedList(text) {
+  const markerPattern = /(^|\s)(\d+)\.\s+/g;
+  const markers = [];
+  let match = markerPattern.exec(text);
+  while (match) {
+    markers.push({
+      number: Number(match[2]),
+      markerStart: match.index + match[1].length,
+      contentStart: markerPattern.lastIndex,
+    });
+    match = markerPattern.exec(text);
+  }
+
+  if (markers.length < 2 || markers[0].number !== 1) return null;
+  if (!markers.every((marker, index) => marker.number === index + 1)) return null;
+
+  return {
+    prefix: text.slice(0, markers[0].markerStart).trim(),
+    items: markers.map((marker, index) => {
+      const end = markers[index + 1]?.markerStart ?? text.length;
+      return text.slice(marker.contentStart, end).trim();
+    }),
+  };
+}
+
 function parseMarkdownBlocks(markdown) {
   const blocks = [];
   let paragraph = [];
   let listItems = [];
+  let orderedItems = [];
 
   const flushParagraph = () => {
     if (paragraph.length) {
@@ -73,18 +99,28 @@ function parseMarkdownBlocks(markdown) {
       listItems = [];
     }
   };
+  const flushOrderedList = () => {
+    if (orderedItems.length) {
+      blocks.push({ type: "ordered-list", items: orderedItems });
+      orderedItems = [];
+    }
+  };
 
   String(markdown).replaceAll("\r\n", "\n").split("\n").forEach((line) => {
     const trimmed = line.trim();
     const heading = /^(#{1,3})\s+(.+)$/.exec(trimmed);
     const bullet = /^[-*]\s+(.+)$/.exec(trimmed);
+    const numbered = /^(\d+)\.\s+(.+)$/.exec(trimmed);
+    const inlineOrdered = splitInlineOrderedList(trimmed);
 
     if (!trimmed) {
       flushParagraph();
       flushList();
+      flushOrderedList();
     } else if (heading) {
       flushParagraph();
       flushList();
+      flushOrderedList();
       blocks.push({
         type: "heading",
         level: heading[1].length,
@@ -92,14 +128,36 @@ function parseMarkdownBlocks(markdown) {
       });
     } else if (bullet) {
       flushParagraph();
+      flushOrderedList();
       listItems.push(bullet[1]);
+    } else if (inlineOrdered) {
+      flushParagraph();
+      flushList();
+      flushOrderedList();
+      if (inlineOrdered.prefix) {
+        blocks.push({ type: "paragraph", text: inlineOrdered.prefix });
+      }
+      blocks.push({ type: "ordered-list", items: inlineOrdered.items });
+    } else if (numbered) {
+      flushParagraph();
+      flushList();
+      const number = Number(numbered[1]);
+      if (number === 1) flushOrderedList();
+      if (number === orderedItems.length + 1) {
+        orderedItems.push(numbered[2]);
+      } else {
+        flushOrderedList();
+        paragraph.push(trimmed);
+      }
     } else {
       flushList();
+      flushOrderedList();
       paragraph.push(trimmed);
     }
   });
   flushParagraph();
   flushList();
+  flushOrderedList();
   return blocks;
 }
 
@@ -350,8 +408,10 @@ function initializeApp() {
         const heading = document.createElement(block.level <= 2 ? "h2" : "h3");
         appendInline(heading, block.text);
         container.append(heading);
-      } else if (block.type === "list") {
-        const list = document.createElement("ul");
+      } else if (block.type === "list" || block.type === "ordered-list") {
+        const list = document.createElement(
+          block.type === "ordered-list" ? "ol" : "ul",
+        );
         block.items.forEach((text) => {
           const item = document.createElement("li");
           appendInline(item, text);
