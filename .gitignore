@@ -10,3 +10,4 @@ __pycache__/
 artifacts/demo/*.mov
 artifacts/demo/*.mp4
 artifacts/demo/*.png
+artifacts/demo/*.jpg
