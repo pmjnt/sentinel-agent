@@ -162,6 +162,30 @@ def test_tool_loop_instructions_require_grounded_advice() -> None:
     assert "willing to disagree" in instructions
 
 
+def test_tool_loop_instructions_allow_user_delegated_candidate_selection() -> None:
+    instructions = create_tool_loop_agent(_settings()).instructions
+
+    assert isinstance(instructions, str)
+    normalized = " ".join(instructions.split())
+    assert (
+        "When the user explicitly asks you to choose the preferred opportunity "
+        "and requests a concrete trade in the same message, your stated preference "
+        "satisfies the selection requirement."
+        in normalized
+    )
+    assert (
+        "Do not ask the user to select a symbol in that case; choose one from the "
+        "finalized research, refresh its market data, re-run deterministic risk "
+        "evaluation, and call propose_trade."
+        in normalized
+    )
+    assert (
+        "When deterministic risk allows the requested trade, you must call "
+        "propose_trade before writing your final response for that turn."
+        in normalized
+    )
+
+
 def test_tool_loop_input_contains_current_validated_policy() -> None:
     value = build_tool_loop_input(
         "Phân tích BTC.",

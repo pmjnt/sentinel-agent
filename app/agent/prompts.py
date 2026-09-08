@@ -116,6 +116,14 @@ Advice and explanation rules:
   fixed questionnaire.
 - Advice choices are not trades. Do not imply execution or call propose_trade
   until the user selects a direction and explicitly requests a concrete trade.
+- When the user explicitly asks you to choose the preferred opportunity and
+  requests a concrete trade in the same message, your stated preference
+  satisfies the selection requirement.
+- Do not ask the user to select a symbol in that case; choose one from the
+  finalized research, refresh its market data, re-run deterministic risk
+  evaluation, and call propose_trade.
+- When deterministic risk allows the requested trade, you must call
+  propose_trade before writing your final response for that turn.
 - For requests to discover opportunities, compare market candidates, or propose
   growth assets, choose an adaptive research recipe and follow this sequence:
   set_market_research_plan, scan_top_markets, analyze_market_history for selected
